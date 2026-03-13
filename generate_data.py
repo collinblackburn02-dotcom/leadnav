@@ -87,3 +87,15 @@ for col in ['GENDER', 'MARRIED', 'AGE_RANGE', 'NET_WORTH', 'INCOME_RANGE']:
 
 n8n_df.to_csv("n8n_enriched_sample.csv", index=False)
 print("✅ Created n8n_enriched_sample.csv (600 rows with messy data)")
+
+import os
+
+# Find your desktop automatically (works on Mac and Windows)
+desktop = os.path.join(os.path.expanduser("~"), "Desktop")
+
+# Save directly to the desktop
+shopify_df.to_csv(os.path.join(desktop, "shopify_orders_sample.csv"), index=False)
+print("✅ Created shopify_orders_sample.csv on your Desktop!")
+
+n8n_df.to_csv(os.path.join(desktop, "n8n_enriched_sample.csv"), index=False)
+print("✅ Created n8n_enriched_sample.csv on your Desktop!")
