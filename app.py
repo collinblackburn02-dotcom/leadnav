@@ -231,10 +231,28 @@ elif st.session_state.app_state == "dashboard":
         # 2. TOP PERFORMING DEMOGRAPHICS
         st.markdown("### 🏆 Top Performing Demographics")
         summary_cols = st.columns(len(dash_data['top_performers']))
+        
         for i, (label, data) in enumerate(dash_data['top_performers'].items()):
-            summary_cols[i].metric(label, str(data[0]), f"{data[1]:.1f}% of Revenue")
-
-        st.markdown("<hr>", unsafe_allow_html=True)
+            with summary_cols[i]:
+                # We use a custom HTML div to handle long strings like Income better than st.metric
+                st.markdown(f"""
+                    <div style="
+                        background-color: #FFFFFF; 
+                        border: 1px solid #E2E8F0; 
+                        border-radius: 12px; 
+                        padding: 15px; 
+                        text-align: center; 
+                        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+                        min-height: 120px;
+                        display: flex;
+                        flex-direction: column;
+                        justify-content: center;
+                    ">
+                        <p style="margin: 0; font-size: 0.8rem; color: #64748B; font-weight: 600; text-transform: uppercase;">{label}</p>
+                        <p style="margin: 5px 0; font-size: 1.1rem; color: #0F172A; font-weight: 700; line-height: 1.2;">{data[0]}</p>
+                        <p style="margin: 0; font-size: 0.85rem; color: #16A34A; background-color: #F0FDF4; border-radius: 20px; padding: 2px 8px; display: inline-block; align-self: center;">{data[1]:.1f}% of Revenue</p>
+                    </div>
+                """, unsafe_allow_html=True)
 
         # 3. SINGLE VARIABLE DEEP DIVE (Zero Lag UI)
         st.markdown("### 🔍 Audience Deep Dive")
