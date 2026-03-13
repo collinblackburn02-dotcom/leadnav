@@ -197,25 +197,31 @@ elif st.session_state.app_state == "dashboard":
         st.rerun()
         
     with c2:
-        selected_dates = st.slider(
-            "Filter by Purchase Date",
-            min_value=st.session_state.min_date,
-            max_value=st.session_state.max_date,
+        # 🚨 THE NEW UI: Calendar Date Picker instead of a Slider
+        selected_dates = st.date_input(
+            "Filter by Purchase Date Range",
             value=(st.session_state.current_start, st.session_state.current_end),
-            format="MMM DD, YYYY"
+            min_value=st.session_state.min_date,
+            max_value=st.session_state.max_date
         )
     
-    # 🚨 Core Engine Trigger: Only rebuild tables if the date slider actually moved
-    if (selected_dates[0] != st.session_state.current_start) or (selected_dates[1] != st.session_state.current_end) or ("dash_data" not in st.session_state):
-        st.session_state.current_start = selected_dates[0]
-        st.session_state.current_end = selected_dates[1]
-        st.session_state.dash_data = build_dashboard_views(
-            st.session_state.cleaned_orders, 
-            st.session_state.cleaned_n8n, 
-            selected_dates[0], 
-            selected_dates[1]
-        )
-    
+    # 🚨 Safety Catch: Wait until the user has clicked BOTH a start and end date
+    if len(selected_dates) == 2:
+        start_date, end_date = selected_dates
+        
+        # Only rebuild tables if the dates actually changed
+        if (start_date != st.session_state.current_start) or (end_date != st.session_state.current_end) or ("dash_data" not in st.session_state):
+            st.session_state.current_start = start_date
+            st.session_state.current_end = end_date
+            st.session_state.dash_data = build_dashboard_views(
+                st.session_state.cleaned_orders, 
+                st.session_state.cleaned_n8n, 
+                start_date, 
+                end_date
+            )
+    elif len(selected_dates) < 2:
+        st.info("📅 Please click a second date on the calendar to complete your range selection.")
+        
     dash_data = st.session_state.dash_data
 
     if not dash_data:
