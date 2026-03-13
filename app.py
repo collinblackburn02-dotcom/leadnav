@@ -79,7 +79,7 @@ def clean_n8n_data(df):
 
 @st.cache_data(show_spinner=False)
 def clean_orders_data(df):
-    """Standardizes the Shopify Orders"""
+    """Standardizes the Shopify Orders and scrubs $0 transactions"""
     # Auto-detect standard Shopify columns or fallback to our generated template
     email_col = next((c for c in df.columns if 'email' in c.lower()), 'Email')
     order_col = next((c for c in df.columns if 'name' in c.lower() or 'order' in c.lower()), 'Order ID')
@@ -88,12 +88,19 @@ def clean_orders_data(df):
     
     df = df.rename(columns={email_col: 'email_match', order_col: 'order_id', total_col: 'revenue_raw', date_col: 'order_date'})
     df['email_match'] = df['email_match'].astype(str).str.lower().str.strip()
+    
+    # Clean the currency string into a math-ready float
     df['revenue_raw'] = pd.to_numeric(df['revenue_raw'].astype(str).str.replace(r'[^\d.-]', '', regex=True), errors='coerce').fillna(0)
     
-    # 🚨 THE FIX: Bulletproof date handling for real Shopify timezone formats
+    # 🚨 THE NEW FIX: Drop any order that is $0.00 (spare parts, free replacements)
+    df = df[df['revenue_raw'] > 0]
+    
+    # Bulletproof date handling for real Shopify timezone formats
     df['order_date'] = pd.to_datetime(df['order_date'], errors='coerce', utc=True)
     df = df.dropna(subset=['order_date']) # Drop anything that failed to parse
     df['order_date'] = df['order_date'].dt.date # Safely extract just the YYYY-MM-DD
+    
+    return df.reset_index(drop=True)
     
     return df
 def build_dashboard_views(orders_df, enriched_df, start_date, end_date):
