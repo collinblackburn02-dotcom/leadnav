@@ -105,19 +105,16 @@ def clean_orders_data(df):
     return df
 def build_dashboard_views(orders_df, enriched_df, start_date, end_date):
     """Zero-Lag Engine: Filters dates, aggregates purchasers, and pre-renders HTML tables."""
-    # 1. Filter orders by selected date range
     mask = (orders_df['order_date'] >= start_date) & (orders_df['order_date'] <= end_date)
     filtered_orders = orders_df.loc[mask]
     
     if filtered_orders.empty: return None
 
-    # 2. Aggregation: Group by Email to create 1 "Purchaser" from multiple orders
     purchasers = filtered_orders.groupby('email_match').agg(
         revenue=('revenue_raw', 'sum'),
         order_count=('order_id', 'nunique')
     ).reset_index()
 
-    # 3. Merge: Match the aggregated purchasers with their n8n demographic data
     df_joined = pd.merge(purchasers, enriched_df, on='email_match', how='inner').reset_index(drop=True)
     if df_joined.empty: return None
 
@@ -128,6 +125,48 @@ def build_dashboard_views(orders_df, enriched_df, start_date, end_date):
     
     top_perf = {}
     all_html_views = {}
+
+    for label, col_key in summary_vars:
+        if col_key in df_joined.columns:
+            # 1. Create a clean subset for this specific variable
+            valid_rows = df_joined[~df_joined[col_key].astype(str).str.lower().isin(['unknown', 'nan', 'u', 'none', '00nan', '', 'null'])]
+            
+            if not valid_rows.empty:
+                # 🚨 FIXED CARD MATH: Denominator is sum of revenue for known values of THIS variable
+                var_specific_total_rev = valid_rows['revenue'].sum()
+                rs = valid_rows.groupby(col_key)['revenue'].sum()
+                
+                top_val = rs.idxmax()
+                top_pct = (rs.max() / var_specific_total_rev * 100) if var_specific_total_rev > 0 else 0
+                top_perf[label] = (top_val, top_pct)
+                
+                # 🚨 RESTORED TABLE LOGIC: 
+                grp = valid_rows.groupby(col_key).agg(
+                    Purchasers=('email_match', 'nunique'), 
+                    Revenue=('revenue', 'sum')
+                ).reset_index()
+                
+                grp['% of Buyers'] = (grp['Revenue'] / var_specific_total_rev) * 100
+                grp['Rev / Purchaser'] = (grp['Revenue'] / grp['Purchasers'])
+                
+                final_v = grp.rename(columns={col_key: label.upper()}).sort_values('Revenue', ascending=False)
+                if label == "Zip Code": final_v = final_v.head(100)
+                
+                styler = final_v.style.format({
+                    'Purchasers': '{:,.0f}', 
+                    'Revenue': '${:,.2f}', 
+                    '% of Buyers': '{:.1f}%', 
+                    'Rev / Purchaser': '${:,.2f}'
+                }).background_gradient(subset=['Revenue', '% of Buyers'], cmap=custom_light_green)
+                
+                all_html_views[label] = styler.hide(axis="index").to_html()
+
+    return {
+        "total_revenue": total_rev,
+        "total_buyers": total_buyers,
+        "top_performers": top_perf,
+        "html_views": all_html_views
+    }
 
 # 4. Pre-calculate all top performers and HTML tables
     for label, col_key in summary_vars:
