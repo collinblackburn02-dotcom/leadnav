@@ -72,7 +72,7 @@ def clean_n8n_data(df):
     
     # 🚨 Explode the comma-separated emails so any burner email matches the Shopify order
     if 'personal_emails' in df.columns:
-        df['email_match'] = df['personal_emails'].astype(str).str.lower().str.replace(r'[^a-z0-9@._-,]', '', regex=True).str.split(',')
+        df['email_match'] = df['personal_emails'].astype(str).str.lower().str.replace(r'[^a-z0-9@._,-]', '', regex=True).str.split(',')
         df = df.explode('email_match').reset_index(drop=True)
         df = df.drop_duplicates(subset=['email_match']).reset_index(drop=True)
     return df
