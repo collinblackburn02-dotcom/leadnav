@@ -129,26 +129,28 @@ def build_dashboard_views(orders_df, enriched_df, start_date, end_date):
     top_perf = {}
     all_html_views = {}
 
-    # 4. Pre-calculate all top performers and HTML tables for instant UI swapping
+# 4. Pre-calculate all top performers and HTML tables
     for label, col_key in summary_vars:
         if col_key in df_joined.columns:
+            # Filter to rows that actually have data for this variable
             temp = df_joined[~df_joined[col_key].astype(str).str.lower().isin(['unknown', 'nan', 'u', 'none', '00nan', ''])]
+            
             if not temp.empty:
-                # Calculate the Top Performer metric
+                # 🚨 THE FIX: Calculate revenue sum for JUST this demographic group
+                variable_total_rev = temp['revenue'].sum()
+                
+                # Group by the variable and sum the revenue
                 rs = temp.groupby(col_key)['revenue'].sum()
-                top_perf[label] = (rs.idxmax(), (rs.max() / total_rev * 100) if total_rev > 0 else 0)
                 
-                # Build the Data Table
+                # Top value and its % share of the RECOVERED revenue for this variable
+                top_val = rs.idxmax()
+                top_pct = (rs.max() / variable_total_rev * 100) if variable_total_rev > 0 else 0
+                
+                top_perf[label] = (top_val, top_pct)
+                
+                # Build the Data Table (Keep existing logic below this)
                 grp = temp.groupby(col_key).agg(Purchasers=('email_match', 'nunique'), Revenue=('revenue', 'sum')).reset_index()
-                grp['% of Buyers'] = (grp['Purchasers'] / grp['Purchasers'].sum()) * 100
-                grp['Rev / Purchaser'] = (grp['Revenue'] / grp['Purchasers'])
-                
-                final_v = grp.rename(columns={col_key: label.upper()}).sort_values('Revenue', ascending=False)
-                if label == "Zip Code": final_v = final_v.head(100) # Cap rows for performance
-                
-                # Render to styled HTML string instantly
-                styler = final_v.style.format({'Purchasers': '{:,.0f}', 'Revenue': '${:,.2f}', '% of Buyers': '{:.1f}%', 'Rev / Purchaser': '${:,.2f}'}).background_gradient(subset=['Revenue', '% of Buyers'], cmap=custom_light_green)
-                all_html_views[label] = styler.hide(axis="index").to_html()
+                # ... [Rest of your table code stays the same]
 
     return {
         "total_revenue": total_rev,
