@@ -198,38 +198,70 @@ def build_dashboard_views(orders_df, enriched_df, start_date, end_date):
         "html_views": all_html_views
     }
 
-# ================ 3. APP FLOW =================
-if "app_state" not in st.session_state: st.session_state.app_state = "onboarding"
+# ================ 3. APP FLOW (MULTI-UPLOAD) =================
+if "app_state" not in st.session_state: 
+    st.session_state.app_state = "onboarding"
+    st.session_state.orders_vault = []
+    st.session_state.n8n_vault = []
 
 if st.session_state.app_state == "onboarding":
     st.markdown(f"<h1 style='text-align: center; font-size: 3rem; margin-top: 50px;'>🧭 {PITCH_COMPANY_NAME} Engine</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #64748B;'>Upload your Shopify Orders and Demographic Data to begin analysis.</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #64748B;'>Upload one or more Shopify and Enriched Data files to begin.</p>", unsafe_allow_html=True)
     
     _, col1, col2, _ = st.columns([1, 2, 2, 1])
+    
     with col1:
-        orders_file = st.file_uploader("1. Upload Shopify Orders (CSV)", type=["csv"])
-    with col2:
-        n8n_file = st.file_uploader("2. Upload Enriched Data (CSV)", type=["csv"])
-        
-    if orders_file and n8n_file:
-        with st.spinner("Resolving Profiles & Cleaning Data..."):
-            raw_orders = pd.read_csv(orders_file, encoding='latin1', on_bad_lines='skip')
-            raw_n8n = pd.read_csv(n8n_file, encoding='latin1', on_bad_lines='skip')
-            
-            st.session_state.cleaned_orders = clean_orders_data(raw_orders)
-            st.session_state.cleaned_n8n = clean_n8n_data(raw_n8n)
-            
-            # Identify the full date range available in the Shopify file
-            st.session_state.min_date = st.session_state.cleaned_orders['order_date'].min()
-            st.session_state.max_date = st.session_state.cleaned_orders['order_date'].max()
-            
-            st.session_state.current_start = st.session_state.min_date
-            st.session_state.current_end = st.session_state.max_date
-            
-            st.session_state.app_state = "dashboard"
-            st.rerun()
+        st.subheader("🛒 Shopify Orders")
+        new_orders = st.file_uploader("Add Shopify CSVs", type=["csv"], accept_multiple_files=True, key="order_up")
+        if new_orders:
+            st.session_state.orders_vault = new_orders
+            st.success(f"{len(new_orders)} Order files staged.")
 
-elif st.session_state.app_state == "dashboard":
+    with col2:
+        st.subheader("🧬 Enriched Data")
+        new_n8n = st.file_uploader("Add n8n CSVs", type=["csv"], accept_multiple_files=True, key="n8n_up")
+        if new_n8n:
+            st.session_state.n8n_vault = new_n8n
+            st.success(f"{len(new_n8n)} Enriched files staged.")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # THE RUN BUTTON
+    _, center_col, _ = st.columns([2, 1, 2])
+    if center_col.button("🚀 Run Analysis", type="primary", use_container_width=True):
+        if not st.session_state.orders_vault or not st.session_state.n8n_vault:
+            st.error("Please upload at least one of each file type.")
+        else:
+            with st.spinner("Deduplicating & Processing Data..."):
+                # 1. Process & Combine Orders
+                all_orders = []
+                for f in st.session_state.orders_vault:
+                    all_orders.append(pd.read_csv(f, encoding='latin1', on_bad_lines='skip'))
+                combined_orders = pd.concat(all_orders, ignore_index=True)
+                
+                # Standardize and then DEDUPLICATE by Order ID
+                clean_orders = clean_orders_data(combined_orders)
+                st.session_state.cleaned_orders = clean_orders.drop_duplicates(subset=['order_id'])
+                
+                # 2. Process & Combine Enriched Data
+                all_n8n = []
+                for f in st.session_state.n8n_vault:
+                    all_n8n.append(pd.read_csv(f, encoding='latin1', on_bad_lines='skip'))
+                combined_n8n = pd.concat(all_n8n, ignore_index=True)
+                
+                # Clean and then DEDUPLICATE by the combined email string or specific personal emails
+                clean_n8n = clean_n8n_data(combined_n8n)
+                # Deduplicating n8n by our generated 'email_match'
+                st.session_state.cleaned_n8n = clean_n8n.drop_duplicates(subset=['email_match'])
+                
+                # 3. Finalize State
+                st.session_state.min_date = st.session_state.cleaned_orders['order_date'].min()
+                st.session_state.max_date = st.session_state.cleaned_orders['order_date'].max()
+                st.session_state.current_start = st.session_state.min_date
+                st.session_state.current_end = st.session_state.max_date
+                
+                st.session_state.app_state = "dashboard"
+                st.rerun()
     
 # --- HEADER & DATE CONTROLS ---
     c1, c2, c3 = st.columns([1, 3, 1])
