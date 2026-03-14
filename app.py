@@ -30,16 +30,28 @@ def apply_custom_theme(primary_color):
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
             html, body, [class*="css"] {{ font-family: 'Outfit', sans-serif; }}
-            .stApp {{ background-color: #FAFAFC; }} /* Extra subtle cool tint to match website */
+            .stApp {{ background-color: #FAFAFC; }} 
             h1, h2, h3 {{ color: #0F172A !important; font-weight: 600 !important; }}
             [data-testid="stSidebar"], [data-testid="collapsedControl"] {{ display: none !important; }}
             div[data-testid="stButton"] button {{ border-radius: 8px; font-weight: 500; padding: 0px 10px !important; }}
             div[data-testid="stButton"] button[kind="primary"] {{ background-color: {primary_color} !important; color: #FFFFFF !important; border: none; }}
-            div[data-testid="stButton"] button[kind="secondary"] {{ background-color: #FFFFFF; color: {primary_color}; border: 1px solid #EBE4F4; }}
-            .premium-table-container {{ border-radius: 12px; border: 1px solid #E2E8F0; background: #FFFFFF; overflow: hidden; margin-top: 1rem; margin-bottom: 2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }}
+            
+            /* 🚨 THE FIX: Slightly darker purple outline for the variable pickers */
+            div[data-testid="stButton"] button[kind="secondary"] {{ background-color: #FFFFFF; color: {primary_color}; border: 1px solid #C4AEE2; }}
+            
+            /* 🚨 THE FIX: Darker purple border for the table container */
+            .premium-table-container {{ border-radius: 12px; border: 1px solid #C4AEE2; background: #FFFFFF; overflow: hidden; margin-top: 1rem; margin-bottom: 2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }}
             .premium-table-container table {{ width: 100% !important; border-collapse: collapse !important; }}
-            .premium-table-container th {{ background-color: #F8F6FA !important; color: #4D148C !important; font-weight: 700 !important; text-align: center !important; padding: 15px 12px !important; border-bottom: 2px solid #EBE4F4 !important; text-transform: uppercase !important; font-size: 0.9rem !important; letter-spacing: 0.5px !important; }}
-            .premium-table-container td {{ text-align: center !important; padding: 12px !important; border-bottom: 1px solid #F8FAFC !important; font-size: 0.85rem !important; }}
+            
+            /* 🚨 THE FIX: Added purple grid lines separating the header cells */
+            .premium-table-container th {{ background-color: #F8F6FA !important; color: {primary_color} !important; font-weight: 700 !important; text-align: center !important; padding: 15px 12px !important; border-bottom: 2px solid #C4AEE2 !important; border-right: 1px solid #EBE4F4 !important; text-transform: uppercase !important; font-size: 0.95rem !important; letter-spacing: 0.5px !important; }}
+            
+            /* 🚨 THE FIX: Added purple grid lines separating the data cells */
+            .premium-table-container td {{ text-align: center !important; padding: 12px !important; border-bottom: 1px solid #EBE4F4 !important; border-right: 1px solid #EBE4F4 !important; font-size: 0.85rem !important; }}
+            
+            /* Clean up the far-right edge so it doesn't double-border with the container */
+            .premium-table-container th:last-child, .premium-table-container td:last-child {{ border-right: none !important; }}
+            
             .premium-table-container td:first-child {{ font-weight: 700 !important; color: #0F172A !important; }}
         </style>
     """, unsafe_allow_html=True)
