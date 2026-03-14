@@ -163,7 +163,7 @@ if st.session_state.app_state == "onboarding":
     st.image("logo.png", width=180)
     # 🚨 FIXED: Centers Piece restored, 2nd and 3rd lines switched
     st.markdown("""
-        <div style="text-align: center; margin-top: -15px; margin-bottom: 25px;">
+        <div style="text-align: center; margin-top: 0px; margin-bottom: 25px;">
             <h1 class="serif-gradient-centerpiece" style="font-size: 3.6rem; margin-bottom: 2px;">Customer Insights Dashboard.</h1>
             <h2 class="serif-subheadline" style="font-size: 1.8rem; color: #0F172A !important; margin-top: 5px;">Get instant demographic insights on your existing customers.</h2>
         </div>
