@@ -30,22 +30,15 @@ def apply_custom_theme(primary_color):
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
             html, body, [class*="css"] {{ font-family: 'Outfit', sans-serif; }}
-            .stApp {{ background-color: #F8FAFC; }} /* Light slate background */
+            .stApp {{ background-color: #F8FAFC; }} 
             h1, h2, h3 {{ color: #0F172A !important; font-weight: 600 !important; }}
-            
-            /* Hide the sidebar */
             [data-testid="stSidebar"], [data-testid="collapsedControl"] {{ display: none !important; }}
-
             div[data-testid="stButton"] button {{ border-radius: 8px; font-weight: 500; padding: 0px 10px !important; }}
             div[data-testid="stButton"] button[kind="primary"] {{ background-color: {primary_color} !important; color: #FFFFFF !important; border: none; }}
             div[data-testid="stButton"] button[kind="secondary"] {{ background-color: #FFFFFF; color: #0F172A; border: 1px solid #CBD5E1; }}
-            
             [data-testid="stMetric"] {{ background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }}
-            
-            /* Remove up/down arrows from metrics */
             [data-testid="stMetricDelta"] svg {{ display: none !important; }}
             [data-testid="stMetricDelta"] div {{ margin-left: 0 !important; }}
-
             .premium-table-container {{ border-radius: 12px; border: 1px solid #E2E8F0; background: #FFFFFF; overflow: hidden; margin-top: 1rem; margin-bottom: 2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }}
             .premium-table-container table {{ width: 100% !important; border-collapse: collapse !important; }}
             .premium-table-container th {{ background-color: #F1F5F9 !important; color: #334155 !important; font-weight: 700 !important; text-align: center !important; padding: 12px !important; border-bottom: 2px solid #CBD5E1 !important; text-transform: uppercase !important; font-size: 0.75rem !important; }}
@@ -55,32 +48,30 @@ def apply_custom_theme(primary_color):
     """, unsafe_allow_html=True)
 
 apply_custom_theme(PITCH_BRAND_COLOR)
-# Keeping the requested "Heavenly Heat" style green gradient for the tables
 custom_light_green = mcolors.LinearSegmentedColormap.from_list("custom_green", ["#F9F7F3", "#D1E5D1", "#6EAB6E"])
 
 # ================ 2. DATA ENGINE =================
 @st.cache_data(show_spinner=False)
 def clean_n8n_data(df):
-    """Standardizes the messy n8n API payload"""
     df = df.rename(columns=N8N_COLUMN_MAPPER)
     df.columns = [c.lower() for c in df.columns]
     
     if 'state_raw' in df.columns: df['region'] = df['state_raw'].str.strip().str.upper().map(STATE_TO_REGION).fillna('Unknown')
     if 'gender' in df.columns: df['gender'] = df['gender'].map({'M': 'Male', 'F': 'Female', 'Male': 'Male', 'Female': 'Female'}).fillna('Unknown')
-    if 'marital_status' in df.columns: df['marital_status'] = df['marital_status'].fillna('Unknown')
+    
+    # 🚨 Cleanup Marital Status: Y/N to Married/Single
+    if 'marital_status' in df.columns:
+        df['marital_status'] = df['marital_status'].map({'Y': 'Married', 'N': 'Single', 'Married': 'Married', 'Single': 'Single'}).fillna('Unknown')
+    
     if 'zip_code' in df.columns: df['zip_code'] = df['zip_code'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(5)
     
-    # 🚨 Explode the comma-separated emails so any burner email matches the Shopify order
     if 'personal_emails' in df.columns:
         df['email_match'] = df['personal_emails'].astype(str).str.lower().str.replace(r'[^a-z0-9@._,-]', '', regex=True).str.split(',')
         df = df.explode('email_match').reset_index(drop=True)
-        df = df.drop_duplicates(subset=['email_match']).reset_index(drop=True)
     return df
 
 @st.cache_data(show_spinner=False)
 def clean_orders_data(df):
-    """Standardizes the Shopify Orders and scrubs $0 transactions"""
-    # Auto-detect standard Shopify columns or fallback to our generated template
     email_col = next((c for c in df.columns if 'email' in c.lower()), 'Email')
     order_col = next((c for c in df.columns if 'name' in c.lower() or 'order' in c.lower()), 'Order ID')
     total_col = next((c for c in df.columns if 'total' in c.lower() or 'price' in c.lower()), 'Total')
@@ -88,26 +79,17 @@ def clean_orders_data(df):
     
     df = df.rename(columns={email_col: 'email_match', order_col: 'order_id', total_col: 'revenue_raw', date_col: 'order_date'})
     df['email_match'] = df['email_match'].astype(str).str.lower().str.strip()
-    
-    # Clean the currency string into a math-ready float
     df['revenue_raw'] = pd.to_numeric(df['revenue_raw'].astype(str).str.replace(r'[^\d.-]', '', regex=True), errors='coerce').fillna(0)
     
-    # 🚨 THE NEW FIX: Drop any order that is $0.00 (spare parts, free replacements)
     df = df[df['revenue_raw'] > 0]
-    
-    # Bulletproof date handling for real Shopify timezone formats
     df['order_date'] = pd.to_datetime(df['order_date'], errors='coerce', utc=True)
-    df = df.dropna(subset=['order_date']) # Drop anything that failed to parse
-    df['order_date'] = df['order_date'].dt.date # Safely extract just the YYYY-MM-DD
-    
+    df = df.dropna(subset=['order_date'])
+    df['order_date'] = df['order_date'].dt.date
     return df.reset_index(drop=True)
-    
-    return df
+
 def build_dashboard_views(orders_df, enriched_df, start_date, end_date):
-    """Zero-Lag Engine: Filters dates, aggregates purchasers, and pre-renders HTML tables."""
     mask = (orders_df['order_date'] >= start_date) & (orders_df['order_date'] <= end_date)
     filtered_orders = orders_df.loc[mask]
-    
     if filtered_orders.empty: return None
 
     purchasers = filtered_orders.groupby('email_match').agg(
@@ -128,11 +110,8 @@ def build_dashboard_views(orders_df, enriched_df, start_date, end_date):
 
     for label, col_key in summary_vars:
         if col_key in df_joined.columns:
-            # 1. Create a clean subset for this specific variable
             valid_rows = df_joined[~df_joined[col_key].astype(str).str.lower().isin(['unknown', 'nan', 'u', 'none', '00nan', '', 'null'])]
-            
             if not valid_rows.empty:
-                # 🚨 FIXED CARD MATH: Denominator is sum of revenue for known values of THIS variable
                 var_specific_total_rev = valid_rows['revenue'].sum()
                 rs = valid_rows.groupby(col_key)['revenue'].sum()
                 
@@ -140,63 +119,17 @@ def build_dashboard_views(orders_df, enriched_df, start_date, end_date):
                 top_pct = (rs.max() / var_specific_total_rev * 100) if var_specific_total_rev > 0 else 0
                 top_perf[label] = (top_val, top_pct)
                 
-                # 🚨 RESTORED TABLE LOGIC: 
-                grp = valid_rows.groupby(col_key).agg(
-                    Purchasers=('email_match', 'nunique'), 
-                    Revenue=('revenue', 'sum')
-                ).reset_index()
-                
+                grp = valid_rows.groupby(col_key).agg(Purchasers=('email_match', 'nunique'), Revenue=('revenue', 'sum')).reset_index()
                 grp['% of Buyers'] = (grp['Revenue'] / var_specific_total_rev) * 100
                 grp['Rev / Purchaser'] = (grp['Revenue'] / grp['Purchasers'])
                 
                 final_v = grp.rename(columns={col_key: label.upper()}).sort_values('Revenue', ascending=False)
                 if label == "Zip Code": final_v = final_v.head(100)
                 
-                styler = final_v.style.format({
-                    'Purchasers': '{:,.0f}', 
-                    'Revenue': '${:,.2f}', 
-                    '% of Buyers': '{:.1f}%', 
-                    'Rev / Purchaser': '${:,.2f}'
-                }).background_gradient(subset=['Revenue', '% of Buyers'], cmap=custom_light_green)
-                
+                styler = final_v.style.format({'Purchasers': '{:,.0f}', 'Revenue': '${:,.2f}', '% of Buyers': '{:.1f}%', 'Rev / Purchaser': '${:,.2f}'}).background_gradient(subset=['Revenue', '% of Buyers'], cmap=custom_light_green)
                 all_html_views[label] = styler.hide(axis="index").to_html()
 
-    return {
-        "total_revenue": total_rev,
-        "total_buyers": total_buyers,
-        "top_performers": top_perf,
-        "html_views": all_html_views
-    }
-
-# 4. Pre-calculate all top performers and HTML tables
-    for label, col_key in summary_vars:
-        if col_key in df_joined.columns:
-            # Filter to rows that actually have data for this variable
-            temp = df_joined[~df_joined[col_key].astype(str).str.lower().isin(['unknown', 'nan', 'u', 'none', '00nan', ''])]
-            
-            if not temp.empty:
-                # 🚨 THE FIX: Calculate revenue sum for JUST this demographic group
-                variable_total_rev = temp['revenue'].sum()
-                
-                # Group by the variable and sum the revenue
-                rs = temp.groupby(col_key)['revenue'].sum()
-                
-                # Top value and its % share of the RECOVERED revenue for this variable
-                top_val = rs.idxmax()
-                top_pct = (rs.max() / variable_total_rev * 100) if variable_total_rev > 0 else 0
-                
-                top_perf[label] = (top_val, top_pct)
-                
-                # Build the Data Table (Keep existing logic below this)
-                grp = temp.groupby(col_key).agg(Purchasers=('email_match', 'nunique'), Revenue=('revenue', 'sum')).reset_index()
-                # ... [Rest of your table code stays the same]
-
-    return {
-        "total_revenue": total_rev,
-        "total_buyers": total_buyers,
-        "top_performers": top_perf,
-        "html_views": all_html_views
-    }
+    return {"total_revenue": total_rev, "total_buyers": total_buyers, "top_performers": top_perf, "html_views": all_html_views}
 
 # ================ 3. APP FLOW (MULTI-UPLOAD) =================
 if "app_state" not in st.session_state: 
@@ -206,132 +139,69 @@ if "app_state" not in st.session_state:
 
 if st.session_state.app_state == "onboarding":
     st.markdown(f"<h1 style='text-align: center; font-size: 3rem; margin-top: 50px;'>🧭 {PITCH_COMPANY_NAME} Engine</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #64748B;'>Upload one or more Shopify and Enriched Data files to begin.</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #64748B;'>Upload Shopify and Enriched Data files to begin.</p>", unsafe_allow_html=True)
     
     _, col1, col2, _ = st.columns([1, 2, 2, 1])
-    
     with col1:
         st.subheader("🛒 Shopify Orders")
-        new_orders = st.file_uploader("Add Shopify CSVs", type=["csv"], accept_multiple_files=True, key="order_up")
-        if new_orders:
-            st.session_state.orders_vault = new_orders
-            st.success(f"{len(new_orders)} Order files staged.")
-
+        st.session_state.orders_vault = st.file_uploader("Add Shopify CSVs", type=["csv"], accept_multiple_files=True, key="order_up")
     with col2:
         st.subheader("🧬 Enriched Data")
-        new_n8n = st.file_uploader("Add n8n CSVs", type=["csv"], accept_multiple_files=True, key="n8n_up")
-        if new_n8n:
-            st.session_state.n8n_vault = new_n8n
-            st.success(f"{len(new_n8n)} Enriched files staged.")
+        st.session_state.n8n_vault = st.file_uploader("Add n8n CSVs", type=["csv"], accept_multiple_files=True, key="n8n_up")
 
     st.markdown("<br>", unsafe_allow_html=True)
-    
-    # THE RUN BUTTON
     _, center_col, _ = st.columns([2, 1, 2])
     if center_col.button("🚀 Run Analysis", type="primary", use_container_width=True):
         if not st.session_state.orders_vault or not st.session_state.n8n_vault:
             st.error("Please upload at least one of each file type.")
         else:
             with st.spinner("Deduplicating & Processing Data..."):
-                # 1. Process & Combine Orders
-                all_orders = []
-                for f in st.session_state.orders_vault:
-                    all_orders.append(pd.read_csv(f, encoding='latin1', on_bad_lines='skip'))
-                combined_orders = pd.concat(all_orders, ignore_index=True)
-                
-                # Standardize and then DEDUPLICATE by Order ID
-                clean_orders = clean_orders_data(combined_orders)
+                # Combine & Deduplicate Orders
+                all_orders = pd.concat([pd.read_csv(f, encoding='latin1', on_bad_lines='skip') for f in st.session_state.orders_vault], ignore_index=True)
+                clean_orders = clean_orders_data(all_orders)
                 st.session_state.cleaned_orders = clean_orders.drop_duplicates(subset=['order_id'])
                 
-                # 2. Process & Combine Enriched Data
-                all_n8n = []
-                for f in st.session_state.n8n_vault:
-                    all_n8n.append(pd.read_csv(f, encoding='latin1', on_bad_lines='skip'))
-                combined_n8n = pd.concat(all_n8n, ignore_index=True)
-                
-                # Clean and then DEDUPLICATE by the combined email string or specific personal emails
-                clean_n8n = clean_n8n_data(combined_n8n)
-                # Deduplicating n8n by our generated 'email_match'
+                # Combine & Deduplicate n8n
+                all_n8n = pd.concat([pd.read_csv(f, encoding='latin1', on_bad_lines='skip') for f in st.session_state.n8n_vault], ignore_index=True)
+                clean_n8n = clean_n8n_data(all_n8n)
                 st.session_state.cleaned_n8n = clean_n8n.drop_duplicates(subset=['email_match'])
                 
-                # 3. Finalize State
                 st.session_state.min_date = st.session_state.cleaned_orders['order_date'].min()
                 st.session_state.max_date = st.session_state.cleaned_orders['order_date'].max()
-                st.session_state.current_start = st.session_state.min_date
-                st.session_state.current_end = st.session_state.max_date
-                
+                st.session_state.current_start, st.session_state.current_end = st.session_state.min_date, st.session_state.max_date
                 st.session_state.app_state = "dashboard"
                 st.rerun()
-    
-# --- HEADER & DATE CONTROLS ---
+
+elif st.session_state.app_state == "dashboard":
+    # --- HEADER & DATE CONTROLS ---
     c1, c2, c3 = st.columns([1, 3, 1])
     if c1.button("🔄 Start Over"): 
         st.session_state.app_state = "onboarding"
         st.rerun()
-        
     with c2:
-        # 🚨 THE SLIDER IS BACK: Instant visual date scrubbing
-        selected_dates = st.slider(
-            "Filter by Purchase Date",
-            min_value=st.session_state.min_date,
-            max_value=st.session_state.max_date,
-            value=(st.session_state.current_start, st.session_state.current_end),
-            format="MMM DD, YYYY"
-        )
+        selected_dates = st.slider("Filter by Purchase Date", min_value=st.session_state.min_date, max_value=st.session_state.max_date, value=(st.session_state.current_start, st.session_state.current_end), format="MMM DD, YYYY")
     
-    # 🚨 Core Engine Trigger: Only rebuild tables if the date slider actually moved
     if (selected_dates[0] != st.session_state.current_start) or (selected_dates[1] != st.session_state.current_end) or ("dash_data" not in st.session_state):
-        st.session_state.current_start = selected_dates[0]
-        st.session_state.current_end = selected_dates[1]
-        st.session_state.dash_data = build_dashboard_views(
-            st.session_state.cleaned_orders, 
-            st.session_state.cleaned_n8n, 
-            selected_dates[0], 
-            selected_dates[1]
-        )
+        st.session_state.current_start, st.session_state.current_end = selected_dates[0], selected_dates[1]
+        st.session_state.dash_data = build_dashboard_views(st.session_state.cleaned_orders, st.session_state.cleaned_n8n, selected_dates[0], selected_dates[1])
     
     dash_data = st.session_state.dash_data
-
     if not dash_data:
-        st.warning("No matched profiles found within this specific date range. Try widening the dates.")
+        st.warning("No matched profiles found.")
     else:
-        # 1. MACRO METRICS
         m1, m2 = st.columns(2)
         m1.metric("Resolved Profiles", f"{dash_data['total_buyers']:,.0f}")
         m2.metric("Attributed Sales", f"${dash_data['total_revenue']:,.2f}")
-        st.markdown("<br>", unsafe_allow_html=True)
-
-        # 2. TOP PERFORMING DEMOGRAPHICS
+        
         st.markdown("### 🏆 Top Performing Demographics")
         summary_cols = st.columns(len(dash_data['top_performers']))
-        
         for i, (label, data) in enumerate(dash_data['top_performers'].items()):
             with summary_cols[i]:
-                # We use a custom HTML div to handle long strings like Income better than st.metric
-                st.markdown(f"""
-                    <div style="
-                        background-color: #FFFFFF; 
-                        border: 1px solid #E2E8F0; 
-                        border-radius: 12px; 
-                        padding: 15px; 
-                        text-align: center; 
-                        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-                        min-height: 120px;
-                        display: flex;
-                        flex-direction: column;
-                        justify-content: center;
-                    ">
-                        <p style="margin: 0; font-size: 0.8rem; color: #64748B; font-weight: 600; text-transform: uppercase;">{label}</p>
-                        <p style="margin: 5px 0; font-size: 1.1rem; color: #0F172A; font-weight: 700; line-height: 1.2;">{data[0]}</p>
-                        <p style="margin: 0; font-size: 0.85rem; color: #16A34A; background-color: #F0FDF4; border-radius: 20px; padding: 2px 8px; display: inline-block; align-self: center;">{data[1]:.1f}% of Revenue</p>
-                    </div>
-                """, unsafe_allow_html=True)
+                st.markdown(f'<div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 15px; text-align: center; min-height: 120px; display: flex; flex-direction: column; justify-content: center;"><p style="margin: 0; font-size: 0.8rem; color: #64748B; font-weight: 600; text-transform: uppercase;">{label}</p><p style="margin: 5px 0; font-size: 1.1rem; color: #0F172A; font-weight: 700; line-height: 1.2;">{data[0]}</p><p style="margin: 0; font-size: 0.85rem; color: #16A34A; background-color: #F0FDF4; border-radius: 20px; padding: 2px 8px; display: inline-block; align-self: center;">{data[1]:.1f}% of Revenue</p></div>', unsafe_allow_html=True)
 
-        # 3. SINGLE VARIABLE DEEP DIVE (Zero Lag UI)
         st.markdown("### 🔍 Audience Deep Dive")
         if "active_var" not in st.session_state: st.session_state.active_var = "Gender"
         if "active_loc_level" not in st.session_state: st.session_state.active_loc_level = "Region"
-        
         v_labels = ["Gender", "Age", "Location", "Marital Status", "Income"]
         var_cols = st.columns(len(v_labels))
         for i, label in enumerate(v_labels):
@@ -347,8 +217,7 @@ if st.session_state.app_state == "onboarding":
             if l3.button("Zip Code", type="primary" if st.session_state.active_loc_level == "Zip Code" else "secondary"): st.session_state.active_loc_level = "Zip Code"; st.rerun()
             lookup_key = st.session_state.active_loc_level
 
-        # Render the exact pre-calculated HTML table
         if lookup_key in dash_data['html_views']:
             st.markdown(f'<div class="premium-table-container">{dash_data["html_views"][lookup_key]}</div>', unsafe_allow_html=True)
         else:
-            st.info(f"Not enough data to calculate {lookup_key} for this date range.")
+            st.info(f"Not enough data to calculate {lookup_key}.")
