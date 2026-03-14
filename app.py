@@ -177,24 +177,32 @@ if st.session_state.app_state == "onboarding":
                 all_n8n = pd.concat([pd.read_csv(f, encoding='latin1', on_bad_lines='skip') for f in st.session_state.n8n_vault], ignore_index=True)
                 st.session_state.cleaned_n8n = clean_n8n_data(all_n8n).drop_duplicates(subset=['email_match'])
                 st.session_state.min_date, st.session_state.max_date = st.session_state.cleaned_orders['order_date'].min(), st.session_state.cleaned_orders['order_date'].max()
-                st.session_state.current_start, st.session_state.current_end = st.session_state.min_date, st.session_state.max_date
+                
+                # 🚨 THE FIX: Initialize date_filter key here to prevent bounce
+                st.session_state.date_filter = (st.session_state.min_date, st.session_state.max_date)
+                
                 st.session_state.app_state = "dashboard"
                 st.rerun()
 
 elif st.session_state.app_state == "dashboard":
-    # 🚨 THE FIX: Initialize these variables so the Deep Dive doesn't crash
     if "active_var" not in st.session_state: st.session_state.active_var = "Gender"
     if "active_loc_level" not in st.session_state: st.session_state.active_loc_level = "Region"
 
     st.image("logo.png", width=180)
     st.markdown("""<div style="text-align: center; margin-top: -10px; margin-bottom: 30px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.5rem; margin-bottom: 0px;">Customer Insights Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 2.8rem; color: #0F172A !important; margin-top: -5px;">Get To Know Your Customer.</h2></div>""", unsafe_allow_html=True)
+    
     _, c2, _ = st.columns([1, 4, 1])
-    with c2: selected_dates = st.slider("Filter by Date", min_value=st.session_state.min_date, max_value=st.session_state.max_date, value=(st.session_state.current_start, st.session_state.current_end), format="MMM DD, YYYY")
+    with c2: 
+        # 🚨 THE FIX: Use key="date_filter" for automatic state management
+        st.slider("Filter by Date", min_value=st.session_state.min_date, max_value=st.session_state.max_date, key="date_filter", format="MMM DD, YYYY")
+    
     st.markdown("<div style='margin-bottom: 50px;'></div>", unsafe_allow_html=True)
 
-    if (selected_dates[0] != st.session_state.current_start) or (selected_dates[1] != st.session_state.current_end) or ("dash_data" not in st.session_state):
-        st.session_state.current_start, st.session_state.current_end = selected_dates[0], selected_dates[1]
-        st.session_state.dash_data = build_dashboard_views(st.session_state.cleaned_orders, st.session_state.cleaned_n8n, selected_dates[0], selected_dates[1])
+    # Re-calculate data if the slider changes or dash_data is missing
+    current_dates = st.session_state.date_filter
+    if "dash_data" not in st.session_state or "last_computed_dates" not in st.session_state or st.session_state.last_computed_dates != current_dates:
+        st.session_state.last_computed_dates = current_dates
+        st.session_state.dash_data = build_dashboard_views(st.session_state.cleaned_orders, st.session_state.cleaned_n8n, current_dates[0], current_dates[1])
     
     dash_data = st.session_state.dash_data
     if dash_data:
@@ -228,6 +236,6 @@ elif st.session_state.app_state == "dashboard":
             if l3.button("Zip Code", type="primary" if st.session_state.active_loc_level == "Zip Code" else "secondary"): st.session_state.active_loc_level = "Zip Code"; st.rerun()
             lk = st.session_state.active_loc_level
         if lk in dash_data['html_views']: st.markdown(f'<div class="premium-table-container">{dash_data["html_views"][lk]}</div>', unsafe_allow_html=True)
-        st.markdown("<br><hr style='border-top: 1px solid #E2E8F0; margin: 2rem 0;'><br>", unsafe_allow_html=True)
+        st.markdown("<br><hr style='border-top: 1px solid #E2E8F0; margin: 3rem 0;'><br>", unsafe_allow_html=True)
         _, reset_col, _ = st.columns([2, 1, 2])
         if reset_col.button("Start Over", use_container_width=True): st.session_state.app_state = "onboarding"; st.rerun()
