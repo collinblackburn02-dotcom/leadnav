@@ -49,27 +49,25 @@ def apply_custom_theme(primary_color):
                 margin-bottom: 8px !important;
             }}
 
-            /* Responsive and Styled Buttons */
+            /* 🚨 CSS FIX: Targeting primary vs secondary buttons */
             div[data-testid="stButton"] button {{ 
                 border-radius: 8px; 
                 font-weight: 600; 
-                padding: 10px 20px !important;
                 transition: all 0.2s ease;
             }}
             
-            /* Primary Button (Run Analysis) */
+            /* Primary (Run Analysis) */
             div[data-testid="stButton"] button[kind="primary"] {{ 
                 background-color: {primary_color} !important; 
                 color: #FFFFFF !important; 
-                border: none;
-                width: 100%;
+                border: none !important;
             }}
             
-            /* Secondary/Go Back Button */
+            /* Secondary (Deep Dive & Go Back) */
             div[data-testid="stButton"] button[kind="secondary"] {{ 
-                background-color: transparent; 
+                background-color: #FFFFFF !important; 
                 color: {primary_color} !important; 
-                border: 2px solid {primary_color} !important;
+                border: 1px solid {primary_color} !important;
             }}
 
             .premium-table-container {{ border-radius: 12px; border: 1px solid {primary_color}; background: #FFFFFF; overflow: hidden; margin-top: 1rem; margin-bottom: 2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }}
@@ -193,7 +191,8 @@ if st.session_state.app_state == "onboarding":
         st.session_state.n8n_vault = st.file_uploader("Upload visitor files.", type=["csv"], accept_multiple_files=True, key="n8n_up")
     
     st.markdown("<br>", unsafe_allow_html=True)
-    _, center_col, _ = st.columns([2, 1.5, 2]) # Widened slightly for responsiveness
+    _, center_col, _ = st.columns([2, 1.5, 2])
+    # 🚨 FIXED: Removed "kind" and used "type='primary'"
     if center_col.button("🚀 Run Analysis", type="primary", use_container_width=True):
         if not st.session_state.orders_vault or not st.session_state.n8n_vault: st.error("Please upload both files.")
         else:
@@ -258,8 +257,8 @@ elif st.session_state.app_state == "dashboard":
             lk = st.session_state.active_loc_level
         if dash_data['html_views'].get(lk): st.markdown(f'<div class="premium-table-container">{dash_data["html_views"][lk]}</div>', unsafe_allow_html=True)
         
-        # 🚨 UPDATED: "Go Back" button with Purple Arrow
         st.markdown("<br><hr style='border-top: 1px solid #E2E8F0; margin: 2rem 0;'><br>", unsafe_allow_html=True)
         _, reset_col, _ = st.columns([2, 1, 2])
-        if reset_col.button("← Go Back", use_container_width=True, kind="secondary"): 
+        # 🚨 FIXED: Changed KIND to TYPE="secondary"
+        if reset_col.button("← Go Back", use_container_width=True, type="secondary"): 
             st.session_state.app_state = "onboarding"; st.rerun()
