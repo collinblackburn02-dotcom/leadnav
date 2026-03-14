@@ -5,7 +5,7 @@ import numpy as np
 
 # ================ 1. CONFIGURATION & THEME =================
 PITCH_COMPANY_NAME = "LeadNavigator" 
-PITCH_BRAND_COLOR = "#0F172A" # Sleek LeadNavigator Navy
+PITCH_BRAND_COLOR = "#0F172A" 
 
 N8N_COLUMN_MAPPER = {
     "GENDER": "gender",
@@ -36,9 +36,6 @@ def apply_custom_theme(primary_color):
             div[data-testid="stButton"] button {{ border-radius: 8px; font-weight: 500; padding: 0px 10px !important; }}
             div[data-testid="stButton"] button[kind="primary"] {{ background-color: {primary_color} !important; color: #FFFFFF !important; border: none; }}
             div[data-testid="stButton"] button[kind="secondary"] {{ background-color: #FFFFFF; color: #0F172A; border: 1px solid #CBD5E1; }}
-            [data-testid="stMetric"] {{ background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }}
-            [data-testid="stMetricDelta"] svg {{ display: none !important; }}
-            [data-testid="stMetricDelta"] div {{ margin-left: 0 !important; }}
             .premium-table-container {{ border-radius: 12px; border: 1px solid #E2E8F0; background: #FFFFFF; overflow: hidden; margin-top: 1rem; margin-bottom: 2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }}
             .premium-table-container table {{ width: 100% !important; border-collapse: collapse !important; }}
             .premium-table-container th {{ background-color: #F1F5F9 !important; color: #334155 !important; font-weight: 700 !important; text-align: center !important; padding: 12px !important; border-bottom: 2px solid #CBD5E1 !important; text-transform: uppercase !important; font-size: 0.75rem !important; }}
@@ -55,16 +52,11 @@ custom_light_green = mcolors.LinearSegmentedColormap.from_list("custom_green", [
 def clean_n8n_data(df):
     df = df.rename(columns=N8N_COLUMN_MAPPER)
     df.columns = [c.lower() for c in df.columns]
-    
     if 'state_raw' in df.columns: df['region'] = df['state_raw'].str.strip().str.upper().map(STATE_TO_REGION).fillna('Unknown')
     if 'gender' in df.columns: df['gender'] = df['gender'].map({'M': 'Male', 'F': 'Female', 'Male': 'Male', 'Female': 'Female'}).fillna('Unknown')
-    
-    # 🚨 Cleanup Marital Status: Y/N to Married/Single
     if 'marital_status' in df.columns:
         df['marital_status'] = df['marital_status'].map({'Y': 'Married', 'N': 'Single', 'Married': 'Married', 'Single': 'Single'}).fillna('Unknown')
-    
     if 'zip_code' in df.columns: df['zip_code'] = df['zip_code'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(5)
-    
     if 'personal_emails' in df.columns:
         df['email_match'] = df['personal_emails'].astype(str).str.lower().str.replace(r'[^a-z0-9@._,-]', '', regex=True).str.split(',')
         df = df.explode('email_match').reset_index(drop=True)
@@ -76,12 +68,9 @@ def clean_orders_data(df):
     order_col = next((c for c in df.columns if 'name' in c.lower() or 'order' in c.lower()), 'Order ID')
     total_col = next((c for c in df.columns if 'total' in c.lower() or 'price' in c.lower()), 'Total')
     date_col = next((c for c in df.columns if 'created' in c.lower() or 'date' in c.lower()), 'Date')
-    
     df = df.rename(columns={email_col: 'email_match', order_col: 'order_id', total_col: 'revenue_raw', date_col: 'order_date'})
     df['email_match'] = df['email_match'].astype(str).str.lower().str.strip()
     df['revenue_raw'] = pd.to_numeric(df['revenue_raw'].astype(str).str.replace(r'[^\d.-]', '', regex=True), errors='coerce').fillna(0)
-    
-    df = df[df['revenue_raw'] > 0]
     df['order_date'] = pd.to_datetime(df['order_date'], errors='coerce', utc=True)
     df = df.dropna(subset=['order_date'])
     df['order_date'] = df['order_date'].dt.date
@@ -91,47 +80,31 @@ def build_dashboard_views(orders_df, enriched_df, start_date, end_date):
     mask = (orders_df['order_date'] >= start_date) & (orders_df['order_date'] <= end_date)
     filtered_orders = orders_df.loc[mask]
     if filtered_orders.empty: return None
-
-    purchasers = filtered_orders.groupby('email_match').agg(
-        revenue=('revenue_raw', 'sum'),
-        order_count=('order_id', 'nunique')
-    ).reset_index()
-
+    purchasers = filtered_orders.groupby('email_match').agg(revenue=('revenue_raw', 'sum'), order_count=('order_id', 'nunique')).reset_index()
     df_joined = pd.merge(purchasers, enriched_df, on='email_match', how='inner').reset_index(drop=True)
     if df_joined.empty: return None
-
     total_rev = df_joined['revenue'].sum()
     total_buyers = df_joined['email_match'].nunique()
-    
     summary_vars = [("Gender", "gender"), ("Age", "age"), ("Marital Status", "marital_status"), ("Region", "region"), ("State", "state_raw"), ("Zip Code", "zip_code"), ("Income", "income")]
-    
     top_perf = {}
     all_html_views = {}
-
     for label, col_key in summary_vars:
         if col_key in df_joined.columns:
             valid_rows = df_joined[~df_joined[col_key].astype(str).str.lower().isin(['unknown', 'nan', 'u', 'none', '00nan', '', 'null'])]
             if not valid_rows.empty:
-                var_specific_total_rev = valid_rows['revenue'].sum()
+                var_total = valid_rows['revenue'].sum()
                 rs = valid_rows.groupby(col_key)['revenue'].sum()
-                
-                top_val = rs.idxmax()
-                top_pct = (rs.max() / var_specific_total_rev * 100) if var_specific_total_rev > 0 else 0
-                top_perf[label] = (top_val, top_pct)
-                
+                top_perf[label] = (rs.idxmax(), (rs.max() / var_total * 100))
                 grp = valid_rows.groupby(col_key).agg(Purchasers=('email_match', 'nunique'), Revenue=('revenue', 'sum')).reset_index()
-                grp['% of Buyers'] = (grp['Revenue'] / var_specific_total_rev) * 100
+                grp['% of Buyers'] = (grp['Revenue'] / var_total) * 100
                 grp['Rev / Purchaser'] = (grp['Revenue'] / grp['Purchasers'])
-                
                 final_v = grp.rename(columns={col_key: label.upper()}).sort_values('Revenue', ascending=False)
                 if label == "Zip Code": final_v = final_v.head(100)
-                
                 styler = final_v.style.format({'Purchasers': '{:,.0f}', 'Revenue': '${:,.2f}', '% of Buyers': '{:.1f}%', 'Rev / Purchaser': '${:,.2f}'}).background_gradient(subset=['Revenue', '% of Buyers'], cmap=custom_light_green)
                 all_html_views[label] = styler.hide(axis="index").to_html()
-
     return {"total_revenue": total_rev, "total_buyers": total_buyers, "top_performers": top_perf, "html_views": all_html_views}
 
-# ================ 3. APP FLOW (MULTI-UPLOAD) =================
+# ================ 3. APP FLOW =================
 if "app_state" not in st.session_state: 
     st.session_state.app_state = "onboarding"
     st.session_state.orders_vault = []
@@ -140,7 +113,6 @@ if "app_state" not in st.session_state:
 if st.session_state.app_state == "onboarding":
     st.markdown(f"<h1 style='text-align: center; font-size: 3rem; margin-top: 50px;'>🧭 {PITCH_COMPANY_NAME} Engine</h1>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; color: #64748B;'>Upload Shopify and Enriched Data files to begin.</p>", unsafe_allow_html=True)
-    
     _, col1, col2, _ = st.columns([1, 2, 2, 1])
     with col1:
         st.subheader("🛒 Shopify Orders")
@@ -148,32 +120,26 @@ if st.session_state.app_state == "onboarding":
     with col2:
         st.subheader("🧬 Enriched Data")
         st.session_state.n8n_vault = st.file_uploader("Add n8n CSVs", type=["csv"], accept_multiple_files=True, key="n8n_up")
-
     st.markdown("<br>", unsafe_allow_html=True)
     _, center_col, _ = st.columns([2, 1, 2])
     if center_col.button("🚀 Run Analysis", type="primary", use_container_width=True):
         if not st.session_state.orders_vault or not st.session_state.n8n_vault:
             st.error("Please upload at least one of each file type.")
         else:
-            with st.spinner("Deduplicating & Processing Data..."):
-                # Combine & Deduplicate Orders
-                all_orders = pd.concat([pd.read_csv(f, encoding='latin1', on_bad_lines='skip') for f in st.session_state.orders_vault], ignore_index=True)
-                clean_orders = clean_orders_data(all_orders)
+            with st.spinner("Processing Data..."):
+                raw_orders_df = pd.concat([pd.read_csv(f, encoding='latin1', on_bad_lines='skip') for f in st.session_state.orders_vault], ignore_index=True)
+                st.session_state.raw_order_count = len(raw_orders_df)
+                clean_orders = clean_orders_data(raw_orders_df)
+                st.session_state.zero_rev_count = st.session_state.raw_order_count - len(clean_orders)
                 st.session_state.cleaned_orders = clean_orders.drop_duplicates(subset=['order_id'])
-                
-                # Combine & Deduplicate n8n
                 all_n8n = pd.concat([pd.read_csv(f, encoding='latin1', on_bad_lines='skip') for f in st.session_state.n8n_vault], ignore_index=True)
-                clean_n8n = clean_n8n_data(all_n8n)
-                st.session_state.cleaned_n8n = clean_n8n.drop_duplicates(subset=['email_match'])
-                
-                st.session_state.min_date = st.session_state.cleaned_orders['order_date'].min()
-                st.session_state.max_date = st.session_state.cleaned_orders['order_date'].max()
+                st.session_state.cleaned_n8n = clean_n8n_data(all_n8n).drop_duplicates(subset=['email_match'])
+                st.session_state.min_date, st.session_state.max_date = st.session_state.cleaned_orders['order_date'].min(), st.session_state.cleaned_orders['order_date'].max()
                 st.session_state.current_start, st.session_state.current_end = st.session_state.min_date, st.session_state.max_date
                 st.session_state.app_state = "dashboard"
                 st.rerun()
 
 elif st.session_state.app_state == "dashboard":
-    # --- HEADER & DATE CONTROLS ---
     c1, c2, c3 = st.columns([1, 3, 1])
     if c1.button("🔄 Start Over"): 
         st.session_state.app_state = "onboarding"
@@ -186,20 +152,27 @@ elif st.session_state.app_state == "dashboard":
         st.session_state.dash_data = build_dashboard_views(st.session_state.cleaned_orders, st.session_state.cleaned_n8n, selected_dates[0], selected_dates[1])
     
     dash_data = st.session_state.dash_data
-    if not dash_data:
-        st.warning("No matched profiles found.")
-    else:
+    if dash_data:
+        # 1. MACRO METRICS (DESCRIPTIVE)
         m1, m2 = st.columns(2)
-        m1.metric("Resolved Profiles", f"{dash_data['total_buyers']:,.0f}")
-        m2.metric("Attributed Sales", f"${dash_data['total_revenue']:,.2f}")
+        mask = (st.session_state.cleaned_orders['order_date'] >= selected_dates[0]) & (st.session_state.cleaned_orders['order_date'] <= selected_dates[1])
+        orders_in_range = st.session_state.cleaned_orders[mask]
+        duplicates_identified = len(orders_in_range) - dash_data['total_buyers']
+
+        with m1:
+            st.markdown(f"""<div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);"><p style="margin: 0; font-size: 0.9rem; color: #64748B;">Resolved Customers</p><h2 style="margin: 10px 0; font-size: 3rem; color: #0F172A;">{dash_data['total_buyers']:,.0f}</h2><p style="margin: 0; font-size: 0.75rem; color: #94A3B8; line-height: 1.4;">Scrubbed <b>{st.session_state.zero_rev_count}</b> orders with no revenue.<br>Identified <b>{duplicates_identified}</b> repeat orders from existing customers.<br>Grouped activity so each customer is only counted once.</p></div>""", unsafe_allow_html=True)
+        with m2:
+            st.markdown(f"""<div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); height: 100%; display: flex; flex-direction: column; justify-content: center;"><p style="margin: 0; font-size: 0.9rem; color: #64748B;">Attributed Sales</p><h2 style="margin: 10px 0; font-size: 3rem; color: #0F172A;">${dash_data['total_revenue']:,.2f}</h2></div>""", unsafe_allow_html=True)
         
-        st.markdown("### 🏆 Top Performing Demographics")
+        # 2. TOP PERFORMERS
+        st.markdown("<br>### 🏆 Top Performing Demographics", unsafe_allow_html=True)
         summary_cols = st.columns(len(dash_data['top_performers']))
         for i, (label, data) in enumerate(dash_data['top_performers'].items()):
             with summary_cols[i]:
                 st.markdown(f'<div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 15px; text-align: center; min-height: 120px; display: flex; flex-direction: column; justify-content: center;"><p style="margin: 0; font-size: 0.8rem; color: #64748B; font-weight: 600; text-transform: uppercase;">{label}</p><p style="margin: 5px 0; font-size: 1.1rem; color: #0F172A; font-weight: 700; line-height: 1.2;">{data[0]}</p><p style="margin: 0; font-size: 0.85rem; color: #16A34A; background-color: #F0FDF4; border-radius: 20px; padding: 2px 8px; display: inline-block; align-self: center;">{data[1]:.1f}% of Revenue</p></div>', unsafe_allow_html=True)
 
-        st.markdown("### 🔍 Audience Deep Dive")
+        # 3. DEEP DIVE
+        st.markdown("<br>### 🔍 Audience Deep Dive", unsafe_allow_html=True)
         if "active_var" not in st.session_state: st.session_state.active_var = "Gender"
         if "active_loc_level" not in st.session_state: st.session_state.active_loc_level = "Region"
         v_labels = ["Gender", "Age", "Location", "Marital Status", "Income"]
@@ -207,17 +180,14 @@ elif st.session_state.app_state == "dashboard":
         for i, label in enumerate(v_labels):
             if var_cols[i].button(label, key=f"btn_{label}", type="primary" if st.session_state.active_var == label else "secondary", use_container_width=True):
                 st.session_state.active_var = label; st.rerun()
-
-        lookup_key = st.session_state.active_var
-        if st.session_state.active_var == "Location":
-            st.markdown("<br>", unsafe_allow_html=True)
+        
+        lk = st.session_state.active_var
+        if lk == "Location":
             l1, l2, l3, _ = st.columns([1, 1, 1, 5])
             if l1.button("Region", type="primary" if st.session_state.active_loc_level == "Region" else "secondary"): st.session_state.active_loc_level = "Region"; st.rerun()
             if l2.button("State", type="primary" if st.session_state.active_loc_level == "State" else "secondary"): st.session_state.active_loc_level = "State"; st.rerun()
             if l3.button("Zip Code", type="primary" if st.session_state.active_loc_level == "Zip Code" else "secondary"): st.session_state.active_loc_level = "Zip Code"; st.rerun()
-            lookup_key = st.session_state.active_loc_level
+            lk = st.session_state.active_loc_level
 
-        if lookup_key in dash_data['html_views']:
-            st.markdown(f'<div class="premium-table-container">{dash_data["html_views"][lookup_key]}</div>', unsafe_allow_html=True)
-        else:
-            st.info(f"Not enough data to calculate {lookup_key}.")
+        if lk in dash_data['html_views']:
+            st.markdown(f'<div class="premium-table-container">{dash_data["html_views"][lk]}</div>', unsafe_allow_html=True)
