@@ -7,13 +7,17 @@ import numpy as np
 PITCH_COMPANY_NAME = "LeadNavigator" 
 PITCH_BRAND_COLOR = "#4D148C" # LeadNavigator Deep Purple
 
+# 🚨 UPDATED: Mapper now includes the new verified headers
 N8N_COLUMN_MAPPER = {
     "GENDER": "gender",
     "MARRIED": "marital_status",
     "AGE_RANGE": "age",
     "INCOME_RANGE": "income",
     "PERSONAL_STATE": "state_raw",
-    "PERSONAL_ZIP": "zip_code"
+    "PERSONAL_ZIP": "zip_code",
+    "HOMEOWNER": "homeowner",
+    "CHILDREN": "children",
+    "NET_WORTH": "net_worth"
 }
 
 STATE_TO_REGION = {
@@ -91,6 +95,11 @@ def clean_n8n_data(df):
     if 'marital_status' in df.columns:
         df['marital_status'] = df['marital_status'].map({'Y': 'Married', 'N': 'Single', 'Married': 'Married', 'Single': 'Single'}).fillna('Unknown')
     if 'zip_code' in df.columns: df['zip_code'] = df['zip_code'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(5)
+    
+    # 🚨 THE FIX: Map Children Y/N to Yes/No
+    if 'children' in df.columns:
+        df['children'] = df['children'].map({'Y': 'Yes', 'N': 'No'}).fillna('Unknown')
+
     if 'personal_emails' in df.columns:
         df['email_match'] = df['personal_emails'].astype(str).str.lower().str.replace(r'[^a-z0-9@._,-]', '', regex=True).str.split(',')
         df = df.explode('email_match').reset_index(drop=True)
@@ -123,7 +132,15 @@ def build_dashboard_views(orders_df, enriched_df, start_date, end_date):
     total_rev = df_joined['revenue'].sum()
     matched_count = df_joined['email_match'].nunique()
     match_rate = (matched_count / unique_shopify_humans * 100) if unique_shopify_humans > 0 else 0
-    summary_vars = [("Gender", "gender"), ("Age", "age"), ("Marital Status", "marital_status"), ("Region", "region"), ("State", "state_raw"), ("Zip Code", "zip_code"), ("Income", "income")]
+    
+    # 🚨 Variable List: Expanded to exactly 10 variables for a 2x5 grid
+    summary_vars = [
+        ("Gender", "gender"), ("Age", "age"), ("Marital Status", "marital_status"), 
+        ("Region", "region"), ("State", "state_raw"), ("Zip Code", "zip_code"), 
+        ("Income", "income"), ("Homeowner", "homeowner"), 
+        ("Children", "children"), ("Net Worth", "net_worth")
+    ]
+    
     top_perf = {}
     all_html_views = {}
     for label, col_key in summary_vars:
@@ -174,14 +191,8 @@ if st.session_state.app_state == "onboarding":
         else:
             with st.spinner("Processing Customer Insights..."):
                 raw_df = pd.concat([pd.read_csv(f, encoding='latin1', on_bad_lines='skip') for f in st.session_state.orders_vault], ignore_index=True)
-                raw_count = len(raw_df)
                 cleaned_step_1 = clean_orders_data(raw_df)
-                st.session_state.zero_rev_count = raw_count - len(cleaned_step_1)
-                unique_orders_df = cleaned_step_1.drop_duplicates(subset=['order_id'])
-                st.session_state.line_item_dupes = len(cleaned_step_1) - len(unique_orders_df)
-                unique_customers_count = unique_orders_df['email_match'].nunique()
-                st.session_state.repeat_orders = len(unique_orders_df) - unique_customers_count
-                st.session_state.cleaned_orders = unique_orders_df
+                st.session_state.cleaned_orders = cleaned_step_1.drop_duplicates(subset=['order_id'])
                 all_n8n = pd.concat([pd.read_csv(f, encoding='latin1', on_bad_lines='skip') for f in st.session_state.n8n_vault], ignore_index=True)
                 st.session_state.cleaned_n8n = clean_n8n_data(all_n8n).drop_duplicates(subset=['email_match'])
                 st.session_state.min_date, st.session_state.max_date = st.session_state.cleaned_orders['order_date'].min(), st.session_state.cleaned_orders['order_date'].max()
@@ -202,7 +213,8 @@ elif st.session_state.app_state == "dashboard":
     with c2:
         selected_dates = st.slider("Filter by Date", min_value=st.session_state.min_date, max_value=st.session_state.max_date, value=(st.session_state.current_start, st.session_state.current_end), format="MMM DD, YYYY")
     
-    st.markdown("<div style='margin-bottom: 40px;'></div>", unsafe_allow_html=True)
+    # 🚨 PADDING: Space below slider
+    st.markdown("<div style='margin-bottom: 50px;'></div>", unsafe_allow_html=True)
 
     if (selected_dates[0] != st.session_state.current_start) or (selected_dates[1] != st.session_state.current_end) or ("dash_data" not in st.session_state):
         st.session_state.current_start, st.session_state.current_end = selected_dates[0], selected_dates[1]
@@ -217,13 +229,7 @@ elif st.session_state.app_state == "dashboard":
                     <h3 style="margin: 0; font-size: 1.6rem; color: #0F172A; font-weight: 700; font-family: Outfit, sans-serif;">Resolved Customers</h3>
                     <h4 style="margin: 5px 0 15px 0; font-size: 1.6rem; color: {PITCH_BRAND_COLOR}; font-weight: 700; font-family: Outfit, sans-serif;">{dash_data['total_buyers']:,.0f}</h4>
                     <p style="margin: 0; font-size: 0.9rem; color: #1e293b; font-weight: 500; font-family: Outfit, sans-serif;">
-                        Identified <b>{dash_data['unique_shopify_customers']:,.0f}</b> individual customers and matched <b>{dash_data['total_buyers']:,.0f} ({dash_data['match_rate']:.1f}%)</b>.
-                    </p>
-                    <hr style="margin: 15px 0; border: 0; border-top: 1px solid #EBE4F4;">
-                    <p style="margin: 0; font-size: 0.75rem; color: #64748B; line-height: 1.4; text-align: left; font-family: Outfit, sans-serif;">
-                        • Scrubbed <b>{st.session_state.zero_rev_count}</b> empty or $0 line items.<br>
-                        • Collapsed <b>{st.session_state.line_item_dupes}</b> multi-line item rows.<br>
-                        • Grouped <b>{st.session_state.repeat_orders}</b> repeat purchases from the same buyers.
+                        Matched <b>{dash_data['total_buyers']:,.0f} ({dash_data['match_rate']:.1f}%)</b> customers.
                     </p>
                 </div>
             """, unsafe_allow_html=True)
@@ -235,24 +241,34 @@ elif st.session_state.app_state == "dashboard":
                 </div>
             """, unsafe_allow_html=True)
         
-        st.markdown("""<h2 class="modern-serif-title" style="margin-top: 4rem; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 10px;"><span style="font-size: 2rem;">🏆</span> Top Performing Demographics</h2>""", unsafe_allow_html=True)
+        # 🚨 PADDING: Space above Top Performers
+        st.markdown("<div style='margin-top: 6rem;'></div>", unsafe_allow_html=True)
+        st.markdown("""<h2 class="modern-serif-title" style="margin-bottom: 2rem; display: flex; align-items: center; gap: 10px;"><span style="font-size: 2rem;">🏆</span> Top Performing Demographics</h2>""", unsafe_allow_html=True)
         
-        summary_cols = st.columns(len(dash_data['top_performers']))
-        for i, (label, data) in enumerate(dash_data['top_performers'].items()):
-            with summary_cols[i]:
-                st.markdown(f'''
-                    <div style="background-color: #F8F5FA; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 15px; text-align: center; min-height: 120px; display: flex; flex-direction: column; justify-content: center; align-items: center; margin-bottom: 3rem;">
-                        <p style="margin: 0; font-size: 1.0rem; color: #0F172A; font-weight: 700; text-transform: uppercase; font-family: Outfit, sans-serif;">{label}</p>
-                        <h3 style="margin: 5px 0 10px 0; font-size: 1.1rem; color: {PITCH_BRAND_COLOR}; font-weight: 600; line-height: 1.2; font-family: Outfit, sans-serif !important;">{data[0]}</h3>
-                        <p style="margin: 0; font-size: 0.85rem; color: {PITCH_BRAND_COLOR}; background-color: #EBE4F4; border-radius: 20px; padding: 4px 10px; display: inline-block; font-weight: 600; font-family: Outfit, sans-serif !important;">{data[1]:.1f}% of Revenue</p>
-                    </div>
-                ''', unsafe_allow_html=True)
+        # 🚨 THE FIX: Logic for 2 Rows of 5 Cards
+        items = list(dash_data['top_performers'].items())
+        for i in range(0, len(items), 5):
+            chunk = items[i:i+5]
+            cols = st.columns(5)
+            for j, (label, data) in enumerate(chunk):
+                with cols[j]:
+                    st.markdown(f'''
+                        <div style="background-color: #F8F5FA; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 15px; text-align: center; min-height: 120px; display: flex; flex-direction: column; justify-content: center; align-items: center; margin-bottom: 2rem;">
+                            <p style="margin: 0; font-size: 1.0rem; color: #0F172A; font-weight: 700; text-transform: uppercase; font-family: Outfit, sans-serif;">{label}</p>
+                            <h3 style="margin: 5px 0 10px 0; font-size: 1.1rem; color: {PITCH_BRAND_COLOR}; font-weight: 600; line-height: 1.2; font-family: Outfit, sans-serif !important;">{data[0]}</h3>
+                            <p style="margin: 0; font-size: 0.85rem; color: {PITCH_BRAND_COLOR}; background-color: #EBE4F4; border-radius: 20px; padding: 4px 10px; display: inline-block; font-weight: 600; font-family: Outfit, sans-serif !important;">{data[1]:.1f}% of Revenue</p>
+                        </div>
+                    ''', unsafe_allow_html=True)
                 
-        st.markdown("""<h2 class="modern-serif-title" style="margin-top: 1.5rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 10px;"><span style="font-size: 2rem;">🔍</span> Customer Deep Dive</h2>""", unsafe_allow_html=True)
+        # 🚨 PADDING: Space above Deep Dive
+        st.markdown("<div style='margin-top: 3rem;'></div>", unsafe_allow_html=True)
+        st.markdown("""<h2 class="modern-serif-title" style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 10px;"><span style="font-size: 2rem;">🔍</span> Customer Deep Dive</h2>""", unsafe_allow_html=True)
         
+        # 🚨 THE FIX: Single row for all 8 buttons (Location counts as 1 button)
         if "active_var" not in st.session_state: st.session_state.active_var = "Gender"
         if "active_loc_level" not in st.session_state: st.session_state.active_loc_level = "Region"
-        v_labels = ["Gender", "Age", "Location", "Marital Status", "Income"]
+        
+        v_labels = ["Gender", "Age", "Location", "Marital Status", "Income", "Homeowner", "Children", "Net Worth"]
         var_cols = st.columns(len(v_labels))
         for i, label in enumerate(v_labels):
             if var_cols[i].button(label, key=f"btn_{label}", type="primary" if st.session_state.active_var == label else "secondary", use_container_width=True):
@@ -265,6 +281,7 @@ elif st.session_state.app_state == "dashboard":
             if l2.button("State", type="primary" if st.session_state.active_loc_level == "State" else "secondary"): st.session_state.active_loc_level = "State"; st.rerun()
             if l3.button("Zip Code", type="primary" if st.session_state.active_loc_level == "Zip Code" else "secondary"): st.session_state.active_loc_level = "Zip Code"; st.rerun()
             lk = st.session_state.active_loc_level
+
         if lk in dash_data['html_views']:
             st.markdown(f'<div class="premium-table-container">{dash_data["html_views"][lk]}</div>', unsafe_allow_html=True)
 
