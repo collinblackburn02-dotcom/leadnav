@@ -46,8 +46,8 @@ def apply_custom_theme(primary_color):
 
 apply_custom_theme(PITCH_BRAND_COLOR)
 
-# 🚨 NEW: The LeadNavigator Purple Gradient for the deep dive tables
-brand_gradient = mcolors.LinearSegmentedColormap.from_list("brand_purple", ["#FFFFFF", "#F3F1F8", "#9B85E1"])
+# 🚨 THE NEW FIX: Ultra-subtle, premium SaaS gradient
+brand_gradient = mcolors.LinearSegmentedColormap.from_list("brand_purple", ["#FFFFFF", "#FBF9FC", "#EBE4F4"])
 
 # ================ 2. DATA ENGINE =================
 @st.cache_data(show_spinner=False)
