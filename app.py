@@ -91,10 +91,14 @@ def clean_n8n_data(df):
     if 'marital_status' in df.columns:
         df['marital_status'] = df['marital_status'].astype(str).str.strip().map({'Y': 'Married', 'N': 'Single', 'Married': 'Married', 'Single': 'Single'}).fillna('Unknown')
     
-    # 🚨 IMPROVED HOMEOWNER LOGIC: Catching Owners vs. everything else
+    # 🚨 THE FIX: Strict whitelist for Homeowner "Yes"
     if 'homeowner' in df.columns:
+        # Convert to string and clean whitespace
         df['homeowner'] = df['homeowner'].astype(str).str.strip()
-        df['homeowner'] = np.where(df['homeowner'].isin(['Homeowner', 'Y', 'Owner']), 'Yes', 'No')
+        # Whitelist specific values for "Yes", treat others (not empty) as "No"
+        yes_values = ['Y', 'Homeowner', 'Probably Homeowner']
+        df['homeowner'] = np.where(df['homeowner'].isin(yes_values), 'Yes', 
+                          np.where(df['homeowner'].isin(['nan', '', 'None', 'null']), 'Unknown', 'No'))
 
     # Children mapping
     if 'children' in df.columns:
@@ -168,7 +172,7 @@ if "app_state" not in st.session_state:
 
 if st.session_state.app_state == "onboarding":
     st.image("logo.png", width=180)
-    # 🚨 UPDATED: Using your exact font sizes (3.6rem / 1.8rem) and logic
+    # 🚨 PRESERVED: Exact layout and font sizes (3.6rem / 1.8rem)
     st.markdown("""
         <div style="text-align: center; margin-top: 0px; margin-bottom: 25px;">
             <h1 class="serif-gradient-centerpiece" style="font-size: 3.6rem; margin-bottom: 2px;">Customer Insights Dashboard.</h1>
