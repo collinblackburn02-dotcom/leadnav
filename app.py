@@ -305,7 +305,7 @@ elif st.session_state.app_state == "dashboard":
                 st.markdown(f'''
                     <div style="background-color: #F8F5FA; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 15px; text-align: center; min-height: 120px; display: flex; flex-direction: column; justify-content: center; align-items: center;">
                         <p style="margin: 0; font-size: 1.0rem; color: #0F172A; font-weight: 700; text-transform: uppercase; font-family: Outfit, sans-serif;">{label}</p>
-                        <h3 style="margin: 5px 0 10px 0; font-size: 1.0rem; color: {PITCH_BRAND_COLOR}; font-weight: 600; line-height: 1.2; font-family: Outfit, sans-serif !important;">{data[0]}</h3>
+                        <h3 style="margin: 5px 0 10px 0; font-size: 1.1rem; color: {PITCH_BRAND_COLOR}; font-weight: 600; line-height: 1.2; font-family: Outfit, sans-serif !important;">{data[0]}</h3>
                         <p style="margin: 0; font-size: 0.85rem; color: {PITCH_BRAND_COLOR}; background-color: #EBE4F4; border-radius: 20px; padding: 4px 10px; display: inline-block; font-weight: 600; font-family: Outfit, sans-serif !important;">{data[1]:.1f}% of Revenue</p>
                     </div>
                 ''', unsafe_allow_html=True)
