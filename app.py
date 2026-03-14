@@ -5,7 +5,7 @@ import numpy as np
 
 # ================ 1. CONFIGURATION & THEME =================
 PITCH_COMPANY_NAME = "LeadNavigator" 
-PITCH_BRAND_COLOR = "#0F172A" 
+PITCH_BRAND_COLOR = "#4D148C" # LeadNavigator Deep Purple
 
 N8N_COLUMN_MAPPER = {
     "GENDER": "gender",
@@ -30,22 +30,24 @@ def apply_custom_theme(primary_color):
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
             html, body, [class*="css"] {{ font-family: 'Outfit', sans-serif; }}
-            .stApp {{ background-color: #F8FAFC; }} 
+            .stApp {{ background-color: #FAFAFC; }} /* Extra subtle cool tint to match website */
             h1, h2, h3 {{ color: #0F172A !important; font-weight: 600 !important; }}
             [data-testid="stSidebar"], [data-testid="collapsedControl"] {{ display: none !important; }}
             div[data-testid="stButton"] button {{ border-radius: 8px; font-weight: 500; padding: 0px 10px !important; }}
             div[data-testid="stButton"] button[kind="primary"] {{ background-color: {primary_color} !important; color: #FFFFFF !important; border: none; }}
-            div[data-testid="stButton"] button[kind="secondary"] {{ background-color: #FFFFFF; color: #0F172A; border: 1px solid #CBD5E1; }}
+            div[data-testid="stButton"] button[kind="secondary"] {{ background-color: #FFFFFF; color: {primary_color}; border: 1px solid #EBE4F4; }}
             .premium-table-container {{ border-radius: 12px; border: 1px solid #E2E8F0; background: #FFFFFF; overflow: hidden; margin-top: 1rem; margin-bottom: 2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }}
             .premium-table-container table {{ width: 100% !important; border-collapse: collapse !important; }}
-            .premium-table-container th {{ background-color: #F1F5F9 !important; color: #334155 !important; font-weight: 700 !important; text-align: center !important; padding: 12px !important; border-bottom: 2px solid #CBD5E1 !important; text-transform: uppercase !important; font-size: 0.75rem !important; }}
+            .premium-table-container th {{ background-color: #F8F6FA !important; color: #4D148C !important; font-weight: 700 !important; text-align: center !important; padding: 12px !important; border-bottom: 2px solid #EBE4F4 !important; text-transform: uppercase !important; font-size: 0.75rem !important; }}
             .premium-table-container td {{ text-align: center !important; padding: 12px !important; border-bottom: 1px solid #F8FAFC !important; font-size: 0.85rem !important; }}
             .premium-table-container td:first-child {{ font-weight: 700 !important; color: #0F172A !important; }}
         </style>
     """, unsafe_allow_html=True)
 
 apply_custom_theme(PITCH_BRAND_COLOR)
-custom_light_green = mcolors.LinearSegmentedColormap.from_list("custom_green", ["#F9F7F3", "#D1E5D1", "#6EAB6E"])
+
+# 🚨 NEW: The LeadNavigator Purple Gradient for the deep dive tables
+brand_gradient = mcolors.LinearSegmentedColormap.from_list("brand_purple", ["#FFFFFF", "#EBE4F4", "#8B5CF6"])
 
 # ================ 2. DATA ENGINE =================
 @st.cache_data(show_spinner=False)
