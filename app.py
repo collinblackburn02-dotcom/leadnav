@@ -41,6 +41,15 @@ def apply_custom_theme(primary_color):
             
             [data-testid="stSidebar"], [data-testid="collapsedControl"] {{ display: none !important; }}
             
+            /* 🚨 THE FIX: Banishing the Hyperlink icons and styling */
+            .stMarkdown a svg {{ display: none !important; }}
+            .stMarkdown a {{ 
+                text-decoration: none !important; 
+                color: inherit !important; 
+                cursor: default !important; 
+                pointer-events: none !important; 
+            }}
+
             div[data-testid="stButton"] button {{ border-radius: 8px; font-weight: 500; padding: 0px 10px !important; }}
             div[data-testid="stButton"] button[kind="primary"] {{ background-color: {primary_color} !important; color: #FFFFFF !important; border: none; }}
             
@@ -267,7 +276,6 @@ elif st.session_state.app_state == "dashboard":
         m1, m2 = st.columns(2)
 
         with m1:
-            # 🚨 THE FIX: Refined hierarchy (larger labels, smaller colored numbers) and soft purple background
             st.markdown(f"""
                 <div style="background-color: #F8F5FA; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 25px 20px; text-align: center; box-shadow: 0 2px 4px rgba(77, 20, 140, 0.05);">
                     <h3 style="margin: 0; font-size: 1.6rem; color: #0F172A; font-weight: 700; font-family: Outfit, sans-serif;">Resolved Customers</h3>
@@ -301,7 +309,6 @@ elif st.session_state.app_state == "dashboard":
         summary_cols = st.columns(len(dash_data['top_performers']))
         for i, (label, data) in enumerate(dash_data['top_performers'].items()):
             with summary_cols[i]:
-                # 🚨 THE FIX: Flipped font sizes, forced center alignment, and added the light purple background
                 st.markdown(f'''
                     <div style="background-color: #F8F5FA; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 15px; text-align: center; min-height: 120px; display: flex; flex-direction: column; justify-content: center; align-items: center;">
                         <p style="margin: 0; font-size: 1.0rem; color: #0F172A; font-weight: 700; text-transform: uppercase; font-family: Outfit, sans-serif;">{label}</p>
@@ -342,7 +349,7 @@ elif st.session_state.app_state == "dashboard":
         if lk in dash_data['html_views']:
             st.markdown(f'<div class="premium-table-container">{dash_data["html_views"][lk]}</div>', unsafe_allow_html=True)
 
-        # 🚨 THE FIX: Start Over button relocated to the very bottom, centered, and emoji removed
+        # Start Over button relocated to the very bottom, centered, and emoji removed
         st.markdown("<br><hr style='border-top: 1px solid #E2E8F0; margin: 2rem 0;'><br>", unsafe_allow_html=True)
         _, reset_col, _ = st.columns([2, 1, 2])
         if reset_col.button("Start Over", use_container_width=True): 
