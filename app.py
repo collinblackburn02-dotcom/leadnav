@@ -38,7 +38,6 @@ def apply_custom_theme(primary_color):
             footer {{ visibility: hidden; }}
             [data-testid="stSidebar"], [data-testid="collapsedControl"] {{ display: none !important; }}
             
-            /* Banishing the Hyperlink icons across the app */
             .stMarkdown a svg {{ display: none !important; }}
             .stMarkdown a {{ 
                 text-decoration: none !important; 
@@ -47,7 +46,6 @@ def apply_custom_theme(primary_color):
                 pointer-events: none !important; 
             }}
 
-            /* 🚨 THE FIX: Slider Label (Bigger, Black, Bold) */
             div[data-testid="stSlider"] label p {{
                 font-size: 1.2rem !important;
                 font-weight: 700 !important;
@@ -155,24 +153,26 @@ if st.session_state.app_state == "onboarding":
     st.markdown("""
         <div style="text-align: center; margin-top: -15px; margin-bottom: 30px;">
             <h1 class="serif-gradient-centerpiece" style="font-size: 2.8rem; margin-bottom: 0px;">Customer Insights Dashboard.</h1>
-            <h2 class="serif-subheadline" style="font-size: 2.2rem; color: #0F172A !important; margin-top: 0px;">Get To Know Your Customer.</h2>
+            <h2 class="serif-subheadline" style="font-size: 2.2rem; color: #0F172A !important; margin-top: 0px;">Upload Customer Data to begin.</h2>
         </div>
     """, unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #64748B; font-family: Outfit, sans-serif;'>Upload Shopify and Enriched Data files to begin.</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #64748B; font-family: Outfit, sans-serif;'>Get instant demographic insights on your existing customers.</p>", unsafe_allow_html=True)
+    
     _, col1, col2, _ = st.columns([1, 2, 2, 1])
     with col1:
-        st.subheader("🛒 Shopify Orders")
-        st.session_state.orders_vault = st.file_uploader("Add Shopify CSVs", type=["csv"], accept_multiple_files=True, key="order_up")
+        st.subheader("👥 Customer Data")
+        st.session_state.orders_vault = st.file_uploader("Upload your Shopify Order Export or a CSV containing columns for Order ID, Date, Email, and Total.", type=["csv"], accept_multiple_files=True, key="order_up")
     with col2:
         st.subheader("🧬 Enriched Data")
-        st.session_state.n8n_vault = st.file_uploader("Add n8n CSVs", type=["csv"], accept_multiple_files=True, key="n8n_up")
+        st.session_state.n8n_vault = st.file_uploader("Upload visitor intelligence files to match against your customer base.", type=["csv"], accept_multiple_files=True, key="n8n_up")
+    
     st.markdown("<br>", unsafe_allow_html=True)
     _, center_col, _ = st.columns([2, 1, 2])
     if center_col.button("🚀 Run Analysis", type="primary", use_container_width=True):
         if not st.session_state.orders_vault or not st.session_state.n8n_vault:
-            st.error("Please upload at least one of each file type.")
+            st.error("Please upload both Customer and Enriched data to proceed.")
         else:
-            with st.spinner("Deduplicating & Processing Data..."):
+            with st.spinner("Processing Customer Insights..."):
                 raw_df = pd.concat([pd.read_csv(f, encoding='latin1', on_bad_lines='skip') for f in st.session_state.orders_vault], ignore_index=True)
                 raw_count = len(raw_df)
                 cleaned_step_1 = clean_orders_data(raw_df)
@@ -198,12 +198,10 @@ elif st.session_state.app_state == "dashboard":
         </div>
     """, unsafe_allow_html=True)
     
-    # Date Slider Section with Label Update
     _, c2, _ = st.columns([1, 4, 1])
     with c2:
         selected_dates = st.slider("Filter by Date", min_value=st.session_state.min_date, max_value=st.session_state.max_date, value=(st.session_state.current_start, st.session_state.current_end), format="MMM DD, YYYY")
     
-    # 🚨 PADDING: Space between slider and metrics
     st.markdown("<div style='margin-bottom: 40px;'></div>", unsafe_allow_html=True)
 
     if (selected_dates[0] != st.session_state.current_start) or (selected_dates[1] != st.session_state.current_end) or ("dash_data" not in st.session_state):
@@ -237,13 +235,11 @@ elif st.session_state.app_state == "dashboard":
                 </div>
             """, unsafe_allow_html=True)
         
-        # 🚨 PADDING: Space above Top Performers
         st.markdown("""<h2 class="modern-serif-title" style="margin-top: 4rem; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 10px;"><span style="font-size: 2rem;">🏆</span> Top Performing Demographics</h2>""", unsafe_allow_html=True)
         
         summary_cols = st.columns(len(dash_data['top_performers']))
         for i, (label, data) in enumerate(dash_data['top_performers'].items()):
             with summary_cols[i]:
-                # 🚨 PADDING: Space below the cards (margin-bottom: 3rem)
                 st.markdown(f'''
                     <div style="background-color: #F8F5FA; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 15px; text-align: center; min-height: 120px; display: flex; flex-direction: column; justify-content: center; align-items: center; margin-bottom: 3rem;">
                         <p style="margin: 0; font-size: 1.0rem; color: #0F172A; font-weight: 700; text-transform: uppercase; font-family: Outfit, sans-serif;">{label}</p>
@@ -252,7 +248,6 @@ elif st.session_state.app_state == "dashboard":
                     </div>
                 ''', unsafe_allow_html=True)
                 
-        # Space below Top Performers header is naturally created by the margin-bottom on the cards above
         st.markdown("""<h2 class="modern-serif-title" style="margin-top: 1.5rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 10px;"><span style="font-size: 2rem;">🔍</span> Customer Deep Dive</h2>""", unsafe_allow_html=True)
         
         if "active_var" not in st.session_state: st.session_state.active_var = "Gender"
