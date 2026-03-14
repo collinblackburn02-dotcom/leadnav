@@ -279,7 +279,7 @@ elif st.session_state.app_state == "dashboard":
             st.markdown(f"""
                 <div style="background-color: #F8F5FA; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 25px 20px; text-align: center; box-shadow: 0 2px 4px rgba(77, 20, 140, 0.05);">
                     <h3 style="margin: 0; font-size: 1.6rem; color: #0F172A; font-weight: 700; font-family: Outfit, sans-serif;">Resolved Customers</h3>
-                    <h4 style="margin: 5px 0 15px 0; font-size: 1.3rem; color: {PITCH_BRAND_COLOR}; font-weight: 700; font-family: Outfit, sans-serif;">{dash_data['total_buyers']:,.0f}</h4>
+                    <h4 style="margin: 5px 0 15px 0; font-size: 1.6rem; color: {PITCH_BRAND_COLOR}; font-weight: 700; font-family: Outfit, sans-serif;">{dash_data['total_buyers']:,.0f}</h4>
                     <p style="margin: 0; font-size: 0.9rem; color: #1e293b; font-weight: 500; font-family: Outfit, sans-serif;">
                         Identified <b>{dash_data['unique_shopify_customers']:,.0f}</b> individual customers and matched <b>{dash_data['total_buyers']:,.0f} ({dash_data['match_rate']:.1f}%)</b>.
                     </p>
