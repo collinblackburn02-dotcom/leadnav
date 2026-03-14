@@ -164,11 +164,11 @@ if st.session_state.app_state == "onboarding":
     # 🚨 FIXED: Centers Piece restored, 2nd and 3rd lines switched
     st.markdown("""
         <div style="text-align: center; margin-top: -15px; margin-bottom: 25px;">
-            <h1 class="serif-gradient-centerpiece" style="font-size: 3.6rem; margin-bottom: 0px;">Customer Insights Dashboard.</h1>
+            <h1 class="serif-gradient-centerpiece" style="font-size: 3.6rem; margin-bottom: 2px;">Customer Insights Dashboard.</h1>
             <h2 class="serif-subheadline" style="font-size: 1.8rem; color: #0F172A !important; margin-top: 5px;">Get instant demographic insights on your existing customers.</h2>
         </div>
     """, unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #64748B; font-family: Outfit, sans-serif; font-size: 0.9rem; margin-top: -15px;'>Upload Customer Data to begin.</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #64748B; font-family: Outfit, sans-serif; font-size: 0.9rem; margin-top: 0px;'>Upload Customer Data to begin.</p>", unsafe_allow_html=True)
     
     _, col1, col2, _ = st.columns([1, 2, 2, 1])
     with col1:
