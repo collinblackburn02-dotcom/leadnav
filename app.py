@@ -32,19 +32,25 @@ def apply_custom_theme(primary_color):
             html, body, [class*="css"] {{ font-family: 'Outfit', sans-serif; }}
             .stApp {{ background-color: #FAFAFC; }} 
             h1, h2, h3 {{ color: #0F172A !important; font-weight: 600 !important; }}
+            
+            /* 🚨 THE FIX: Hide standard Streamlit headers and footers */
+            [data-testid="stHeader"] {{ display: none !important; }}
+            #MainMenu {{ visibility: hidden; }}
+            footer {{ visibility: hidden; }}
+            
             [data-testid="stSidebar"], [data-testid="collapsedControl"] {{ display: none !important; }}
             
             div[data-testid="stButton"] button {{ border-radius: 8px; font-weight: 500; padding: 0px 10px !important; }}
             div[data-testid="stButton"] button[kind="primary"] {{ background-color: {primary_color} !important; color: #FFFFFF !important; border: none; }}
             
-            /* 🚨 THE FIX: Match the active button's deep purple for inactive outlines */
+            /* THE FIX: Match the active button's deep purple for inactive outlines */
             div[data-testid="stButton"] button[kind="secondary"] {{ background-color: #FFFFFF; color: {primary_color}; border: 1px solid {primary_color}; }}
             
-            /* 🚨 THE FIX: Match the active button's deep purple for the table outline */
+            /* THE FIX: Match the active button's deep purple for the table outline */
             .premium-table-container {{ border-radius: 12px; border: 1px solid {primary_color}; background: #FFFFFF; overflow: hidden; margin-top: 1rem; margin-bottom: 2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }}
             .premium-table-container table {{ width: 100% !important; border-collapse: collapse !important; }}
             
-            /* 🚨 THE FIX: Match the header underline to the new deep purple border */
+            /* THE FIX: Match the header underline to the new deep purple border */
             .premium-table-container th {{ background-color: #F8F6FA !important; color: {primary_color} !important; font-weight: 700 !important; text-align: center !important; padding: 15px 12px !important; border-bottom: 2px solid {primary_color} !important; border-right: 1px solid #EBE4F4 !important; text-transform: uppercase !important; font-size: 0.95rem !important; letter-spacing: 0.5px !important; }}
             
             /* Internal grid lines remain soft so they don't distract from the data */
@@ -57,7 +63,7 @@ def apply_custom_theme(primary_color):
 
 apply_custom_theme(PITCH_BRAND_COLOR)
 
-# 🚨 THE NEW FIX: Ultra-subtle, premium SaaS gradient
+# THE NEW FIX: Ultra-subtle, premium SaaS gradient
 brand_gradient = mcolors.LinearSegmentedColormap.from_list("brand_purple", ["#FFFFFF", "#FBF9FC", "#EBE4F4"])
 
 # ================ 2. DATA ENGINE =================
@@ -104,7 +110,7 @@ def build_dashboard_views(orders_df, enriched_df, start_date, end_date):
     filtered_orders = orders_df.loc[mask]
     if filtered_orders.empty: return None
     
-    # 🚨 Added logic: Calculate unique individual buyers in Shopify for the match rate
+    # Added logic: Calculate unique individual buyers in Shopify for the match rate
     unique_shopify_humans = filtered_orders['email_match'].nunique()
     
     purchasers = filtered_orders.groupby('email_match').agg(revenue=('revenue_raw', 'sum'), order_count=('order_id', 'nunique')).reset_index()
@@ -114,7 +120,7 @@ def build_dashboard_views(orders_df, enriched_df, start_date, end_date):
     
     total_rev = df_joined['revenue'].sum()
     
-    # 🚨 Added logic: Calculate the match rate
+    # Added logic: Calculate the match rate
     matched_count = df_joined['email_match'].nunique()
     match_rate = (matched_count / unique_shopify_humans * 100) if unique_shopify_humans > 0 else 0
     
@@ -137,7 +143,7 @@ def build_dashboard_views(orders_df, enriched_df, start_date, end_date):
                 styler = final_v.style.format({'Purchasers': '{:,.0f}', 'Revenue': '${:,.2f}', '% of Buyers': '{:.1f}%', 'Rev / Purchaser': '${:,.2f}'}).background_gradient(subset=['Revenue', '% of Buyers'], cmap=brand_gradient)
                 all_html_views[label] = styler.hide(axis="index").to_html()
                 
-    # 🚨 Updated return statement to include the new match metrics
+    # Updated return statement to include the new match metrics
     return {
         "total_revenue": total_rev, 
         "total_buyers": matched_count, 
@@ -160,7 +166,7 @@ if st.session_state.app_state == "onboarding":
     with logo_col:
         st.image("logo.png", use_container_width=True)
         
-    st.markdown("<h3 style='text-align: center; color: #64748B; margin-top: -15px; margin-bottom: 30px;'>Audience Engine</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align: center; color: #64748B; margin-top: -15px; margin-bottom: 30px;'>Customer Insights Dashboard</h3>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; color: #64748B;'>Upload Shopify and Enriched Data files to begin.</p>", unsafe_allow_html=True)
     
     _, col1, col2, _ = st.columns([1, 2, 2, 1])
@@ -179,7 +185,7 @@ if st.session_state.app_state == "onboarding":
             st.error("Please upload at least one of each file type.")
         else:
             with st.spinner("Deduplicating & Processing Data..."):
-                # 🚨 New Logic: Process Orders and count all the duplicates and blanks
+                # New Logic: Process Orders and count all the duplicates and blanks
                 raw_df = pd.concat([pd.read_csv(f, encoding='latin1', on_bad_lines='skip') for f in st.session_state.orders_vault], ignore_index=True)
                 raw_count = len(raw_df)
                 
@@ -209,18 +215,29 @@ if st.session_state.app_state == "onboarding":
 
 elif st.session_state.app_state == "dashboard":
     
-    # 🚨 THE FIX: Logo placed cleanly in the top left column above the Start Over button
-    c1, c2, c3 = st.columns([1, 3, 1])
+    # 🚨 THE FIX: Centered Logo and Large Title for the Dashboard
+    _, dash_logo_col, _ = st.columns([1, 1, 1])
+    with dash_logo_col:
+        st.image("logo.png", use_container_width=True)
+        
+    st.markdown("<h1 style='text-align: center; color: #0F172A; margin-top: -10px; margin-bottom: 30px; font-size: 2.5rem;'>Customer Insights Dashboard</h1>", unsafe_allow_html=True)
+    
+    # 🚨 THE FIX: The Controls Row (Start Over + Date Slider)
+    c1, c2, c3 = st.columns([1, 4, 1])
     
     with c1:
-        st.image("logo.png", width=250)
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("🔄 Start Over"): 
+        # Added a tiny spacer so the button aligns vertically with the slider track
+        st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True) 
+        if st.button("🔄 Start Over", use_container_width=True): 
             st.session_state.app_state = "onboarding"
             st.rerun()
             
     with c2:
         selected_dates = st.slider("Filter by Purchase Date", min_value=st.session_state.min_date, max_value=st.session_state.max_date, value=(st.session_state.current_start, st.session_state.current_end), format="MMM DD, YYYY")
+    
+    with c3:
+        # We will put the "Download CSV" button here next!
+        pass
     
     if (selected_dates[0] != st.session_state.current_start) or (selected_dates[1] != st.session_state.current_end) or ("dash_data" not in st.session_state):
         st.session_state.current_start, st.session_state.current_end = selected_dates[0], selected_dates[1]
