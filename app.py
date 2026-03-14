@@ -28,12 +28,16 @@ st.set_page_config(page_title=f"{PITCH_COMPANY_NAME} | Audience Engine", page_ic
 def apply_custom_theme(primary_color):
     st.markdown(f"""
         <style>
-            @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+            /* 🚨 THE FIX: Imported Playfair Display for the Serif Headers, kept Outfit for the body */
+            @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;0,800;1,600&display=swap');
+            
             html, body, [class*="css"] {{ font-family: 'Outfit', sans-serif; }}
             .stApp {{ background-color: #FAFAFC; }} 
-            h1, h2, h3 {{ color: #0F172A !important; font-weight: 600 !important; }}
             
-            /* 🚨 THE FIX: Hide standard Streamlit headers and footers */
+            /* 🚨 THE FIX: All Headers are now the elegant Playfair Display Serif font */
+            h1, h2, h3 {{ font-family: 'Playfair Display', serif !important; color: #0F172A !important; font-weight: 700 !important; letter-spacing: -0.5px; }}
+            
+            /* Hide standard Streamlit headers and footers */
             [data-testid="stHeader"] {{ display: none !important; }}
             #MainMenu {{ visibility: hidden; }}
             footer {{ visibility: hidden; }}
@@ -43,18 +47,18 @@ def apply_custom_theme(primary_color):
             div[data-testid="stButton"] button {{ border-radius: 8px; font-weight: 500; padding: 0px 10px !important; }}
             div[data-testid="stButton"] button[kind="primary"] {{ background-color: {primary_color} !important; color: #FFFFFF !important; border: none; }}
             
-            /* THE FIX: Match the active button's deep purple for inactive outlines */
-            div[data-testid="stButton"] button[kind="secondary"] {{ background-color: #FFFFFF; color: {primary_color}; border: 1px solid {primary_color}; }}
+            /* Match the active button's deep purple for inactive outlines */
+            div[data-testid="stButton"] button[kind="secondary"] {{ background-color: #FFFFFF; color: {primary_color}; border: 1px solid {primary_color}; font-family: 'Outfit', sans-serif !important; }}
             
-            /* THE FIX: Match the active button's deep purple for the table outline */
+            /* Match the active button's deep purple for the table outline */
             .premium-table-container {{ border-radius: 12px; border: 1px solid {primary_color}; background: #FFFFFF; overflow: hidden; margin-top: 1rem; margin-bottom: 2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }}
             .premium-table-container table {{ width: 100% !important; border-collapse: collapse !important; }}
             
-            /* THE FIX: Match the header underline to the new deep purple border */
-            .premium-table-container th {{ background-color: #F8F6FA !important; color: {primary_color} !important; font-weight: 700 !important; text-align: center !important; padding: 15px 12px !important; border-bottom: 2px solid {primary_color} !important; border-right: 1px solid #EBE4F4 !important; text-transform: uppercase !important; font-size: 0.95rem !important; letter-spacing: 0.5px !important; }}
+            /* Match the header underline to the new deep purple border */
+            .premium-table-container th {{ font-family: 'Outfit', sans-serif !important; background-color: #F8F6FA !important; color: {primary_color} !important; font-weight: 700 !important; text-align: center !important; padding: 15px 12px !important; border-bottom: 2px solid {primary_color} !important; border-right: 1px solid #EBE4F4 !important; text-transform: uppercase !important; font-size: 0.95rem !important; letter-spacing: 0.5px !important; }}
             
             /* Internal grid lines remain soft so they don't distract from the data */
-            .premium-table-container td {{ text-align: center !important; padding: 12px !important; border-bottom: 1px solid #EBE4F4 !important; border-right: 1px solid #EBE4F4 !important; font-size: 0.85rem !important; }}
+            .premium-table-container td {{ font-family: 'Outfit', sans-serif !important; text-align: center !important; padding: 12px !important; border-bottom: 1px solid #EBE4F4 !important; border-right: 1px solid #EBE4F4 !important; font-size: 0.85rem !important; }}
             
             .premium-table-container th:last-child, .premium-table-container td:last-child {{ border-right: none !important; }}
             .premium-table-container td:first-child {{ font-weight: 700 !important; color: #0F172A !important; }}
@@ -63,7 +67,7 @@ def apply_custom_theme(primary_color):
 
 apply_custom_theme(PITCH_BRAND_COLOR)
 
-# THE NEW FIX: Ultra-subtle, premium SaaS gradient
+# Ultra-subtle, premium SaaS gradient
 brand_gradient = mcolors.LinearSegmentedColormap.from_list("brand_purple", ["#FFFFFF", "#FBF9FC", "#EBE4F4"])
 
 # ================ 2. DATA ENGINE =================
@@ -110,7 +114,7 @@ def build_dashboard_views(orders_df, enriched_df, start_date, end_date):
     filtered_orders = orders_df.loc[mask]
     if filtered_orders.empty: return None
     
-    # Added logic: Calculate unique individual buyers in Shopify for the match rate
+    # Calculate unique individual buyers in Shopify for the match rate
     unique_shopify_humans = filtered_orders['email_match'].nunique()
     
     purchasers = filtered_orders.groupby('email_match').agg(revenue=('revenue_raw', 'sum'), order_count=('order_id', 'nunique')).reset_index()
@@ -120,7 +124,7 @@ def build_dashboard_views(orders_df, enriched_df, start_date, end_date):
     
     total_rev = df_joined['revenue'].sum()
     
-    # Added logic: Calculate the match rate
+    # Calculate the match rate
     matched_count = df_joined['email_match'].nunique()
     match_rate = (matched_count / unique_shopify_humans * 100) if unique_shopify_humans > 0 else 0
     
@@ -143,7 +147,6 @@ def build_dashboard_views(orders_df, enriched_df, start_date, end_date):
                 styler = final_v.style.format({'Purchasers': '{:,.0f}', 'Revenue': '${:,.2f}', '% of Buyers': '{:.1f}%', 'Rev / Purchaser': '${:,.2f}'}).background_gradient(subset=['Revenue', '% of Buyers'], cmap=brand_gradient)
                 all_html_views[label] = styler.hide(axis="index").to_html()
                 
-    # Updated return statement to include the new match metrics
     return {
         "total_revenue": total_rev, 
         "total_buyers": matched_count, 
@@ -161,13 +164,24 @@ if "app_state" not in st.session_state:
 
 if st.session_state.app_state == "onboarding":
     
-    # 🚨 THE FIX: Centered Logo for the Onboarding Screen
+    # Centered Logo for the Onboarding Screen
     _, logo_col, _ = st.columns([1, 1, 1])
     with logo_col:
         st.image("logo.png", use_container_width=True)
         
-    st.markdown("<h3 style='text-align: center; color: #64748B; margin-top: -15px; margin-bottom: 30px;'>Customer Insights Dashboard</h3>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #64748B;'>Upload Shopify and Enriched Data files to begin.</p>", unsafe_allow_html=True)
+    # 🚨 THE FIX: Gradient and Serif text applied to the Onboarding Screen
+    st.markdown("""
+        <div style="text-align: center; margin-top: -15px; margin-bottom: 30px;">
+            <h1 style="font-size: 2.8rem; margin-bottom: 0px; background: linear-gradient(90deg, #4D148C 0%, #20B2AA 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block;">
+                Customer Insights Dashboard.
+            </h1>
+            <h2 style="font-size: 2.2rem; color: #0F172A !important; margin-top: 0px;">
+                Get To Know Your Customer.
+            </h2>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("<p style='text-align: center; color: #64748B; font-family: Outfit, sans-serif;'>Upload Shopify and Enriched Data files to begin.</p>", unsafe_allow_html=True)
     
     _, col1, col2, _ = st.columns([1, 2, 2, 1])
     with col1:
@@ -185,26 +199,20 @@ if st.session_state.app_state == "onboarding":
             st.error("Please upload at least one of each file type.")
         else:
             with st.spinner("Deduplicating & Processing Data..."):
-                # New Logic: Process Orders and count all the duplicates and blanks
                 raw_df = pd.concat([pd.read_csv(f, encoding='latin1', on_bad_lines='skip') for f in st.session_state.orders_vault], ignore_index=True)
                 raw_count = len(raw_df)
                 
-                # Clean: This converts blanks to 0 and removes them
                 cleaned_step_1 = clean_orders_data(raw_df)
                 st.session_state.zero_rev_count = raw_count - len(cleaned_step_1)
                 
-                # Deduplicate: Remove the multi-line line items
                 unique_orders_df = cleaned_step_1.drop_duplicates(subset=['order_id'])
                 st.session_state.line_item_dupes = len(cleaned_step_1) - len(unique_orders_df)
                 
-                # Identify Repeat Customers (Same email buying different Order IDs)
                 unique_customers_count = unique_orders_df['email_match'].nunique()
                 st.session_state.repeat_orders = len(unique_orders_df) - unique_customers_count
                 
-                # Final Vault storage
                 st.session_state.cleaned_orders = unique_orders_df
                 
-                # Process Enriched Data
                 all_n8n = pd.concat([pd.read_csv(f, encoding='latin1', on_bad_lines='skip') for f in st.session_state.n8n_vault], ignore_index=True)
                 st.session_state.cleaned_n8n = clean_n8n_data(all_n8n).drop_duplicates(subset=['email_match'])
                 
@@ -215,18 +223,27 @@ if st.session_state.app_state == "onboarding":
 
 elif st.session_state.app_state == "dashboard":
     
-    # 🚨 THE FIX: Centered Logo and Large Title for the Dashboard
+    # Centered Logo for the Dashboard
     _, dash_logo_col, _ = st.columns([1, 1, 1])
     with dash_logo_col:
         st.image("logo.png", use_container_width=True)
         
-    st.markdown("<h1 style='text-align: center; color: #0F172A; margin-top: -10px; margin-bottom: 30px; font-size: 2.5rem;'>Customer Insights Dashboard</h1>", unsafe_allow_html=True)
+    # 🚨 THE FIX: Gradient and Serif text applied to the Dashboard Hero
+    st.markdown("""
+        <div style="text-align: center; margin-top: -10px; margin-bottom: 30px;">
+            <h1 style="font-size: 3.5rem; margin-bottom: 0px; background: linear-gradient(90deg, #4D148C 0%, #20B2AA 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block;">
+                Customer Insights Dashboard.
+            </h1>
+            <h2 style="font-size: 2.8rem; color: #0F172A !important; margin-top: -5px;">
+                Get To Know Your Customer.
+            </h2>
+        </div>
+    """, unsafe_allow_html=True)
     
-    # 🚨 THE FIX: The Controls Row (Start Over + Date Slider)
+    # The Controls Row (Start Over + Date Slider)
     c1, c2, c3 = st.columns([1, 4, 1])
     
     with c1:
-        # Added a tiny spacer so the button aligns vertically with the slider track
         st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True) 
         if st.button("🔄 Start Over", use_container_width=True): 
             st.session_state.app_state = "onboarding"
@@ -251,13 +268,13 @@ elif st.session_state.app_state == "dashboard":
         with m1:
             st.markdown(f"""
                 <div style="background-color: #FFFFFF; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                    <p style="margin: 0; font-size: 0.9rem; color: #64748B;">Resolved Customers</p>
-                    <h2 style="margin: 10px 0; font-size: 3rem; color: #0F172A;">{dash_data['total_buyers']:,.0f}</h2>
-                    <p style="margin: 0; font-size: 0.9rem; color: #1e293b; font-weight: 500;">
+                    <p style="margin: 0; font-size: 0.9rem; color: #64748B; font-family: Outfit, sans-serif;">Resolved Customers</p>
+                    <h2 style="margin: 10px 0; font-size: 3.5rem; color: #0F172A;">{dash_data['total_buyers']:,.0f}</h2>
+                    <p style="margin: 0; font-size: 0.9rem; color: #1e293b; font-weight: 500; font-family: Outfit, sans-serif;">
                         Identified <b>{dash_data['unique_shopify_customers']:,.0f}</b> individual customers and matched <b>{dash_data['total_buyers']:,.0f} ({dash_data['match_rate']:.1f}%)</b>.
                     </p>
                     <hr style="margin: 15px 0; border: 0; border-top: 1px solid #f1f5f9;">
-                    <p style="margin: 0; font-size: 0.75rem; color: #94A3B8; line-height: 1.4; text-align: left;">
+                    <p style="margin: 0; font-size: 0.75rem; color: #94A3B8; line-height: 1.4; text-align: left; font-family: Outfit, sans-serif;">
                         • Scrubbed <b>{st.session_state.zero_rev_count}</b> empty or $0 line items.<br>
                         • Collapsed <b>{st.session_state.line_item_dupes}</b> multi-line item rows.<br>
                         • Grouped <b>{st.session_state.repeat_orders}</b> repeat purchases from the same buyers.
@@ -265,11 +282,11 @@ elif st.session_state.app_state == "dashboard":
                 </div>
             """, unsafe_allow_html=True)
         with m2:
-            st.markdown(f"""<div style="background-color: #FFFFFF; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); height: 100%; display: flex; flex-direction: column; justify-content: center;"><p style="margin: 0; font-size: 0.9rem; color: #64748B;">Attributed Sales</p><h2 style="margin: 10px 0; font-size: 3rem; color: #0F172A;">${dash_data['total_revenue']:,.2f}</h2></div>""", unsafe_allow_html=True)
+            st.markdown(f"""<div style="background-color: #FFFFFF; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); height: 100%; display: flex; flex-direction: column; justify-content: center;"><p style="margin: 0; font-size: 0.9rem; color: #64748B; font-family: Outfit, sans-serif;">Attributed Sales</p><h2 style="margin: 10px 0; font-size: 3.5rem; color: #0F172A;">${dash_data['total_revenue']:,.2f}</h2></div>""", unsafe_allow_html=True)
         
         # 2. TOP PERFORMERS
         st.markdown("""
-            <h2 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: #0F172A; font-weight: 700; font-size: 1.8rem; display: flex; align-items: center; gap: 10px;">
+            <h2 style="margin-top: 2rem; margin-bottom: 0.5rem; color: #0F172A; font-weight: 700; font-size: 2rem; display: flex; align-items: center; gap: 10px;">
                 <span style="font-size: 2rem;">🏆</span> Top Performing Demographics
             </h2>
         """, unsafe_allow_html=True)
@@ -279,20 +296,20 @@ elif st.session_state.app_state == "dashboard":
             with summary_cols[i]:
                 st.markdown(f'''
                     <div style="background-color: #FFFFFF; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 15px; text-align: center; min-height: 120px; display: flex; flex-direction: column; justify-content: center;">
-                        <p style="margin: 0; font-size: 0.8rem; color: #64748B; font-weight: 600; text-transform: uppercase;">{label}</p>
-                        <p style="margin: 5px 0; font-size: 1.1rem; color: #0F172A; font-weight: 700; line-height: 1.2;">{data[0]}</p>
-                        <p style="margin: 0; font-size: 0.85rem; color: {PITCH_BRAND_COLOR}; background-color: #EBE4F4; border-radius: 20px; padding: 2px 8px; display: inline-block; align-self: center; font-weight: 600;">{data[1]:.1f}% of Revenue</p>
+                        <p style="margin: 0; font-size: 0.8rem; color: #64748B; font-weight: 600; text-transform: uppercase; font-family: Outfit, sans-serif;">{label}</p>
+                        <h3 style="margin: 5px 0; font-size: 1.4rem; color: #0F172A; font-weight: 700; line-height: 1.2;">{data[0]}</h3>
+                        <p style="margin: 0; font-size: 0.85rem; color: {PITCH_BRAND_COLOR}; background-color: #EBE4F4; border-radius: 20px; padding: 2px 8px; display: inline-block; align-self: center; font-weight: 600; font-family: Outfit, sans-serif;">{data[1]:.1f}% of Revenue</p>
                     </div>
                 ''', unsafe_allow_html=True)
                 
         # 3. DEEP DIVE (Polished Subheading)
         st.markdown("""
             <h2 style="
-                margin-top: 2rem; 
+                margin-top: 2.5rem; 
                 margin-bottom: 0.5rem; 
                 color: #0F172A; 
                 font-weight: 700; 
-                font-size: 1.8rem;
+                font-size: 2rem;
                 display: flex;
                 align-items: center;
                 gap: 10px;
