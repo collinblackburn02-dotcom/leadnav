@@ -224,14 +224,43 @@ elif st.session_state.app_state == "dashboard":
             st.markdown(f"""<div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); height: 100%; display: flex; flex-direction: column; justify-content: center;"><p style="margin: 0; font-size: 0.9rem; color: #64748B;">Attributed Sales</p><h2 style="margin: 10px 0; font-size: 3rem; color: #0F172A;">${dash_data['total_revenue']:,.2f}</h2></div>""", unsafe_allow_html=True)
         
         # 2. TOP PERFORMERS
-        st.markdown("<br>### 🏆 Top Performing Demographics", unsafe_allow_html=True)
+       # 2. TOP PERFORMERS (Polished Subheading)
+        st.markdown("""
+            <h2 style="
+                margin-top: 1.5rem; 
+                margin-bottom: 0.5rem; 
+                color: #0F172A; 
+                font-weight: 700; 
+                font-size: 1.8rem;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            ">
+                <span style="font-size: 2rem;">🏆</span> Top Performing Demographics
+            </h2>
+        """, unsafe_allow_html=True)
+        
         summary_cols = st.columns(len(dash_data['top_performers']))
         for i, (label, data) in enumerate(dash_data['top_performers'].items()):
             with summary_cols[i]:
                 st.markdown(f'<div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 15px; text-align: center; min-height: 120px; display: flex; flex-direction: column; justify-content: center;"><p style="margin: 0; font-size: 0.8rem; color: #64748B; font-weight: 600; text-transform: uppercase;">{label}</p><p style="margin: 5px 0; font-size: 1.1rem; color: #0F172A; font-weight: 700; line-height: 1.2;">{data[0]}</p><p style="margin: 0; font-size: 0.85rem; color: #16A34A; background-color: #F0FDF4; border-radius: 20px; padding: 2px 8px; display: inline-block; align-self: center;">{data[1]:.1f}% of Revenue</p></div>', unsafe_allow_html=True)
-
-        # 3. DEEP DIVE
-        st.markdown("<br>### 🔍 Audience Deep Dive", unsafe_allow_html=True)
+        
+        # 3. DEEP DIVE (Polished Subheading)
+        st.markdown("""
+            <h2 style="
+                margin-top: 2rem; 
+                margin-bottom: 0.5rem; 
+                color: #0F172A; 
+                font-weight: 700; 
+                font-size: 1.8rem;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            ">
+                <span style="font-size: 2rem;">🔍</span> Audience Deep Dive
+            </h2>
+        """, unsafe_allow_html=True)
+        
         if "active_var" not in st.session_state: st.session_state.active_var = "Gender"
         if "active_loc_level" not in st.session_state: st.session_state.active_loc_level = "Region"
         v_labels = ["Gender", "Age", "Location", "Marital Status", "Income"]
