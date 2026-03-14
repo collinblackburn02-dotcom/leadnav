@@ -38,7 +38,7 @@ def apply_custom_theme(primary_color):
             div[data-testid="stButton"] button[kind="secondary"] {{ background-color: #FFFFFF; color: {primary_color}; border: 1px solid #EBE4F4; }}
             .premium-table-container {{ border-radius: 12px; border: 1px solid #E2E8F0; background: #FFFFFF; overflow: hidden; margin-top: 1rem; margin-bottom: 2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }}
             .premium-table-container table {{ width: 100% !important; border-collapse: collapse !important; }}
-            .premium-table-container th {{ background-color: #F8F6FA !important; color: #4D148C !important; font-weight: 700 !important; text-align: center !important; padding: 15px 12px !important; border-bottom: 2px solid #EBE4F4 !important; text-transform: uppercase !important; font-size: 0.95rem !important; letter-spacing: 0.5px !important; }}
+            .premium-table-container th {{ background-color: #F8F6FA !important; color: #4D148C !important; font-weight: 700 !important; text-align: center !important; padding: 15px 12px !important; border-bottom: 2px solid #EBE4F4 !important; text-transform: uppercase !important; font-size: 0.9rem !important; letter-spacing: 0.5px !important; }}
             .premium-table-container td {{ text-align: center !important; padding: 12px !important; border-bottom: 1px solid #F8FAFC !important; font-size: 0.85rem !important; }}
             .premium-table-container td:first-child {{ font-weight: 700 !important; color: #0F172A !important; }}
         </style>
