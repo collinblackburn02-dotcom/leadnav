@@ -251,21 +251,11 @@ elif st.session_state.app_state == "dashboard":
         </div>
     """, unsafe_allow_html=True)
     
-    # The Controls Row (Start Over + Date Slider + blank for export)
-    c1, c2, c3 = st.columns([1, 4, 1])
+    # Center the Date Slider row
+    _, c2, _ = st.columns([1, 4, 1])
     
-    with c1:
-        st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True) 
-        if st.button("🔄 Start Over", use_container_width=True): 
-            st.session_state.app_state = "onboarding"
-            st.rerun()
-            
     with c2:
         selected_dates = st.slider("Filter by Purchase Date", min_value=st.session_state.min_date, max_value=st.session_state.max_date, value=(st.session_state.current_start, st.session_state.current_end), format="MMM DD, YYYY")
-    
-    with c3:
-        # We will put the "Download CSV" button here next!
-        pass
     
     if (selected_dates[0] != st.session_state.current_start) or (selected_dates[1] != st.session_state.current_end) or ("dash_data" not in st.session_state):
         st.session_state.current_start, st.session_state.current_end = selected_dates[0], selected_dates[1]
@@ -277,9 +267,10 @@ elif st.session_state.app_state == "dashboard":
         m1, m2 = st.columns(2)
 
         with m1:
+            # 🚨 THE FIX: Larger, bolder metric headers
             st.markdown(f"""
                 <div style="background-color: #FFFFFF; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                    <p style="margin: 0; font-size: 0.9rem; color: #64748B; font-family: Outfit, sans-serif;">Resolved Customers</p>
+                    <p style="margin: 0; font-size: 1.2rem; color: #0F172A; font-weight: 700; font-family: Outfit, sans-serif;">Resolved Customers</p>
                     <h2 style="margin: 10px 0; font-size: 3.5rem; color: #0F172A; font-family: Outfit, sans-serif;">{dash_data['total_buyers']:,.0f}</h2>
                     <p style="margin: 0; font-size: 0.9rem; color: #1e293b; font-weight: 500; font-family: Outfit, sans-serif;">
                         Identified <b>{dash_data['unique_shopify_customers']:,.0f}</b> individual customers and matched <b>{dash_data['total_buyers']:,.0f} ({dash_data['match_rate']:.1f}%)</b>.
@@ -293,7 +284,7 @@ elif st.session_state.app_state == "dashboard":
                 </div>
             """, unsafe_allow_html=True)
         with m2:
-            st.markdown(f"""<div style="background-color: #FFFFFF; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); height: 100%; display: flex; flex-direction: column; justify-content: center;"><p style="margin: 0; font-size: 0.9rem; color: #64748B; font-family: Outfit, sans-serif;">Attributed Sales</p><h2 style="margin: 10px 0; font-size: 3.5rem; color: #0F172A; font-family: Outfit, sans-serif;">${dash_data['total_revenue']:,.2f}</h2></div>""", unsafe_allow_html=True)
+            st.markdown(f"""<div style="background-color: #FFFFFF; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); height: 100%; display: flex; flex-direction: column; justify-content: center;"><p style="margin: 0; font-size: 1.2rem; color: #0F172A; font-weight: 700; font-family: Outfit, sans-serif;">Attributed Sales</p><h2 style="margin: 10px 0; font-size: 3.5rem; color: #0F172A; font-family: Outfit, sans-serif;">${dash_data['total_revenue']:,.2f}</h2></div>""", unsafe_allow_html=True)
         
         # 2. TOP PERFORMERS
         st.markdown("""
@@ -344,3 +335,10 @@ elif st.session_state.app_state == "dashboard":
 
         if lk in dash_data['html_views']:
             st.markdown(f'<div class="premium-table-container">{dash_data["html_views"][lk]}</div>', unsafe_allow_html=True)
+
+        # 🚨 THE FIX: Start Over button relocated to the very bottom
+        st.markdown("<br><hr style='border-top: 1px solid #E2E8F0; margin: 2rem 0;'><br>", unsafe_allow_html=True)
+        _, reset_col, _ = st.columns([2, 1, 2])
+        if reset_col.button("Start Over", use_container_width=True): 
+            st.session_state.app_state = "onboarding"
+            st.rerun()
