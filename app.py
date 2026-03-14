@@ -68,12 +68,22 @@ def clean_orders_data(df):
     order_col = next((c for c in df.columns if 'name' in c.lower() or 'order' in c.lower()), 'Order ID')
     total_col = next((c for c in df.columns if 'total' in c.lower() or 'price' in c.lower()), 'Total')
     date_col = next((c for c in df.columns if 'created' in c.lower() or 'date' in c.lower()), 'Date')
+    
     df = df.rename(columns={email_col: 'email_match', order_col: 'order_id', total_col: 'revenue_raw', date_col: 'order_date'})
     df['email_match'] = df['email_match'].astype(str).str.lower().str.strip()
-    df['revenue_raw'] = pd.to_numeric(df['revenue_raw'].astype(str).str.replace(r'[^\d.-]', '', regex=True), errors='coerce').fillna(0)
+    
+    # 1. Clean currency and force blanks to 0
+    df['revenue_raw'] = df['revenue_raw'].astype(str).str.replace(r'[^\d.-]', '', regex=True)
+    df['revenue_raw'] = pd.to_numeric(df['revenue_raw'], errors='coerce').fillna(0)
+    
+    # 2. Drop the zeros/blanks BEFORE doing anything else
+    df = df[df['revenue_raw'] > 0]
+    
+    # 3. Handle dates
     df['order_date'] = pd.to_datetime(df['order_date'], errors='coerce', utc=True)
     df = df.dropna(subset=['order_date'])
     df['order_date'] = df['order_date'].dt.date
+    
     return df.reset_index(drop=True)
 
 def build_dashboard_views(orders_df, enriched_df, start_date, end_date):
@@ -126,18 +136,33 @@ if st.session_state.app_state == "onboarding":
         if not st.session_state.orders_vault or not st.session_state.n8n_vault:
             st.error("Please upload at least one of each file type.")
         else:
-            with st.spinner("Processing Data..."):
-                raw_orders_df = pd.concat([pd.read_csv(f, encoding='latin1', on_bad_lines='skip') for f in st.session_state.orders_vault], ignore_index=True)
-                st.session_state.raw_order_count = len(raw_orders_df)
-                clean_orders = clean_orders_data(raw_orders_df)
-                st.session_state.zero_rev_count = st.session_state.raw_order_count - len(clean_orders)
-                st.session_state.cleaned_orders = clean_orders.drop_duplicates(subset=['order_id'])
-                all_n8n = pd.concat([pd.read_csv(f, encoding='latin1', on_bad_lines='skip') for f in st.session_state.n8n_vault], ignore_index=True)
-                st.session_state.cleaned_n8n = clean_n8n_data(all_n8n).drop_duplicates(subset=['email_match'])
-                st.session_state.min_date, st.session_state.max_date = st.session_state.cleaned_orders['order_date'].min(), st.session_state.cleaned_orders['order_date'].max()
-                st.session_state.current_start, st.session_state.current_end = st.session_state.min_date, st.session_state.max_date
-                st.session_state.app_state = "dashboard"
-                st.rerun()
+            with st.spinner("Deduplicating & Processing Data..."):
+            # Load raw data
+            raw_df = pd.concat([pd.read_csv(f, encoding='latin1', on_bad_lines='skip') for f in st.session_state.orders_vault], ignore_index=True)
+            raw_count = len(raw_df)
+            
+            # Clean: This converts blanks to 0 and removes them
+            cleaned_step_1 = clean_orders_data(raw_df)
+            st.session_state.zero_rev_count = raw_count - len(cleaned_step_1)
+            
+            # Deduplicate: Remove the multi-line line items (#6078 appearing 4 times)
+            unique_orders_df = cleaned_step_1.drop_duplicates(subset=['order_id'])
+            line_item_dupes = len(cleaned_step_1) - len(unique_orders_df)
+            
+            # Identify Repeat Customers (Same email buying different Order IDs)
+            unique_customers_count = unique_orders_df['email_match'].nunique()
+            repeat_customer_orders = len(unique_orders_df) - unique_customers_count
+            
+            # Final Vault storage
+            st.session_state.raw_row_count = raw_count
+            st.session_state.line_item_dupes = line_item_dupes
+            st.session_state.repeat_orders = repeat_customer_orders
+            st.session_state.cleaned_orders = unique_orders_df
+            
+            # Process Enriched Data
+            all_n8n = pd.concat([pd.read_csv(f, encoding='latin1', on_bad_lines='skip') for f in st.session_state.n8n_vault], ignore_index=True)
+            st.session_state.cleaned_n8n = clean_n8n_data(all_n8n).drop_duplicates(subset=['email_match'])
+            
 
 elif st.session_state.app_state == "dashboard":
     c1, c2, c3 = st.columns([1, 3, 1])
