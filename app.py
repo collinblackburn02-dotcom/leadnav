@@ -154,8 +154,15 @@ if "app_state" not in st.session_state:
     st.session_state.n8n_vault = []
 
 if st.session_state.app_state == "onboarding":
-    st.markdown(f"<h1 style='text-align: center; font-size: 3rem; margin-top: 50px;'>🧭 {PITCH_COMPANY_NAME} Engine</h1>", unsafe_allow_html=True)
+    
+    # 🚨 THE FIX: Centered Logo for the Onboarding Screen
+    _, logo_col, _ = st.columns([1, 1, 1])
+    with logo_col:
+        st.image("logo.png", use_container_width=True)
+        
+    st.markdown("<h3 style='text-align: center; color: #64748B; margin-top: -15px; margin-bottom: 30px;'>Audience Engine</h3>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; color: #64748B;'>Upload Shopify and Enriched Data files to begin.</p>", unsafe_allow_html=True)
+    
     _, col1, col2, _ = st.columns([1, 2, 2, 1])
     with col1:
         st.subheader("🛒 Shopify Orders")
@@ -163,6 +170,7 @@ if st.session_state.app_state == "onboarding":
     with col2:
         st.subheader("🧬 Enriched Data")
         st.session_state.n8n_vault = st.file_uploader("Add n8n CSVs", type=["csv"], accept_multiple_files=True, key="n8n_up")
+    
     st.markdown("<br>", unsafe_allow_html=True)
     _, center_col, _ = st.columns([2, 1, 2])
     
@@ -200,10 +208,17 @@ if st.session_state.app_state == "onboarding":
                 st.rerun()
 
 elif st.session_state.app_state == "dashboard":
+    
+    # 🚨 THE FIX: Logo placed cleanly in the top left column above the Start Over button
     c1, c2, c3 = st.columns([1, 3, 1])
-    if c1.button("🔄 Start Over"): 
-        st.session_state.app_state = "onboarding"
-        st.rerun()
+    
+    with c1:
+        st.image("logo.png", width=250)
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🔄 Start Over"): 
+            st.session_state.app_state = "onboarding"
+            st.rerun()
+            
     with c2:
         selected_dates = st.slider("Filter by Purchase Date", min_value=st.session_state.min_date, max_value=st.session_state.max_date, value=(st.session_state.current_start, st.session_state.current_end), format="MMM DD, YYYY")
     
@@ -234,7 +249,7 @@ elif st.session_state.app_state == "dashboard":
             """, unsafe_allow_html=True)
         with m2:
             st.markdown(f"""<div style="background-color: #FFFFFF; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); height: 100%; display: flex; flex-direction: column; justify-content: center;"><p style="margin: 0; font-size: 0.9rem; color: #64748B;">Attributed Sales</p><h2 style="margin: 10px 0; font-size: 3rem; color: #0F172A;">${dash_data['total_revenue']:,.2f}</h2></div>""", unsafe_allow_html=True)
-      
+        
         # 2. TOP PERFORMERS
         st.markdown("""
             <h2 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: #0F172A; font-weight: 700; font-size: 1.8rem; display: flex; align-items: center; gap: 10px;">
@@ -245,7 +260,6 @@ elif st.session_state.app_state == "dashboard":
         summary_cols = st.columns(len(dash_data['top_performers']))
         for i, (label, data) in enumerate(dash_data['top_performers'].items()):
             with summary_cols[i]:
-                # 🚨 THE FIX: Deep purple border and matching purple percentage pills
                 st.markdown(f'''
                     <div style="background-color: #FFFFFF; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 15px; text-align: center; min-height: 120px; display: flex; flex-direction: column; justify-content: center;">
                         <p style="margin: 0; font-size: 0.8rem; color: #64748B; font-weight: 600; text-transform: uppercase;">{label}</p>
