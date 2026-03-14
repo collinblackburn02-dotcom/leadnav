@@ -38,13 +38,21 @@ def apply_custom_theme(primary_color):
             footer {{ visibility: hidden; }}
             [data-testid="stSidebar"], [data-testid="collapsedControl"] {{ display: none !important; }}
             
-            /* 🚨 THE FIX: Banishing the Hyperlink icons and styling across the app */
+            /* Banishing the Hyperlink icons across the app */
             .stMarkdown a svg {{ display: none !important; }}
             .stMarkdown a {{ 
                 text-decoration: none !important; 
                 color: inherit !important; 
                 cursor: default !important; 
                 pointer-events: none !important; 
+            }}
+
+            /* 🚨 THE FIX: Slider Label (Bigger, Black, Bold) */
+            div[data-testid="stSlider"] label p {{
+                font-size: 1.2rem !important;
+                font-weight: 700 !important;
+                color: #0F172A !important;
+                margin-bottom: 8px !important;
             }}
 
             div[data-testid="stButton"] button {{ border-radius: 8px; font-weight: 500; padding: 0px 10px !important; }}
@@ -189,10 +197,15 @@ elif st.session_state.app_state == "dashboard":
             <h2 class="serif-subheadline" style="font-size: 2.8rem; color: #0F172A !important; margin-top: -5px;">Get To Know Your Customer.</h2>
         </div>
     """, unsafe_allow_html=True)
+    
+    # Date Slider Section with Label Update
     _, c2, _ = st.columns([1, 4, 1])
     with c2:
-        selected_dates = st.slider("Filter by Purchase Date", min_value=st.session_state.min_date, max_value=st.session_state.max_date, value=(st.session_state.current_start, st.session_state.current_end), format="MMM DD, YYYY")
+        selected_dates = st.slider("Filter by Date", min_value=st.session_state.min_date, max_value=st.session_state.max_date, value=(st.session_state.current_start, st.session_state.current_end), format="MMM DD, YYYY")
     
+    # 🚨 PADDING: Space between slider and metrics
+    st.markdown("<div style='margin-bottom: 40px;'></div>", unsafe_allow_html=True)
+
     if (selected_dates[0] != st.session_state.current_start) or (selected_dates[1] != st.session_state.current_end) or ("dash_data" not in st.session_state):
         st.session_state.current_start, st.session_state.current_end = selected_dates[0], selected_dates[1]
         st.session_state.dash_data = build_dashboard_views(st.session_state.cleaned_orders, st.session_state.cleaned_n8n, selected_dates[0], selected_dates[1])
@@ -224,19 +237,24 @@ elif st.session_state.app_state == "dashboard":
                 </div>
             """, unsafe_allow_html=True)
         
-        st.markdown("""<h2 class="modern-serif-title" style="margin-top: 2rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 10px;"><span style="font-size: 2rem;">🏆</span> Top Performing Demographics</h2>""", unsafe_allow_html=True)
+        # 🚨 PADDING: Space above Top Performers
+        st.markdown("""<h2 class="modern-serif-title" style="margin-top: 4rem; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 10px;"><span style="font-size: 2rem;">🏆</span> Top Performing Demographics</h2>""", unsafe_allow_html=True)
+        
         summary_cols = st.columns(len(dash_data['top_performers']))
         for i, (label, data) in enumerate(dash_data['top_performers'].items()):
             with summary_cols[i]:
+                # 🚨 PADDING: Space below the cards (margin-bottom: 3rem)
                 st.markdown(f'''
-                    <div style="background-color: #F8F5FA; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 15px; text-align: center; min-height: 120px; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+                    <div style="background-color: #F8F5FA; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 15px; text-align: center; min-height: 120px; display: flex; flex-direction: column; justify-content: center; align-items: center; margin-bottom: 3rem;">
                         <p style="margin: 0; font-size: 1.0rem; color: #0F172A; font-weight: 700; text-transform: uppercase; font-family: Outfit, sans-serif;">{label}</p>
                         <h3 style="margin: 5px 0 10px 0; font-size: 1.1rem; color: {PITCH_BRAND_COLOR}; font-weight: 600; line-height: 1.2; font-family: Outfit, sans-serif !important;">{data[0]}</h3>
                         <p style="margin: 0; font-size: 0.85rem; color: {PITCH_BRAND_COLOR}; background-color: #EBE4F4; border-radius: 20px; padding: 4px 10px; display: inline-block; font-weight: 600; font-family: Outfit, sans-serif !important;">{data[1]:.1f}% of Revenue</p>
                     </div>
                 ''', unsafe_allow_html=True)
                 
-        st.markdown("""<h2 class="modern-serif-title" style="margin-top: 2.5rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 10px;"><span style="font-size: 2rem;">🔍</span> Customer Deep Dive</h2>""", unsafe_allow_html=True)
+        # Space below Top Performers header is naturally created by the margin-bottom on the cards above
+        st.markdown("""<h2 class="modern-serif-title" style="margin-top: 1.5rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 10px;"><span style="font-size: 2rem;">🔍</span> Customer Deep Dive</h2>""", unsafe_allow_html=True)
+        
         if "active_var" not in st.session_state: st.session_state.active_var = "Gender"
         if "active_loc_level" not in st.session_state: st.session_state.active_loc_level = "Region"
         v_labels = ["Gender", "Age", "Location", "Marital Status", "Income"]
