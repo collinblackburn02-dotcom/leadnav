@@ -42,7 +42,7 @@ def apply_custom_theme(primary_color):
             [data-testid="stSidebar"], [data-testid="collapsedControl"] {{ display: none !important; }}
             
             .stMarkdown a svg {{ display: none !important; }}
-            .stMarkdown a {{ text-decoration: none !important; color: inherit !important; pointer-events: none !important; }}
+            .stMarkdown a {{ text-decoration: none !important; color: inherit !important; cursor: default !important; pointer-events: none !important; }}
 
             div[data-testid="stSlider"] label p {{
                 font-size: 1.2rem !important;
@@ -91,24 +91,24 @@ def clean_n8n_data(df):
     if 'marital_status' in df.columns:
         df['marital_status'] = df['marital_status'].astype(str).str.strip().map({'Y': 'Married', 'N': 'Single', 'Married': 'Married', 'Single': 'Single'}).fillna('Unknown')
     
-    # 🚨 THE FIX: Force Homeowner to "No" for anything not in the whitelist
+    # Final robust attempt at Homeowner mapping
     if 'homeowner' in df.columns:
-        yes_values = ['y', 'homeowner', 'probably homeowner']
+        yes_patterns = ['y', 'homeowner', 'probably homeowner', 'owner']
         def map_owner(val):
             v = str(val).lower().strip()
-            if v in yes_values: return 'Yes'
-            if v in ['nan', '', 'none', 'null']: return 'Unknown'
+            if any(p in v for p in yes_patterns): return 'Yes'
+            if v in ['nan', '', 'none', 'null', 'unknown']: return 'Unknown'
             return 'No'
         df['homeowner'] = df['homeowner'].apply(map_owner)
 
-    # 🚨 THE FIX: Force Children to "No" if it is "N"
+    # Children mapping
     if 'children' in df.columns:
         def map_kids(val):
             v = str(val).lower().strip()
-            if v == 'y': return 'Yes'
-            if v == 'n': return 'No'
+            if 'y' in v: return 'Yes'
+            if 'n' in v: return 'No'
             if v in ['nan', '', 'none', 'null']: return 'Unknown'
-            return val # Keep original string for detailed age buckets if they exist
+            return val 
         df['children'] = df['children'].apply(map_kids)
 
     if 'zip_code' in df.columns: df['zip_code'] = df['zip_code'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(5)
@@ -179,7 +179,6 @@ if "app_state" not in st.session_state:
 
 if st.session_state.app_state == "onboarding":
     st.image("logo.png", width=180)
-    # 🚨 PRESERVED: Your exact font sizes and layout
     st.markdown("""
         <div style="text-align: center; margin-top: 0px; margin-bottom: 25px;">
             <h1 class="serif-gradient-centerpiece" style="font-size: 3.6rem; margin-bottom: 2px;">Customer Insights Dashboard.</h1>
@@ -274,8 +273,6 @@ elif st.session_state.app_state == "dashboard":
         st.markdown("""<h2 class="modern-serif-title" style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 10px;"><span style="font-size: 2rem;">🔍</span> Customer Deep Dive</h2>""", unsafe_allow_html=True)
         
         if "active_var" not in st.session_state: st.session_state.active_var = "Gender"
-        if "active_loc_level" not in st.session_state: st.session_state.active_loc_level = "Region"
-        
         v_labels = ["Gender", "Age", "Location", "Marital Status", "Income", "Homeowner", "Children", "Net Worth"]
         var_cols = st.columns(len(v_labels))
         for i, label in enumerate(v_labels):
