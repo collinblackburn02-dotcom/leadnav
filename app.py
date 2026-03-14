@@ -38,21 +38,45 @@ def apply_custom_theme(primary_color):
             #MainMenu {{ visibility: hidden; }}
             footer {{ visibility: hidden; }}
             [data-testid="stSidebar"], [data-testid="collapsedControl"] {{ display: none !important; }}
+            
             .stMarkdown a svg {{ display: none !important; }}
             .stMarkdown a {{ text-decoration: none !important; color: inherit !important; cursor: default !important; pointer-events: none !important; }}
+            
             div[data-testid="stSlider"] label p {{
                 font-size: 1.2rem !important;
                 font-weight: 700 !important;
                 color: #0F172A !important;
                 margin-bottom: 8px !important;
             }}
-            div[data-testid="stButton"] button {{ border-radius: 8px; font-weight: 500; padding: 0px 10px !important; }}
-            div[data-testid="stButton"] button[kind="primary"] {{ background-color: {primary_color} !important; color: #FFFFFF !important; border: none; }}
-            div[data-testid="stButton"] button[kind="secondary"] {{ background-color: #FFFFFF; color: {primary_color}; border: 1px solid {primary_color}; font-family: 'Outfit', sans-serif !important; }}
+
+            /* Responsive and Styled Buttons */
+            div[data-testid="stButton"] button {{ 
+                border-radius: 8px; 
+                font-weight: 600; 
+                padding: 10px 20px !important;
+                transition: all 0.2s ease;
+            }}
+            
+            /* Primary Button (Run Analysis) */
+            div[data-testid="stButton"] button[kind="primary"] {{ 
+                background-color: {primary_color} !important; 
+                color: #FFFFFF !important; 
+                border: none;
+                width: 100%;
+            }}
+            
+            /* Secondary/Go Back Button */
+            div[data-testid="stButton"] button[kind="secondary"] {{ 
+                background-color: transparent; 
+                color: {primary_color} !important; 
+                border: 2px solid {primary_color} !important;
+            }}
+
             .premium-table-container {{ border-radius: 12px; border: 1px solid {primary_color}; background: #FFFFFF; overflow: hidden; margin-top: 1rem; margin-bottom: 2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }}
             .premium-table-container table {{ width: 100% !important; border-collapse: collapse !important; }}
             .premium-table-container th {{ font-family: 'Outfit', sans-serif !important; background-color: #F8F6FA !important; color: {primary_color} !important; font-weight: 700 !important; text-align: center !important; padding: 15px 12px !important; border-bottom: 2px solid {primary_color} !important; border-right: 1px solid #EBE4F4 !important; text-transform: uppercase !important; font-size: 0.95rem !important; letter-spacing: 0.5px !important; }}
             .premium-table-container td {{ font-family: 'Outfit', sans-serif !important; text-align: center !important; padding: 12px !important; border-bottom: 1px solid #EBE4F4 !important; border-right: 1px solid #EBE4F4 !important; font-size: 0.85rem !important; }}
+            
             .serif-gradient-centerpiece {{ 
                 font-family: 'Playfair Display', serif !important; 
                 background: linear-gradient(90deg, #4D148C 0%, #20B2AA 100%); 
@@ -122,13 +146,14 @@ def build_dashboard_views(orders_df, enriched_df, start_date, end_date):
     mask = (orders_df['order_date'] >= start_date) & (orders_df['order_date'] <= end_date)
     filtered_orders = orders_df.loc[mask]
     if filtered_orders.empty: return None
-    unique_shopify_humans = filtered_orders['email_match'].nunique()
     purchasers = filtered_orders.groupby('email_match').agg(revenue=('revenue_raw', 'sum')).reset_index()
     df_joined = pd.merge(purchasers, enriched_df, on='email_match', how='inner').reset_index(drop=True)
     if df_joined.empty: return None
     total_rev = df_joined['revenue'].sum()
     matched_count = df_joined['email_match'].nunique()
+    unique_shopify_humans = filtered_orders['email_match'].nunique()
     match_rate = (matched_count / unique_shopify_humans * 100) if unique_shopify_humans > 0 else 0
+    
     summary_vars = [("Gender", "gender"), ("Age", "age"), ("Marital Status", "marital_status"), ("Region", "region"), ("State", "state_raw"), ("Zip Code", "zip_code"), ("Income", "income"), ("Homeowner", "homeowner"), ("Children", "children"), ("Net Worth", "net_worth")]
     top_perf = {}
     all_html_views = {}
@@ -158,15 +183,17 @@ if st.session_state.app_state == "onboarding":
     st.image("logo.png", width=180)
     st.markdown("""<div style="text-align: center; margin-top: 0px; margin-bottom: 25px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.6rem; margin-bottom: 2px;">Customer Insights Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 1.8rem; color: #0F172A !important; margin-top: 5px;">Get instant demographic insights on your existing customers.</h2></div>""", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; color: #64748B; font-family: Outfit, sans-serif; font-size: 0.9rem; margin-top: 0px;'>Upload Customer Data to begin.</p>", unsafe_allow_html=True)
+    
     _, col1, col2, _ = st.columns([1, 2, 2, 1])
     with col1:
         st.subheader("👥 Customer Data")
-        st.session_state.orders_vault = st.file_uploader("Upload Shopify Order Export or a CSV (Order ID, Date, Email, Total).", type=["csv"], accept_multiple_files=True, key="order_up")
+        st.session_state.orders_vault = st.file_uploader("Upload Shopify Export.", type=["csv"], accept_multiple_files=True, key="order_up")
     with col2:
         st.subheader("🧬 Enriched Data")
-        st.session_state.n8n_vault = st.file_uploader("Upload visitor intelligence files.", type=["csv"], accept_multiple_files=True, key="n8n_up")
+        st.session_state.n8n_vault = st.file_uploader("Upload visitor files.", type=["csv"], accept_multiple_files=True, key="n8n_up")
+    
     st.markdown("<br>", unsafe_allow_html=True)
-    _, center_col, _ = st.columns([2, 1, 2])
+    _, center_col, _ = st.columns([2, 1.5, 2]) # Widened slightly for responsiveness
     if center_col.button("🚀 Run Analysis", type="primary", use_container_width=True):
         if not st.session_state.orders_vault or not st.session_state.n8n_vault: st.error("Please upload both files.")
         else:
@@ -177,10 +204,7 @@ if st.session_state.app_state == "onboarding":
                 all_n8n = pd.concat([pd.read_csv(f, encoding='latin1', on_bad_lines='skip') for f in st.session_state.n8n_vault], ignore_index=True)
                 st.session_state.cleaned_n8n = clean_n8n_data(all_n8n).drop_duplicates(subset=['email_match'])
                 st.session_state.min_date, st.session_state.max_date = st.session_state.cleaned_orders['order_date'].min(), st.session_state.cleaned_orders['order_date'].max()
-                
-                # 🚨 THE FIX: Initialize date_filter key here to prevent bounce
                 st.session_state.date_filter = (st.session_state.min_date, st.session_state.max_date)
-                
                 st.session_state.app_state = "dashboard"
                 st.rerun()
 
@@ -192,19 +216,17 @@ elif st.session_state.app_state == "dashboard":
     st.markdown("""<div style="text-align: center; margin-top: -10px; margin-bottom: 30px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.5rem; margin-bottom: 0px;">Customer Insights Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 2.8rem; color: #0F172A !important; margin-top: -5px;">Get To Know Your Customer.</h2></div>""", unsafe_allow_html=True)
     
     _, c2, _ = st.columns([1, 4, 1])
-    with c2: 
-        # 🚨 THE FIX: Use key="date_filter" for automatic state management
-        st.slider("Filter by Date", min_value=st.session_state.min_date, max_value=st.session_state.max_date, key="date_filter", format="MMM DD, YYYY")
+    with c2: st.slider("Filter by Date", min_value=st.session_state.min_date, max_value=st.session_state.max_date, key="date_filter", format="MMM DD, YYYY")
     
     st.markdown("<div style='margin-bottom: 50px;'></div>", unsafe_allow_html=True)
-
-    # Re-calculate data if the slider changes or dash_data is missing
-    current_dates = st.session_state.date_filter
-    if "dash_data" not in st.session_state or "last_computed_dates" not in st.session_state or st.session_state.last_computed_dates != current_dates:
-        st.session_state.last_computed_dates = current_dates
-        st.session_state.dash_data = build_dashboard_views(st.session_state.cleaned_orders, st.session_state.cleaned_n8n, current_dates[0], current_dates[1])
     
-    dash_data = st.session_state.dash_data
+    current_dates = st.session_state.get("date_filter")
+    if isinstance(current_dates, (tuple, list)) and len(current_dates) == 2:
+        if "dash_data" not in st.session_state or st.session_state.get("last_computed_dates") != current_dates:
+            st.session_state.last_computed_dates = current_dates
+            st.session_state.dash_data = build_dashboard_views(st.session_state.cleaned_orders, st.session_state.cleaned_n8n, current_dates[0], current_dates[1])
+    
+    dash_data = st.session_state.get("dash_data")
     if dash_data:
         m1, m2 = st.columns(2)
         with m1: st.markdown(f"""<div style="background-color: #F8F5FA; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 25px 20px; text-align: center;"><h3 style="margin: 0; font-size: 1.6rem; color: #0F172A; font-weight: 700;">Resolved Customers</h3><h4 style="margin: 5px 0 15px 0; font-size: 1.6rem; color: {PITCH_BRAND_COLOR}; font-weight: 700;">{dash_data['total_buyers']:,.0f}</h4><p style="margin: 0; font-size: 0.9rem; color: #1e293b;">Matched <b>{dash_data['total_buyers']:,.0f} ({dash_data['match_rate']:.1f}%)</b> customers.</p></div>""", unsafe_allow_html=True)
@@ -221,7 +243,6 @@ elif st.session_state.app_state == "dashboard":
 
         st.markdown("<div style='margin-top: 3rem;'></div>", unsafe_allow_html=True)
         st.markdown("""<h2 class="modern-serif-title" style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 10px;"><span style="font-size: 2rem;">🔍</span> Customer Deep Dive</h2>""", unsafe_allow_html=True)
-        
         v_labels = ["Gender", "Age", "Location", "Marital Status", "Income", "Homeowner", "Children", "Net Worth"]
         var_cols = st.columns(len(v_labels))
         for i, label in enumerate(v_labels):
@@ -235,7 +256,10 @@ elif st.session_state.app_state == "dashboard":
             if l2.button("State", type="primary" if st.session_state.active_loc_level == "State" else "secondary"): st.session_state.active_loc_level = "State"; st.rerun()
             if l3.button("Zip Code", type="primary" if st.session_state.active_loc_level == "Zip Code" else "secondary"): st.session_state.active_loc_level = "Zip Code"; st.rerun()
             lk = st.session_state.active_loc_level
-        if lk in dash_data['html_views']: st.markdown(f'<div class="premium-table-container">{dash_data["html_views"][lk]}</div>', unsafe_allow_html=True)
-        st.markdown("<br><hr style='border-top: 1px solid #E2E8F0; margin: 3rem 0;'><br>", unsafe_allow_html=True)
+        if dash_data['html_views'].get(lk): st.markdown(f'<div class="premium-table-container">{dash_data["html_views"][lk]}</div>', unsafe_allow_html=True)
+        
+        # 🚨 UPDATED: "Go Back" button with Purple Arrow
+        st.markdown("<br><hr style='border-top: 1px solid #E2E8F0; margin: 2rem 0;'><br>", unsafe_allow_html=True)
         _, reset_col, _ = st.columns([2, 1, 2])
-        if reset_col.button("Start Over", use_container_width=True): st.session_state.app_state = "onboarding"; st.rerun()
+        if reset_col.button("← Go Back", use_container_width=True, kind="secondary"): 
+            st.session_state.app_state = "onboarding"; st.rerun()
