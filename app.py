@@ -294,8 +294,8 @@ elif st.session_state.app_state == "dashboard":
         with m2:
             st.markdown(f"""
                 <div style="background-color: #F8F5FA; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 25px 20px; text-align: center; box-shadow: 0 2px 4px rgba(77, 20, 140, 0.05); height: 100%; display: flex; flex-direction: column; justify-content: center;">
-                    <h3 style="margin: 0; font-size: 1.6rem; color: #0F172A; font-weight: 700; font-family: Outfit, sans-serif;">Attributed Sales</h3>
-                    <h4 style="margin: 5px 0 0 0; font-size: 1.3rem; color: {PITCH_BRAND_COLOR}; font-weight: 700; font-family: Outfit, sans-serif;">${dash_data['total_revenue']:,.2f}</h4>
+                    <h3 style="margin: 0; font-size: 1.75rem; color: #0F172A; font-weight: 700; font-family: Outfit, sans-serif;">Attributed Sales</h3>
+                    <h4 style="margin: 5px 0 0 0; font-size: 1.75rem; color: {PITCH_BRAND_COLOR}; font-weight: 700; font-family: Outfit, sans-serif;">${dash_data['total_revenue']:,.2f}</h4>
                 </div>
             """, unsafe_allow_html=True)
         
