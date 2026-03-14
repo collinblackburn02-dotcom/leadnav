@@ -217,9 +217,8 @@ elif st.session_state.app_state == "dashboard":
         m1, m2 = st.columns(2)
 
         with m1:
-            # 🚨 New Logic: The custom HTML card with the exact requested text
             st.markdown(f"""
-                <div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <div style="background-color: #FFFFFF; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
                     <p style="margin: 0; font-size: 0.9rem; color: #64748B;">Resolved Customers</p>
                     <h2 style="margin: 10px 0; font-size: 3rem; color: #0F172A;">{dash_data['total_buyers']:,.0f}</h2>
                     <p style="margin: 0; font-size: 0.9rem; color: #1e293b; font-weight: 500;">
@@ -234,9 +233,9 @@ elif st.session_state.app_state == "dashboard":
                 </div>
             """, unsafe_allow_html=True)
         with m2:
-            st.markdown(f"""<div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); height: 100%; display: flex; flex-direction: column; justify-content: center;"><p style="margin: 0; font-size: 0.9rem; color: #64748B;">Attributed Sales</p><h2 style="margin: 10px 0; font-size: 3rem; color: #0F172A;">${dash_data['total_revenue']:,.2f}</h2></div>""", unsafe_allow_html=True)
-        
-       # 2. TOP PERFORMERS
+            st.markdown(f"""<div style="background-color: #FFFFFF; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); height: 100%; display: flex; flex-direction: column; justify-content: center;"><p style="margin: 0; font-size: 0.9rem; color: #64748B;">Attributed Sales</p><h2 style="margin: 10px 0; font-size: 3rem; color: #0F172A;">${dash_data['total_revenue']:,.2f}</h2></div>""", unsafe_allow_html=True)
+      
+        # 2. TOP PERFORMERS
         st.markdown("""
             <h2 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: #0F172A; font-weight: 700; font-size: 1.8rem; display: flex; align-items: center; gap: 10px;">
                 <span style="font-size: 2rem;">🏆</span> Top Performing Demographics
