@@ -90,14 +90,25 @@ def build_dashboard_views(orders_df, enriched_df, start_date, end_date):
     mask = (orders_df['order_date'] >= start_date) & (orders_df['order_date'] <= end_date)
     filtered_orders = orders_df.loc[mask]
     if filtered_orders.empty: return None
+    
+    # 🚨 Added logic: Calculate unique individual buyers in Shopify for the match rate
+    unique_shopify_humans = filtered_orders['email_match'].nunique()
+    
     purchasers = filtered_orders.groupby('email_match').agg(revenue=('revenue_raw', 'sum'), order_count=('order_id', 'nunique')).reset_index()
     df_joined = pd.merge(purchasers, enriched_df, on='email_match', how='inner').reset_index(drop=True)
+    
     if df_joined.empty: return None
+    
     total_rev = df_joined['revenue'].sum()
-    total_buyers = df_joined['email_match'].nunique()
+    
+    # 🚨 Added logic: Calculate the match rate
+    matched_count = df_joined['email_match'].nunique()
+    match_rate = (matched_count / unique_shopify_humans * 100) if unique_shopify_humans > 0 else 0
+    
     summary_vars = [("Gender", "gender"), ("Age", "age"), ("Marital Status", "marital_status"), ("Region", "region"), ("State", "state_raw"), ("Zip Code", "zip_code"), ("Income", "income")]
     top_perf = {}
     all_html_views = {}
+    
     for label, col_key in summary_vars:
         if col_key in df_joined.columns:
             valid_rows = df_joined[~df_joined[col_key].astype(str).str.lower().isin(['unknown', 'nan', 'u', 'none', '00nan', '', 'null'])]
@@ -112,7 +123,16 @@ def build_dashboard_views(orders_df, enriched_df, start_date, end_date):
                 if label == "Zip Code": final_v = final_v.head(100)
                 styler = final_v.style.format({'Purchasers': '{:,.0f}', 'Revenue': '${:,.2f}', '% of Buyers': '{:.1f}%', 'Rev / Purchaser': '${:,.2f}'}).background_gradient(subset=['Revenue', '% of Buyers'], cmap=custom_light_green)
                 all_html_views[label] = styler.hide(axis="index").to_html()
-    return {"total_revenue": total_rev, "total_buyers": total_buyers, "top_performers": top_perf, "html_views": all_html_views}
+                
+    # 🚨 Updated return statement to include the new match metrics
+    return {
+        "total_revenue": total_rev, 
+        "total_buyers": matched_count, 
+        "unique_shopify_customers": unique_shopify_humans,
+        "match_rate": match_rate,
+        "top_performers": top_perf, 
+        "html_views": all_html_views
+    }
 
 # ================ 3. APP FLOW =================
 if "app_state" not in st.session_state: 
@@ -132,37 +152,39 @@ if st.session_state.app_state == "onboarding":
         st.session_state.n8n_vault = st.file_uploader("Add n8n CSVs", type=["csv"], accept_multiple_files=True, key="n8n_up")
     st.markdown("<br>", unsafe_allow_html=True)
     _, center_col, _ = st.columns([2, 1, 2])
+    
     if center_col.button("🚀 Run Analysis", type="primary", use_container_width=True):
         if not st.session_state.orders_vault or not st.session_state.n8n_vault:
             st.error("Please upload at least one of each file type.")
         else:
             with st.spinner("Deduplicating & Processing Data..."):
-            # Load raw data
-            raw_df = pd.concat([pd.read_csv(f, encoding='latin1', on_bad_lines='skip') for f in st.session_state.orders_vault], ignore_index=True)
-            raw_count = len(raw_df)
-            
-            # Clean: This converts blanks to 0 and removes them
-            cleaned_step_1 = clean_orders_data(raw_df)
-            st.session_state.zero_rev_count = raw_count - len(cleaned_step_1)
-            
-            # Deduplicate: Remove the multi-line line items (#6078 appearing 4 times)
-            unique_orders_df = cleaned_step_1.drop_duplicates(subset=['order_id'])
-            line_item_dupes = len(cleaned_step_1) - len(unique_orders_df)
-            
-            # Identify Repeat Customers (Same email buying different Order IDs)
-            unique_customers_count = unique_orders_df['email_match'].nunique()
-            repeat_customer_orders = len(unique_orders_df) - unique_customers_count
-            
-            # Final Vault storage
-            st.session_state.raw_row_count = raw_count
-            st.session_state.line_item_dupes = line_item_dupes
-            st.session_state.repeat_orders = repeat_customer_orders
-            st.session_state.cleaned_orders = unique_orders_df
-            
-            # Process Enriched Data
-            all_n8n = pd.concat([pd.read_csv(f, encoding='latin1', on_bad_lines='skip') for f in st.session_state.n8n_vault], ignore_index=True)
-            st.session_state.cleaned_n8n = clean_n8n_data(all_n8n).drop_duplicates(subset=['email_match'])
-            
+                # 🚨 New Logic: Process Orders and count all the duplicates and blanks
+                raw_df = pd.concat([pd.read_csv(f, encoding='latin1', on_bad_lines='skip') for f in st.session_state.orders_vault], ignore_index=True)
+                raw_count = len(raw_df)
+                
+                # Clean: This converts blanks to 0 and removes them
+                cleaned_step_1 = clean_orders_data(raw_df)
+                st.session_state.zero_rev_count = raw_count - len(cleaned_step_1)
+                
+                # Deduplicate: Remove the multi-line line items
+                unique_orders_df = cleaned_step_1.drop_duplicates(subset=['order_id'])
+                st.session_state.line_item_dupes = len(cleaned_step_1) - len(unique_orders_df)
+                
+                # Identify Repeat Customers (Same email buying different Order IDs)
+                unique_customers_count = unique_orders_df['email_match'].nunique()
+                st.session_state.repeat_orders = len(unique_orders_df) - unique_customers_count
+                
+                # Final Vault storage
+                st.session_state.cleaned_orders = unique_orders_df
+                
+                # Process Enriched Data
+                all_n8n = pd.concat([pd.read_csv(f, encoding='latin1', on_bad_lines='skip') for f in st.session_state.n8n_vault], ignore_index=True)
+                st.session_state.cleaned_n8n = clean_n8n_data(all_n8n).drop_duplicates(subset=['email_match'])
+                
+                st.session_state.min_date, st.session_state.max_date = st.session_state.cleaned_orders['order_date'].min(), st.session_state.cleaned_orders['order_date'].max()
+                st.session_state.current_start, st.session_state.current_end = st.session_state.min_date, st.session_state.max_date
+                st.session_state.app_state = "dashboard"
+                st.rerun()
 
 elif st.session_state.app_state == "dashboard":
     c1, c2, c3 = st.columns([1, 3, 1])
@@ -180,12 +202,24 @@ elif st.session_state.app_state == "dashboard":
     if dash_data:
         # 1. MACRO METRICS (DESCRIPTIVE)
         m1, m2 = st.columns(2)
-        mask = (st.session_state.cleaned_orders['order_date'] >= selected_dates[0]) & (st.session_state.cleaned_orders['order_date'] <= selected_dates[1])
-        orders_in_range = st.session_state.cleaned_orders[mask]
-        duplicates_identified = len(orders_in_range) - dash_data['total_buyers']
 
         with m1:
-            st.markdown(f"""<div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);"><p style="margin: 0; font-size: 0.9rem; color: #64748B;">Resolved Customers</p><h2 style="margin: 10px 0; font-size: 3rem; color: #0F172A;">{dash_data['total_buyers']:,.0f}</h2><p style="margin: 0; font-size: 0.75rem; color: #94A3B8; line-height: 1.4;">Scrubbed <b>{st.session_state.zero_rev_count}</b> orders with no revenue.<br>Identified <b>{duplicates_identified}</b> repeat orders from existing customers.<br>Grouped activity so each customer is only counted once.</p></div>""", unsafe_allow_html=True)
+            # 🚨 New Logic: The custom HTML card with the exact requested text
+            st.markdown(f"""
+                <div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                    <p style="margin: 0; font-size: 0.9rem; color: #64748B;">Resolved Customers</p>
+                    <h2 style="margin: 10px 0; font-size: 3rem; color: #0F172A;">{dash_data['total_buyers']:,.0f}</h2>
+                    <p style="margin: 0; font-size: 0.9rem; color: #1e293b; font-weight: 500;">
+                        Identified <b>{dash_data['unique_shopify_customers']:,.0f}</b> individual customers and matched <b>{dash_data['total_buyers']:,.0f} ({dash_data['match_rate']:.1f}%)</b>.
+                    </p>
+                    <hr style="margin: 15px 0; border: 0; border-top: 1px solid #f1f5f9;">
+                    <p style="margin: 0; font-size: 0.75rem; color: #94A3B8; line-height: 1.4; text-align: left;">
+                        • Scrubbed <b>{st.session_state.zero_rev_count}</b> empty or $0 line items.<br>
+                        • Collapsed <b>{st.session_state.line_item_dupes}</b> multi-line item rows.<br>
+                        • Grouped <b>{st.session_state.repeat_orders}</b> repeat purchases from the same buyers.
+                    </p>
+                </div>
+            """, unsafe_allow_html=True)
         with m2:
             st.markdown(f"""<div style="background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); height: 100%; display: flex; flex-direction: column; justify-content: center;"><p style="margin: 0; font-size: 0.9rem; color: #64748B;">Attributed Sales</p><h2 style="margin: 10px 0; font-size: 3rem; color: #0F172A;">${dash_data['total_revenue']:,.2f}</h2></div>""", unsafe_allow_html=True)
         
