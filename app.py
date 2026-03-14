@@ -28,20 +28,17 @@ st.set_page_config(page_title=f"{PITCH_COMPANY_NAME} | Audience Engine", page_ic
 def apply_custom_theme(primary_color):
     st.markdown(f"""
         <style>
-            /* Imported Outfit for the body, Playfair Display for chosen Titles */
             @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;0,800;1,600&display=swap');
             
             html, body, [class*="css"] {{ font-family: 'Outfit', sans-serif; }}
             .stApp {{ background-color: #FAFAFC; }} 
             
-            /* Hide standard Streamlit headers and footers */
             [data-testid="stHeader"] {{ display: none !important; }}
             #MainMenu {{ visibility: hidden; }}
             footer {{ visibility: hidden; }}
-            
             [data-testid="stSidebar"], [data-testid="collapsedControl"] {{ display: none !important; }}
             
-            /* 🚨 THE FIX: Banishing the Hyperlink icons and styling */
+            /* 🚨 THE FIX: Banishing the Hyperlink icons and styling across the app */
             .stMarkdown a svg {{ display: none !important; }}
             .stMarkdown a {{ 
                 text-decoration: none !important; 
@@ -52,24 +49,15 @@ def apply_custom_theme(primary_color):
 
             div[data-testid="stButton"] button {{ border-radius: 8px; font-weight: 500; padding: 0px 10px !important; }}
             div[data-testid="stButton"] button[kind="primary"] {{ background-color: {primary_color} !important; color: #FFFFFF !important; border: none; }}
-            
-            /* Match the active button's deep purple for inactive outlines */
             div[data-testid="stButton"] button[kind="secondary"] {{ background-color: #FFFFFF; color: {primary_color}; border: 1px solid {primary_color}; font-family: 'Outfit', sans-serif !important; }}
             
-            /* Match the active button's deep purple for the table outline */
             .premium-table-container {{ border-radius: 12px; border: 1px solid {primary_color}; background: #FFFFFF; overflow: hidden; margin-top: 1rem; margin-bottom: 2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }}
             .premium-table-container table {{ width: 100% !important; border-collapse: collapse !important; }}
-            
-            /* Match the header underline to the new deep purple border */
             .premium-table-container th {{ font-family: 'Outfit', sans-serif !important; background-color: #F8F6FA !important; color: {primary_color} !important; font-weight: 700 !important; text-align: center !important; padding: 15px 12px !important; border-bottom: 2px solid {primary_color} !important; border-right: 1px solid #EBE4F4 !important; text-transform: uppercase !important; font-size: 0.95rem !important; letter-spacing: 0.5px !important; }}
-            
-            /* Internal grid lines remain soft so they don't distract from the data */
             .premium-table-container td {{ font-family: 'Outfit', sans-serif !important; text-align: center !important; padding: 12px !important; border-bottom: 1px solid #EBE4F4 !important; border-right: 1px solid #EBE4F4 !important; font-size: 0.85rem !important; }}
-            
             .premium-table-container th:last-child, .premium-table-container td:last-child {{ border-right: none !important; }}
             .premium-table-container td:first-child {{ font-weight: 700 !important; color: #0F172A !important; }}
             
-            /* Reusable centerline title centerpiece with gradient */
             .serif-gradient-centerpiece {{ 
                 font-family: 'Playfair Display', serif !important; 
                 background: linear-gradient(90deg, #4D148C 0%, #20B2AA 100%); 
@@ -79,29 +67,12 @@ def apply_custom_theme(primary_color):
                 font-weight: 700 !important; 
                 letter-spacing: -0.5px;
             }}
-            
-            /* Reusable centerline black subheadline */
-            .serif-subheadline {{ 
-                font-family: 'Playfair Display', serif !important; 
-                color: #0F172A !important; 
-                font-weight: 700 !important; 
-                letter-spacing: -0.5px;
-            }}
-            
-            /* reusable chosen modern serif subtitle class */
-            .modern-serif-title {{ 
-                font-family: 'Playfair Display', serif !important; 
-                color: #0F172A !important; 
-                font-weight: 700 !important; 
-                letter-spacing: -0.5px; 
-            }}
-            
+            .serif-subheadline {{ font-family: 'Playfair Display', serif !important; color: #0F172A !important; font-weight: 700 !important; letter-spacing: -0.5px; }}
+            .modern-serif-title {{ font-family: 'Playfair Display', serif !important; color: #0F172A !important; font-weight: 700 !important; letter-spacing: -0.5px; }}
         </style>
     """, unsafe_allow_html=True)
 
 apply_custom_theme(PITCH_BRAND_COLOR)
-
-# Ultra-subtle, premium SaaS gradient
 brand_gradient = mcolors.LinearSegmentedColormap.from_list("brand_purple", ["#FFFFFF", "#FBF9FC", "#EBE4F4"])
 
 # ================ 2. DATA ENGINE =================
@@ -125,47 +96,30 @@ def clean_orders_data(df):
     order_col = next((c for c in df.columns if 'name' in c.lower() or 'order' in c.lower()), 'Order ID')
     total_col = next((c for c in df.columns if 'total' in c.lower() or 'price' in c.lower()), 'Total')
     date_col = next((c for c in df.columns if 'created' in c.lower() or 'date' in c.lower()), 'Date')
-    
     df = df.rename(columns={email_col: 'email_match', order_col: 'order_id', total_col: 'revenue_raw', date_col: 'order_date'})
     df['email_match'] = df['email_match'].astype(str).str.lower().str.strip()
-    
-    # 1. Clean currency and force blanks to 0
     df['revenue_raw'] = df['revenue_raw'].astype(str).str.replace(r'[^\d.-]', '', regex=True)
     df['revenue_raw'] = pd.to_numeric(df['revenue_raw'], errors='coerce').fillna(0)
-    
-    # 2. Drop the zeros/blanks BEFORE doing anything else
     df = df[df['revenue_raw'] > 0]
-    
-    # 3. Handle dates
     df['order_date'] = pd.to_datetime(df['order_date'], errors='coerce', utc=True)
     df = df.dropna(subset=['order_date'])
     df['order_date'] = df['order_date'].dt.date
-    
     return df.reset_index(drop=True)
 
 def build_dashboard_views(orders_df, enriched_df, start_date, end_date):
     mask = (orders_df['order_date'] >= start_date) & (orders_df['order_date'] <= end_date)
     filtered_orders = orders_df.loc[mask]
     if filtered_orders.empty: return None
-    
-    # Calculate unique individual buyers in Shopify for the match rate
     unique_shopify_humans = filtered_orders['email_match'].nunique()
-    
     purchasers = filtered_orders.groupby('email_match').agg(revenue=('revenue_raw', 'sum'), order_count=('order_id', 'nunique')).reset_index()
     df_joined = pd.merge(purchasers, enriched_df, on='email_match', how='inner').reset_index(drop=True)
-    
     if df_joined.empty: return None
-    
     total_rev = df_joined['revenue'].sum()
-    
-    # Calculate the match rate
     matched_count = df_joined['email_match'].nunique()
     match_rate = (matched_count / unique_shopify_humans * 100) if unique_shopify_humans > 0 else 0
-    
     summary_vars = [("Gender", "gender"), ("Age", "age"), ("Marital Status", "marital_status"), ("Region", "region"), ("State", "state_raw"), ("Zip Code", "zip_code"), ("Income", "income")]
     top_perf = {}
     all_html_views = {}
-    
     for label, col_key in summary_vars:
         if col_key in df_joined.columns:
             valid_rows = df_joined[~df_joined[col_key].astype(str).str.lower().isin(['unknown', 'nan', 'u', 'none', '00nan', '', 'null'])]
@@ -180,15 +134,7 @@ def build_dashboard_views(orders_df, enriched_df, start_date, end_date):
                 if label == "Zip Code": final_v = final_v.head(100)
                 styler = final_v.style.format({'Purchasers': '{:,.0f}', 'Revenue': '${:,.2f}', '% of Buyers': '{:.1f}%', 'Rev / Purchaser': '${:,.2f}'}).background_gradient(subset=['Revenue', '% of Buyers'], cmap=brand_gradient)
                 all_html_views[label] = styler.hide(axis="index").to_html()
-                
-    return {
-        "total_revenue": total_rev, 
-        "total_buyers": matched_count, 
-        "unique_shopify_customers": unique_shopify_humans,
-        "match_rate": match_rate,
-        "top_performers": top_perf, 
-        "html_views": all_html_views
-    }
+    return {"total_revenue": total_rev, "total_buyers": matched_count, "unique_shopify_customers": unique_shopify_humans, "match_rate": match_rate, "top_performers": top_perf, "html_views": all_html_views}
 
 # ================ 3. APP FLOW =================
 if "app_state" not in st.session_state: 
@@ -197,19 +143,14 @@ if "app_state" not in st.session_state:
     st.session_state.n8n_vault = []
 
 if st.session_state.app_state == "onboarding":
-    
-    # Smaller Logo in top-left
     st.image("logo.png", width=180)
-    
     st.markdown("""
         <div style="text-align: center; margin-top: -15px; margin-bottom: 30px;">
             <h1 class="serif-gradient-centerpiece" style="font-size: 2.8rem; margin-bottom: 0px;">Customer Insights Dashboard.</h1>
             <h2 class="serif-subheadline" style="font-size: 2.2rem; color: #0F172A !important; margin-top: 0px;">Get To Know Your Customer.</h2>
         </div>
     """, unsafe_allow_html=True)
-    
     st.markdown("<p style='text-align: center; color: #64748B; font-family: Outfit, sans-serif;'>Upload Shopify and Enriched Data files to begin.</p>", unsafe_allow_html=True)
-    
     _, col1, col2, _ = st.columns([1, 2, 2, 1])
     with col1:
         st.subheader("🛒 Shopify Orders")
@@ -217,10 +158,8 @@ if st.session_state.app_state == "onboarding":
     with col2:
         st.subheader("🧬 Enriched Data")
         st.session_state.n8n_vault = st.file_uploader("Add n8n CSVs", type=["csv"], accept_multiple_files=True, key="n8n_up")
-    
     st.markdown("<br>", unsafe_allow_html=True)
     _, center_col, _ = st.columns([2, 1, 2])
-    
     if center_col.button("🚀 Run Analysis", type="primary", use_container_width=True):
         if not st.session_state.orders_vault or not st.session_state.n8n_vault:
             st.error("Please upload at least one of each file type.")
@@ -228,41 +167,29 @@ if st.session_state.app_state == "onboarding":
             with st.spinner("Deduplicating & Processing Data..."):
                 raw_df = pd.concat([pd.read_csv(f, encoding='latin1', on_bad_lines='skip') for f in st.session_state.orders_vault], ignore_index=True)
                 raw_count = len(raw_df)
-                
                 cleaned_step_1 = clean_orders_data(raw_df)
                 st.session_state.zero_rev_count = raw_count - len(cleaned_step_1)
-                
                 unique_orders_df = cleaned_step_1.drop_duplicates(subset=['order_id'])
                 st.session_state.line_item_dupes = len(cleaned_step_1) - len(unique_orders_df)
-                
                 unique_customers_count = unique_orders_df['email_match'].nunique()
                 st.session_state.repeat_orders = len(unique_orders_df) - unique_customers_count
-                
                 st.session_state.cleaned_orders = unique_orders_df
-                
                 all_n8n = pd.concat([pd.read_csv(f, encoding='latin1', on_bad_lines='skip') for f in st.session_state.n8n_vault], ignore_index=True)
                 st.session_state.cleaned_n8n = clean_n8n_data(all_n8n).drop_duplicates(subset=['email_match'])
-                
                 st.session_state.min_date, st.session_state.max_date = st.session_state.cleaned_orders['order_date'].min(), st.session_state.cleaned_orders['order_date'].max()
                 st.session_state.current_start, st.session_state.current_end = st.session_state.min_date, st.session_state.max_date
                 st.session_state.app_state = "dashboard"
                 st.rerun()
 
 elif st.session_state.app_state == "dashboard":
-    
-    # Small Logo in top-left corner
     st.image("logo.png", width=180)
-    
     st.markdown("""
         <div style="text-align: center; margin-top: -10px; margin-bottom: 30px;">
             <h1 class="serif-gradient-centerpiece" style="font-size: 3.5rem; margin-bottom: 0px;">Customer Insights Dashboard.</h1>
             <h2 class="serif-subheadline" style="font-size: 2.8rem; color: #0F172A !important; margin-top: -5px;">Get To Know Your Customer.</h2>
         </div>
     """, unsafe_allow_html=True)
-    
-    # Center the Date Slider row perfectly
     _, c2, _ = st.columns([1, 4, 1])
-    
     with c2:
         selected_dates = st.slider("Filter by Purchase Date", min_value=st.session_state.min_date, max_value=st.session_state.max_date, value=(st.session_state.current_start, st.session_state.current_end), format="MMM DD, YYYY")
     
@@ -272,9 +199,7 @@ elif st.session_state.app_state == "dashboard":
     
     dash_data = st.session_state.dash_data
     if dash_data:
-        # 1. MACRO METRICS (DESCRIPTIVE)
         m1, m2 = st.columns(2)
-
         with m1:
             st.markdown(f"""
                 <div style="background-color: #F8F5FA; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 25px 20px; text-align: center; box-shadow: 0 2px 4px rgba(77, 20, 140, 0.05);">
@@ -299,13 +224,7 @@ elif st.session_state.app_state == "dashboard":
                 </div>
             """, unsafe_allow_html=True)
         
-        # 2. TOP PERFORMERS
-        st.markdown("""
-            <h2 class="modern-serif-title" style="margin-top: 2rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 10px;">
-                <span style="font-size: 2rem;">🏆</span> Top Performing Demographics
-            </h2>
-        """, unsafe_allow_html=True)
-        
+        st.markdown("""<h2 class="modern-serif-title" style="margin-top: 2rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 10px;"><span style="font-size: 2rem;">🏆</span> Top Performing Demographics</h2>""", unsafe_allow_html=True)
         summary_cols = st.columns(len(dash_data['top_performers']))
         for i, (label, data) in enumerate(dash_data['top_performers'].items()):
             with summary_cols[i]:
@@ -317,19 +236,7 @@ elif st.session_state.app_state == "dashboard":
                     </div>
                 ''', unsafe_allow_html=True)
                 
-        # 3. DEEP DIVE (Customer Deep Dive)
-        st.markdown("""
-            <h2 class="modern-serif-title" style="
-                margin-top: 2.5rem; 
-                margin-bottom: 0.5rem; 
-                display: flex;
-                align-items: center;
-                gap: 10px;
-            ">
-                <span style="font-size: 2rem;">🔍</span> Customer Deep Dive
-            </h2>
-        """, unsafe_allow_html=True)
-        
+        st.markdown("""<h2 class="modern-serif-title" style="margin-top: 2.5rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 10px;"><span style="font-size: 2rem;">🔍</span> Customer Deep Dive</h2>""", unsafe_allow_html=True)
         if "active_var" not in st.session_state: st.session_state.active_var = "Gender"
         if "active_loc_level" not in st.session_state: st.session_state.active_loc_level = "Region"
         v_labels = ["Gender", "Age", "Location", "Marital Status", "Income"]
@@ -345,11 +252,9 @@ elif st.session_state.app_state == "dashboard":
             if l2.button("State", type="primary" if st.session_state.active_loc_level == "State" else "secondary"): st.session_state.active_loc_level = "State"; st.rerun()
             if l3.button("Zip Code", type="primary" if st.session_state.active_loc_level == "Zip Code" else "secondary"): st.session_state.active_loc_level = "Zip Code"; st.rerun()
             lk = st.session_state.active_loc_level
-
         if lk in dash_data['html_views']:
             st.markdown(f'<div class="premium-table-container">{dash_data["html_views"][lk]}</div>', unsafe_allow_html=True)
 
-        # Start Over button relocated to the very bottom, centered, and emoji removed
         st.markdown("<br><hr style='border-top: 1px solid #E2E8F0; margin: 2rem 0;'><br>", unsafe_allow_html=True)
         _, reset_col, _ = st.columns([2, 1, 2])
         if reset_col.button("Start Over", use_container_width=True): 
