@@ -123,7 +123,7 @@ def build_dashboard_views(orders_df, enriched_df, start_date, end_date):
                 grp['Rev / Purchaser'] = (grp['Revenue'] / grp['Purchasers'])
                 final_v = grp.rename(columns={col_key: label.upper()}).sort_values('Revenue', ascending=False)
                 if label == "Zip Code": final_v = final_v.head(100)
-                styler = final_v.style.format({'Purchasers': '{:,.0f}', 'Revenue': '${:,.2f}', '% of Buyers': '{:.1f}%', 'Rev / Purchaser': '${:,.2f}'}).background_gradient(subset=['Revenue', '% of Buyers'], cmap=custom_light_green)
+                styler = final_v.style.format({'Purchasers': '{:,.0f}', 'Revenue': '${:,.2f}', '% of Buyers': '{:.1f}%', 'Rev / Purchaser': '${:,.2f}'}).background_gradient(subset=['Revenue', '% of Buyers'], cmap=brand_gradient)
                 all_html_views[label] = styler.hide(axis="index").to_html()
                 
     # 🚨 Updated return statement to include the new match metrics
