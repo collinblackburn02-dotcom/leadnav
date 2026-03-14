@@ -45,23 +45,23 @@ def apply_custom_theme(primary_color):
             div[data-testid="stButton"] button[kind="primary"] {{ background-color: {primary_color} !important; color: #FFFFFF !important; border: none; }}
             
             /* Match the active button's deep purple for inactive outlines */
-            div[data-testid="stButton"] button[kind="secondary"] {{ background-color: #FFFFFF; color: {primary_color}; border: 1px solid {primary_color}; }}
+            div[data-testid="stButton"] button[kind="secondary"] {{ background-color: #FFFFFF; color: {primary_color}; border: 1px solid {primary_color}; font-family: 'Outfit', sans-serif !important; }}
             
             /* Match the active button's deep purple for the table outline */
             .premium-table-container {{ border-radius: 12px; border: 1px solid {primary_color}; background: #FFFFFF; overflow: hidden; margin-top: 1rem; margin-bottom: 2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }}
             .premium-table-container table {{ width: 100% !important; border-collapse: collapse !important; }}
             
             /* Match the header underline to the new deep purple border */
-            .premium-table-container th {{ background-color: #F8F6FA !important; color: {primary_color} !important; font-weight: 700 !important; text-align: center !important; padding: 15px 12px !important; border-bottom: 2px solid {primary_color} !important; border-right: 1px solid #EBE4F4 !important; text-transform: uppercase !important; font-size: 0.95rem !important; letter-spacing: 0.5px !important; }}
+            .premium-table-container th {{ font-family: 'Outfit', sans-serif !important; background-color: #F8F6FA !important; color: {primary_color} !important; font-weight: 700 !important; text-align: center !important; padding: 15px 12px !important; border-bottom: 2px solid {primary_color} !important; border-right: 1px solid #EBE4F4 !important; text-transform: uppercase !important; font-size: 0.95rem !important; letter-spacing: 0.5px !important; }}
             
             /* Internal grid lines remain soft so they don't distract from the data */
-            .premium-table-container td {{ text-align: center !important; padding: 12px !important; border-bottom: 1px solid #EBE4F4 !important; border-right: 1px solid #EBE4F4 !important; font-size: 0.85rem !important; }}
+            .premium-table-container td {{ font-family: 'Outfit', sans-serif !important; text-align: center !important; padding: 12px !important; border-bottom: 1px solid #EBE4F4 !important; border-right: 1px solid #EBE4F4 !important; font-size: 0.85rem !important; }}
             
             .premium-table-container th:last-child, .premium-table-container td:last-child {{ border-right: none !important; }}
             .premium-table-container td:first-child {{ font-weight: 700 !important; color: #0F172A !important; }}
             
-            /* 🚨 THE FIX: Reusable centerline title centerpiece with gradient */
-            .stApp . serif-gradient-centerpiece { 
+            /* Reusable centerline title centerpiece with gradient */
+            .serif-gradient-centerpiece {{ 
                 font-family: 'Playfair Display', serif !important; 
                 background: linear-gradient(90deg, #4D148C 0%, #20B2AA 100%); 
                 -webkit-background-clip: text; 
@@ -69,32 +69,23 @@ def apply_custom_theme(primary_color):
                 display: inline-block; 
                 font-weight: 700 !important; 
                 letter-spacing: -0.5px;
-            }
+            }}
             
             /* Reusable centerline black subheadline */
-            .stApp . serif-subheadline { 
+            .serif-subheadline {{ 
                 font-family: 'Playfair Display', serif !important; 
                 color: #0F172A !important; 
                 font-weight: 700 !important; 
                 letter-spacing: -0.5px;
-            }
+            }}
             
             /* reusable chosen modern serif subtitle class */
-            .stApp . modern-serif-title { 
+            .modern-serif-title {{ 
                 font-family: 'Playfair Display', serif !important; 
                 color: #0F172A !important; 
                 font-weight: 700 !important; 
                 letter-spacing: -0.5px; 
-            }
-            
-            /* Ensure metric labels/numbers remain the standardOutfit sans-serif font */
-            .sans-serif-label, .sans-serif-number, .picker-variable-text { font-family: 'Outfit', sans-serif !important; }
-            .premium-table-container td, .premium-table-container th { font-family: 'Outfit', sans-serif !important; }
-            [data-testid="stMetricLabel"] {{ font-family: 'Outfit', sans-serif !important; font-size: 0.9rem; }}
-            [data-testid="stMetricValue"] {{ font-family: 'Outfit', sans-serif !important; font-size: 3.5rem; }}
-            
-            /* Metrics container sans-serif */
-            .macro-metric-card, .metric-number-centerpiece, .top-perf-card-header, .top-perf-pill, . picker-variable-text, div[data-testid="stButton"] button { font-family: 'Outfit', sans-serif !important; }
+            }}
             
         </style>
     """, unsafe_allow_html=True)
@@ -198,7 +189,7 @@ if "app_state" not in st.session_state:
 
 if st.session_state.app_state == "onboarding":
     
-    # 🚨 THE FIX: Smaller Logo in top-left, centered centerpiece text centerline
+    # Smaller Logo in top-left
     st.image("logo.png", width=180)
     
     st.markdown("""
@@ -208,7 +199,7 @@ if st.session_state.app_state == "onboarding":
         </div>
     """, unsafe_allow_html=True)
     
-    st.markdown("<p style='text-align: center; color: #64748B;'>Upload Shopify and Enriched Data files to begin.</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #64748B; font-family: Outfit, sans-serif;'>Upload Shopify and Enriched Data files to begin.</p>", unsafe_allow_html=True)
     
     _, col1, col2, _ = st.columns([1, 2, 2, 1])
     with col1:
@@ -250,7 +241,7 @@ if st.session_state.app_state == "onboarding":
 
 elif st.session_state.app_state == "dashboard":
     
-    # 🚨 THE FIX: Small Logo in top-left corner, centerpiece text centerline
+    # Small Logo in top-left corner
     st.image("logo.png", width=180)
     
     st.markdown("""
@@ -287,14 +278,14 @@ elif st.session_state.app_state == "dashboard":
 
         with m1:
             st.markdown(f"""
-                <div class="macro-metric-card" style="background-color: #FFFFFF; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-                    <p style="margin: 0; font-size: 0.9rem; color: #64748B;">Resolved Customers</p>
-                    <h2 class="sans-serif-metric-number" style="margin: 10px 0; font-size: 3.5rem; color: #0F172A; font-family: Outfit, sans-serif;">{dash_data['total_buyers']:,.0f}</h2>
-                    <p style="margin: 0; font-size: 0.9rem; color: #1e293b; font-weight: 500;">
+                <div style="background-color: #FFFFFF; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                    <p style="margin: 0; font-size: 0.9rem; color: #64748B; font-family: Outfit, sans-serif;">Resolved Customers</p>
+                    <h2 style="margin: 10px 0; font-size: 3.5rem; color: #0F172A; font-family: Outfit, sans-serif;">{dash_data['total_buyers']:,.0f}</h2>
+                    <p style="margin: 0; font-size: 0.9rem; color: #1e293b; font-weight: 500; font-family: Outfit, sans-serif;">
                         Identified <b>{dash_data['unique_shopify_customers']:,.0f}</b> individual customers and matched <b>{dash_data['total_buyers']:,.0f} ({dash_data['match_rate']:.1f}%)</b>.
                     </p>
                     <hr style="margin: 15px 0; border: 0; border-top: 1px solid #f1f5f9;">
-                    <p style="margin: 0; font-size: 0.75rem; color: #94A3B8; line-height: 1.4; text-align: left;">
+                    <p style="margin: 0; font-size: 0.75rem; color: #94A3B8; line-height: 1.4; text-align: left; font-family: Outfit, sans-serif;">
                         • Scrubbed <b>{st.session_state.zero_rev_count}</b> empty or $0 line items.<br>
                         • Collapsed <b>{st.session_state.line_item_dupes}</b> multi-line item rows.<br>
                         • Grouped <b>{st.session_state.repeat_orders}</b> repeat purchases from the same buyers.
@@ -302,11 +293,11 @@ elif st.session_state.app_state == "dashboard":
                 </div>
             """, unsafe_allow_html=True)
         with m2:
-            st.markdown(f"""<div class="macro-metric-card" style="background-color: #FFFFFF; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); height: 100%; display: flex; flex-direction: column; justify-content: center;"><p style="margin: 0; font-size: 0.9rem; color: #64748B;">Attributed Sales</p><h2 class="sans-serif-metric-number" style="margin: 10px 0; font-size: 3.5rem; color: #0F172A; font-family: Outfit, sans-serif;">${dash_data['total_revenue']:,.2f}</h2></div>""", unsafe_allow_html=True)
+            st.markdown(f"""<div style="background-color: #FFFFFF; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); height: 100%; display: flex; flex-direction: column; justify-content: center;"><p style="margin: 0; font-size: 0.9rem; color: #64748B; font-family: Outfit, sans-serif;">Attributed Sales</p><h2 style="margin: 10px 0; font-size: 3.5rem; color: #0F172A; font-family: Outfit, sans-serif;">${dash_data['total_revenue']:,.2f}</h2></div>""", unsafe_allow_html=True)
         
-        # 2. TOP PERFORMERS (Title is modern serif, content is sans-serif)
+        # 2. TOP PERFORMERS
         st.markdown("""
-            <h2 class="modern-serif-title" style="margin-top: 2rem; margin-bottom: 0.5rem;">
+            <h2 class="modern-serif-title" style="margin-top: 2rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 10px;">
                 <span style="font-size: 2rem;">🏆</span> Top Performing Demographics
             </h2>
         """, unsafe_allow_html=True)
@@ -314,16 +305,15 @@ elif st.session_state.app_state == "dashboard":
         summary_cols = st.columns(len(dash_data['top_performers']))
         for i, (label, data) in enumerate(dash_data['top_performers'].items()):
             with summary_cols[i]:
-                # Card content variable headers made Outfit
                 st.markdown(f'''
                     <div style="background-color: #FFFFFF; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 15px; text-align: center; min-height: 120px; display: flex; flex-direction: column; justify-content: center;">
-                        <p style="margin: 0; font-size: 0.8rem; color: #64748B; font-weight: 600; text-transform: uppercase;">{label}</p>
-                        <h3 class="sans-serif-card-variable" style="margin: 5px 0; font-size: 1.4rem; color: #0F172A; font-weight: 700; line-height: 1.2; font-family: Outfit, sans-serif !important;">{data[0]}</h3>
-                        <p class="sans-serif-card-variable top-perf-pill" style="margin: 0; font-size: 0.85rem; color: {PITCH_BRAND_COLOR}; background-color: #EBE4F4; border-radius: 20px; padding: 2px 8px; display: inline-block; align-self: center; font-weight: 600; font-family: Outfit, sans-serif !important;">{data[1]:.1f}% of Revenue</p>
+                        <p style="margin: 0; font-size: 0.8rem; color: #64748B; font-weight: 600; text-transform: uppercase; font-family: Outfit, sans-serif;">{label}</p>
+                        <h3 style="margin: 5px 0; font-size: 1.4rem; color: #0F172A; font-weight: 700; line-height: 1.2; font-family: Outfit, sans-serif !important;">{data[0]}</h3>
+                        <p style="margin: 0; font-size: 0.85rem; color: {PITCH_BRAND_COLOR}; background-color: #EBE4F4; border-radius: 20px; padding: 2px 8px; display: inline-block; align-self: center; font-weight: 600; font-family: Outfit, sans-serif !important;">{data[1]:.1f}% of Revenue</p>
                     </div>
                 ''', unsafe_allow_html=True)
                 
-        # 3. DEEP DIVE (Polished Subheading made modern serif, changed text)
+        # 3. DEEP DIVE (Customer Deep Dive)
         st.markdown("""
             <h2 class="modern-serif-title" style="
                 margin-top: 2.5rem; 
