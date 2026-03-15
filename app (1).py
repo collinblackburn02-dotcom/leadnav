@@ -7,7 +7,7 @@ import numpy as np
 PITCH_COMPANY_NAME = "LeadNavigator" 
 PITCH_BRAND_COLOR = "#4D148C" # LeadNavigator Deep Purple
 
-# 🚨 UPDATED: Robust Mapper to handle both DTC and the new B2B API headers
+# Mapper handles DTC and the rich B2B API headers from your sample
 N8N_COLUMN_MAPPER = {
     "GENDER": "gender",
     "MARRIED": "marital_status",
@@ -18,7 +18,6 @@ N8N_COLUMN_MAPPER = {
     "HOMEOWNER": "homeowner",
     "CHILDREN": "children",
     "NET_WORTH": "net_worth",
-    # B2B Specifics
     "SENIORITY_LEVEL": "seniority",
     "COMPANY_REVENUE": "co_revenue",
     "COMPANY_EMPLOYEE_COUNT": "co_size",
@@ -70,6 +69,8 @@ brand_gradient = mcolors.LinearSegmentedColormap.from_list("brand_purple", ["#FF
 def clean_n8n_data(df):
     df = df.rename(columns=N8N_COLUMN_MAPPER)
     df.columns = [c.lower() for c in df.columns]
+    
+    # Core demographic cleaning
     if 'state_raw' in df.columns: df['region'] = df['state_raw'].str.strip().str.upper().map(STATE_TO_REGION).fillna('Unknown')
     if 'gender' in df.columns:
         df['gender'] = df['gender'].astype(str).str.strip().map({'M': 'Male', 'F': 'Female', 'Male': 'Male', 'Female': 'Female'}).fillna('Unknown')
@@ -85,9 +86,10 @@ def clean_n8n_data(df):
             return 'No'
         df['homeowner'] = df['homeowner'].apply(map_owner)
 
-    if 'zip_code' in df.columns: df['zip_code'] = df['zip_code'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(5)
+    if 'zip_code' in df.columns: 
+        df['zip_code'] = df['zip_code'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(5)
     
-    # 🚨 API Logic: The new data uses 'personal_emails' or 'business_email'
+    # Handle the API email headers
     email_col = 'personal_emails' if 'personal_emails' in df.columns else ('business_email' if 'business_email' in df.columns else None)
     if email_col:
         df['email_match'] = df[email_col].astype(str).str.lower().str.replace(r'[^a-z0-9@._,-]', '', regex=True).str.split(',')
@@ -100,6 +102,7 @@ def clean_orders_data(df):
     order_col = next((c for c in df.columns if 'name' in c.lower() or 'order' in c.lower()), 'Order ID')
     total_col = next((c for c in df.columns if 'total' in c.lower() or 'price' in c.lower()), 'Total')
     date_col = next((c for c in df.columns if 'created' in c.lower() or 'date' in c.lower()), 'Date')
+    
     df = df.rename(columns={email_col: 'email_match', order_col: 'order_id', total_col: 'revenue_raw', date_col: 'order_date'})
     df['email_match'] = df['email_match'].astype(str).str.lower().str.strip()
     df['revenue_raw'] = pd.to_numeric(df['revenue_raw'].astype(str).str.replace(r'[^\d.-]', '', regex=True), errors='coerce').fillna(0)
@@ -113,6 +116,7 @@ def build_dashboard_views(orders_df, enriched_df, start_date, end_date, biz_type
     mask = (orders_df['order_date'] >= start_date) & (orders_df['order_date'] <= end_date)
     filtered_orders = orders_df.loc[mask]
     if filtered_orders.empty: return None
+    
     purchasers = filtered_orders.groupby('email_match').agg(revenue=('revenue_raw', 'sum')).reset_index()
     df_joined = pd.merge(purchasers, enriched_df, on='email_match', how='inner').reset_index(drop=True)
     if df_joined.empty: return None
@@ -122,8 +126,7 @@ def build_dashboard_views(orders_df, enriched_df, start_date, end_date, biz_type
     unique_shopify_humans = filtered_orders['email_match'].nunique()
     match_rate = (matched_count / unique_shopify_humans * 100) if unique_shopify_humans > 0 else 0
     
-    # 🚨 DYNAMIC VARIABLE LIST based on Business Type
-    if biz_type == "B2B":
+    if biz_type == "B2B / Enterprise Sales":
         summary_vars = [
             ("Industry", "industry"), ("Seniority", "seniority"), ("Company Revenue", "co_revenue"),
             ("Company Size", "co_size"), ("Department", "department"), ("Job Title", "job_title"),
@@ -138,22 +141,42 @@ def build_dashboard_views(orders_df, enriched_df, start_date, end_date, biz_type
     
     top_perf = {}
     all_html_views = {}
+    
     for label, col_key in summary_vars:
         if col_key in df_joined.columns:
-            valid_rows = df_joined[~df_joined[col_key].astype(str).str.lower().isin(['unknown', 'nan', 'u', 'none', 'null', '00nan', ''])]
+            df_joined[col_key] = df_joined[col_key].astype(str).str.strip()
+            invalid_list = ['unknown', 'nan', 'u', 'none', 'null', '00nan', '', 'n/a', 'undefined']
+            valid_rows = df_joined[~df_joined[col_key].str.lower().isin(invalid_list)]
+            
             if not valid_rows.empty:
                 var_total = valid_rows['revenue'].sum()
                 rs = valid_rows.groupby(col_key)['revenue'].sum()
                 top_perf[label] = (rs.idxmax(), (rs.max() / var_total * 100))
-                grp = valid_rows.groupby(col_key).agg(Purchasers=('email_match', 'nunique'), Revenue=('revenue', 'sum')).reset_index()
+                
+                grp = valid_rows.groupby(col_key).agg(
+                    Purchasers=('email_match', 'nunique'), 
+                    Revenue=('revenue', 'sum')
+                ).reset_index()
+                
                 grp['% of Buyers'] = (grp['Revenue'] / var_total) * 100
                 grp['Rev / Purchaser'] = (grp['Revenue'] / grp['Purchasers'])
                 final_v = grp.rename(columns={col_key: label.upper()}).sort_values('Revenue', ascending=False)
-                if label == "Zip Code" or label == "Job Title": final_v = final_v.head(50)
-                styler = final_v.style.format({'Purchasers': '{:,.0f}', 'Revenue': '${:,.2f}', '% of Buyers': '{:.1f}%', 'Rev / Purchaser': '${:,.2f}'}).background_gradient(subset=['Revenue', '% of Buyers'], cmap=brand_gradient)
+                
+                if label in ["Zip Code", "Job Title", "Industry"]: 
+                    final_v = final_v.head(50)
+                
+                styler = final_v.style.format({
+                    'Purchasers': '{:,.0f}', 'Revenue': '${:,.2f}', 
+                    '% of Buyers': '{:.1f}%', 'Rev / Purchaser': '${:,.2f}'
+                }).background_gradient(subset=['Revenue', '% of Buyers'], cmap=brand_gradient)
+                
                 all_html_views[label] = styler.hide(axis="index").to_html()
                 
-    return {"total_revenue": total_rev, "total_buyers": matched_count, "unique_shopify_customers": unique_shopify_humans, "match_rate": match_rate, "top_performers": top_perf, "html_views": all_html_views}
+    return {
+        "total_revenue": total_rev, "total_buyers": matched_count, 
+        "unique_shopify_customers": unique_shopify_humans, "match_rate": match_rate, 
+        "top_performers": top_perf, "html_views": all_html_views
+    }
 
 # ================ 3. APP FLOW =================
 if "app_state" not in st.session_state: 
@@ -165,9 +188,8 @@ if st.session_state.app_state == "onboarding":
     st.markdown("""<div style="text-align: center; margin-top: 0px; margin-bottom: 25px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.6rem; margin-bottom: 2px;">Customer Insights Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 1.8rem; color: #0F172A !important; margin-top: 5px;">Get instant demographic insights on your existing customers.</h2></div>""", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; color: #64748B; font-family: Outfit, sans-serif; font-size: 0.9rem; margin-top: 0px;'>Upload Customer Data to begin.</p>", unsafe_allow_html=True)
     
-    # 🚨 NEW: Business Type Selector
     _, type_col, _ = st.columns([2, 1, 2])
-    st.session_state.biz_type = type_col.selectbox("Business Type Profile", ["DTC Ecommerce", "B2B / Enterprise Sales"], help="This adjusts which charts and demographics are prioritized in your dashboard.")
+    st.session_state.biz_type = type_col.selectbox("Business Type Profile", ["DTC Ecommerce", "B2B / Enterprise Sales"])
     
     st.markdown("<br>", unsafe_allow_html=True)
     _, col1, col2, _ = st.columns([1, 2, 2, 1])
@@ -195,6 +217,7 @@ if st.session_state.app_state == "onboarding":
                 st.rerun()
 
 elif st.session_state.app_state == "dashboard":
+    # Initialize UI state
     if "active_var" not in st.session_state: st.session_state.active_var = "Location"
     if "active_loc_level" not in st.session_state: st.session_state.active_loc_level = "Region"
 
@@ -203,10 +226,10 @@ elif st.session_state.app_state == "dashboard":
     
     _, c2, _ = st.columns([1, 4, 1])
     with c2: st.slider("Filter by Date", min_value=st.session_state.min_date, max_value=st.session_state.max_date, key="date_filter", format="MMM DD, YYYY")
-    st.markdown("<div style='margin-bottom: 50px;'></div>", unsafe_allow_html=True)
-
+    
+    # Check for valid date filter before indexing
     current_dates = st.session_state.get("date_filter")
-    if isinstance(current_dates, (tuple, list)):
+    if isinstance(current_dates, (tuple, list)) and len(current_dates) == 2:
         if "dash_data" not in st.session_state or st.session_state.get("last_computed_dates") != current_dates:
             st.session_state.last_computed_dates = current_dates
             st.session_state.dash_data = build_dashboard_views(st.session_state.cleaned_orders, st.session_state.cleaned_n8n, current_dates[0], current_dates[1], st.session_state.biz_type)
@@ -230,13 +253,13 @@ elif st.session_state.app_state == "dashboard":
         st.markdown("<div style='margin-top: 3rem;'></div>")
         st.markdown("""<h2 class="modern-serif-title" style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 10px;"><span style="font-size: 2rem;">🔍</span> Audience Deep Dive</h2>""", unsafe_allow_html=True)
         
-        # 🚨 DYNAMIC BUTTONS
+        # Dynamic Nav Buttons based on Business Profile
         if st.session_state.biz_type == "B2B / Enterprise Sales":
             v_labels = ["Industry", "Seniority", "Company Revenue", "Company Size", "Department", "Job Title", "Location", "Income"]
         else:
             v_labels = ["Gender", "Age", "Location", "Marital Status", "Income", "Homeowner", "Children", "Net Worth"]
             
-        var_cols = st.columns(8)
+        var_cols = st.columns(len(v_labels))
         for i, label in enumerate(v_labels):
             if var_cols[i].button(label, key=f"btn_{label}", type="primary" if st.session_state.active_var == label else "secondary", use_container_width=True):
                 st.session_state.active_var = label; st.rerun()
