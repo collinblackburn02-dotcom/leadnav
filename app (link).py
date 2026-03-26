@@ -5,11 +5,12 @@ import numpy as np
 import requests
 import json
 import time
+import io  # 🚨 Necessary for reading Aidan's CSV response
 
 # ================ 1. CONFIGURATION & THEME =================
 PITCH_COMPANY_NAME = "LeadNavigator" 
 PITCH_BRAND_COLOR = "#4D148C" # LeadNavigator Deep Purple
-# 🚨 Replace this with the Production URL Aidan sends you
+# 🚨 UPDATED WEBHOOK URL
 AIDAN_WEBHOOK_URL = "https://n8n.srv1144572.hstgr.cloud/webhook/669d6ef0-1393-479e-81c5-5b0bea4262b7"
 
 N8N_COLUMN_MAPPER = {
@@ -70,12 +71,16 @@ brand_gradient = mcolors.LinearSegmentedColormap.from_list("brand_purple", ["#FF
 
 # ================ 2. DATA ENGINE =================
 @st.cache_data(show_spinner=False)
-def clean_api_response(data_list):
-    df = pd.DataFrame(data_list)
+def clean_api_response(df):
+    """Processes DataFrame from Aidan's CSV response"""
+    # Force headers to match mapper keys (uppercase and stripped)
+    df.columns = [str(c).strip().upper() for c in df.columns]
     df = df.rename(columns=N8N_COLUMN_MAPPER)
     df.columns = [c.lower() for c in df.columns]
     
-    if 'state_raw' in df.columns: df['region'] = df['state_raw'].str.strip().str.upper().map(STATE_TO_REGION).fillna('Unknown')
+    if 'state_raw' in df.columns: 
+        df['region'] = df['state_raw'].str.strip().str.upper().map(STATE_TO_REGION).fillna('Unknown')
+    
     if 'gender' in df.columns:
         df['gender'] = df['gender'].astype(str).str.strip().map({'M': 'Male', 'F': 'Female', 'Male': 'Male', 'Female': 'Female'}).fillna('Unknown')
     
@@ -197,23 +202,28 @@ if st.session_state.app_state == "onboarding":
                     progress_bar.progress((i + 1) / (len(intel_messages) + 1))
                     time.sleep(0.5)
 
-                # API Call
+                # 🚨 API Call UPDATED FOR CSV
                 payload = {"emails": unique_emails}
                 try:
                     response = requests.post(AIDAN_WEBHOOK_URL, json=payload, timeout=120)
                     if response.status_code == 200:
-                        st.session_state.cleaned_n8n = clean_api_response(response.json()).drop_duplicates(subset=['email_match'])
+                        # Convert CSV text response to DataFrame
+                        csv_stream = io.StringIO(response.text)
+                        raw_enriched_df = pd.read_csv(csv_stream)
+                        
+                        st.session_state.cleaned_n8n = clean_api_response(raw_enriched_df).drop_duplicates(subset=['email_match'])
                         st.session_state.cleaned_orders = cleaned_orders
                         st.session_state.min_date, st.session_state.max_date = cleaned_orders['order_date'].min(), cleaned_orders['order_date'].max()
                         st.session_state.date_filter = (st.session_state.min_date, st.session_state.max_date)
                         st.session_state.app_state = "dashboard"
                         st.rerun()
                     else:
-                        st.error(f"API Error: Server returned {response.status_code}. Check if the n8n flow is active.")
+                        st.error(f"API Error: Server returned {response.status_code}. Aidan needs to add a 'Respond to Webhook' node to his n8n flow.")
                 except Exception as e:
                     st.error(f"Connection Failed: {str(e)}")
 
 elif st.session_state.app_state == "dashboard":
+    # (Rest of dashboard code remains identical to your working version)
     if "active_var" not in st.session_state: st.session_state.active_var = "Location"
     if "active_loc_level" not in st.session_state: st.session_state.active_loc_level = "Region"
 
