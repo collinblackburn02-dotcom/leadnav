@@ -19,7 +19,8 @@ N8N_COLUMN_MAPPER = {
     "SENIORITY_LEVEL": "seniority", "COMPANY_REVENUE": "co_revenue",
     "COMPANY_EMPLOYEE_COUNT": "co_size", "COMPANY_INDUSTRY": "industry",
     "DEPARTMENT": "department", "JOB_TITLE": "job_title", 
-    "SKIPTRACE_CREDIT_RATING": "credit_rating"
+    "SKIPTRACE_CREDIT_RATING": "credit_rating",
+    "COMPANY_STATE": "co_state", "COMPANY_NAICS": "naics"
 }
 
 STATE_TO_REGION = {
@@ -84,21 +85,43 @@ def clean_api_response(df):
     df = df.rename(columns=N8N_COLUMN_MAPPER)
     df.columns = [c.lower() for c in df.columns]
     
-    # 🚨 AGGRESSIVE CREDIT MAPPING: Catch anything with "credit" in the name
     if 'credit_rating' not in df.columns:
         c_col = next((c for c in df.columns if 'credit' in c), None)
         if c_col: df = df.rename(columns={c_col: 'credit_rating'})
     
-    # 🚨 BULLETPROOF FORMATTING (Y/N/M/F)
     for col in ['gender', 'homeowner', 'children', 'marital_status']:
         if col in df.columns:
             df[col] = df[col].astype(str).str.strip().str.title()
             df[col] = df[col].replace({'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female'})
             
-    # 🚨 STATE CAPITALIZATION FIX
     if 'state_raw' in df.columns: 
         df['state_raw'] = df['state_raw'].astype(str).str.strip().str.upper()
         df['region'] = df['state_raw'].map(STATE_TO_REGION).fillna('Unknown')
+        
+    # 🚨 B2B STATE & REGION MAPPING
+    if 'co_state' in df.columns:
+        df['co_state'] = df['co_state'].astype(str).str.strip().str.upper()
+        df['co_region'] = df['co_state'].map(STATE_TO_REGION).fillna('Unknown')
+        
+    # 🚨 B2B NAICS DICTIONARY & CLEANER
+    if 'naics' in df.columns:
+        def map_naics(code):
+            c = str(code).split('.')[0].strip() # Clean floats like 236.0
+            if c in ['nan', 'None', '', 'null', '0', 'UNKNOWN']: return 'Unknown'
+            prefix = c[:2]
+            mapping = {
+                '11': 'Agriculture', '21': 'Mining', '22': 'Utilities', '23': 'Construction',
+                '31': 'Manufacturing', '32': 'Manufacturing', '33': 'Manufacturing',
+                '42': 'Wholesale', '44': 'Retail', '45': 'Retail',
+                '48': 'Transportation', '49': 'Transportation', '51': 'Information',
+                '52': 'Finance/Insurance', '53': 'Real Estate', '54': 'Professional Services',
+                '55': 'Management', '56': 'Administrative', '61': 'Education',
+                '62': 'Health Care', '71': 'Arts/Entertainment', '72': 'Accommodation/Food',
+                '81': 'Other Services', '92': 'Public Admin'
+            }
+            desc = mapping.get(prefix, 'Industry')
+            return f"{c} ({desc})"
+        df['naics'] = df['naics'].apply(map_naics)
         
     df['email_match'] = df['email_match'].astype(str).str.lower().str.replace(r'[^a-z0-9@._,-]', '', regex=True).str.split(',')
     df = df.explode('email_match').reset_index(drop=True)
@@ -128,7 +151,12 @@ def build_dashboard_views(orders_df, enriched_df, start_date, end_date, biz_type
     unique_shopify = f_orders['email_match'].nunique()
     match_rate = (matched_count / unique_shopify * 100) if unique_shopify > 0 else 0
     
-    vars = ([("Industry", "industry"), ("Seniority", "seniority"), ("Company Revenue", "co_revenue"), ("Company Size", "co_size"), ("Department", "department"), ("Job Title", "job_title"), ("Region", "region"), ("State", "state_raw")] if biz_type == "B2B / Enterprise Sales" else [("Gender", "gender"), ("Age", "age"), ("Marital Status", "marital_status"), ("Region", "region"), ("State", "state_raw"), ("Income", "income"), ("Homeowner", "homeowner"), ("Children", "children"), ("Net Worth", "net_worth"), ("Credit Rating", "credit_rating")])
+    # 🚨 DYNAMIC B2B/DTC VARIABLE ALLOCATION
+    if biz_type == "B2B / Enterprise Sales":
+        vars = [("Industry", "industry"), ("Seniority", "seniority"), ("Company Revenue", "co_revenue"), ("Company Size", "co_size"), ("Department", "department"), ("Job Title", "job_title"), ("NAICS Code", "naics"), ("Company Region", "co_region"), ("Company State", "co_state")]
+    else:
+        vars = [("Gender", "gender"), ("Age", "age"), ("Marital Status", "marital_status"), ("Region", "region"), ("State", "state_raw"), ("Income", "income"), ("Homeowner", "homeowner"), ("Children", "children"), ("Net Worth", "net_worth"), ("Credit Rating", "credit_rating")]
+        
     top_perf, all_html = {}, {}
 
     for label, col_key in vars:
@@ -196,14 +224,21 @@ if st.session_state.app_state == "onboarding":
                         st.session_state.cleaned_orders = cleaned_orders
                         st.session_state.min_date, st.session_state.max_date = cleaned_orders['order_date'].min(), cleaned_orders['order_date'].max()
                         st.session_state.date_filter = (st.session_state.min_date, st.session_state.max_date)
+                        
+                        # 🚨 RESET UI STATE ON SUCCESSFUL RUN
+                        if st.session_state.biz_type == "B2B / Enterprise Sales":
+                            st.session_state.active_var = "Industry"
+                            st.session_state.active_loc_level = "Company Region"
+                        else:
+                            st.session_state.active_var = "Location"
+                            st.session_state.active_loc_level = "Region"
+                            
                         st.session_state.app_state = "dashboard"
                         st.rerun()
                     else: st.error(f"Error {response.status_code}")
                 except Exception as e: st.error(f"Error: {str(e)}")
 
 elif st.session_state.app_state == "dashboard":
-    if "active_var" not in st.session_state: st.session_state.active_var = "Location"
-    if "active_loc_level" not in st.session_state: st.session_state.active_loc_level = "Region"
     st.image("logo.png", width=180)
     st.markdown(f"""<div style="text-align: center; margin-top: -10px; margin-bottom: 30px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.5rem; margin-bottom: 0px;">Customer Insights Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 2.8rem; color: #0F172A !important; margin-top: -5px;">{st.session_state.biz_type} Profile.</h2></div>""", unsafe_allow_html=True)
     if "integrity_stats" in st.session_state:
@@ -234,8 +269,12 @@ elif st.session_state.app_state == "dashboard":
         st.markdown("<div style='margin-top: 3rem;'></div>", unsafe_allow_html=True)
         st.markdown("""<h2 class="modern-serif-title" style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 10px;"><span style="font-size: 2rem;">🔍</span> Audience Deep Dive</h2>""", unsafe_allow_html=True)
         
-        v_labels = (["Industry", "Seniority", "Company Revenue", "Company Size", "Department", "Job Title", "Location", "Income"] if st.session_state.biz_type == "B2B / Enterprise Sales" else ["Gender", "Age", "Location", "Marital Status", "Income", "Homeowner", "Children", "Net Worth", "Credit Rating"])
-        
+        # 🚨 DYNAMIC BUTTON GENERATION (B2B vs DTC)
+        if st.session_state.biz_type == "B2B / Enterprise Sales":
+            v_labels = ["Industry", "Seniority", "Company Revenue", "Company Size", "Department", "Job Title", "Company Location", "NAICS Code"]
+        else:
+            v_labels = ["Gender", "Age", "Location", "Marital Status", "Income", "Homeowner", "Children", "Net Worth", "Credit Rating"]
+            
         for i in range(0, len(v_labels), 5):
             var_cols = st.columns(5)
             for j, label in enumerate(v_labels[i:i+5]):
@@ -243,15 +282,20 @@ elif st.session_state.app_state == "dashboard":
                     st.session_state.active_var = label; st.rerun()
                     
         lk = st.session_state.active_var
-        if lk == "Location":
+        if lk == "Location" or lk == "Company Location":
             st.markdown("<div style='margin-top: 1rem;'></div>", unsafe_allow_html=True)
             l1, l2, l3, _ = st.columns([1, 1, 1, 5])
-            if l1.button("Region", key="reg_btn", type="primary" if st.session_state.active_loc_level == "Region" else "secondary"): st.session_state.active_loc_level = "Region"; st.rerun()
-            if l2.button("State", key="state_btn", type="primary" if st.session_state.active_loc_level == "State" else "secondary"): st.session_state.active_loc_level = "State"; st.rerun()
-            if l3.button("Zip Code", key="zip_btn", type="primary" if st.session_state.active_loc_level == "Zip Code" else "secondary"): st.session_state.active_loc_level = "Zip Code"; st.rerun()
-            lk = st.session_state.active_loc_level
+            
+            if st.session_state.biz_type == "B2B / Enterprise Sales":
+                if l1.button("Company Region", key="co_reg_btn", type="primary" if st.session_state.active_loc_level == "Company Region" else "secondary"): st.session_state.active_loc_level = "Company Region"; st.rerun()
+                if l2.button("Company State", key="co_state_btn", type="primary" if st.session_state.active_loc_level == "Company State" else "secondary"): st.session_state.active_loc_level = "Company State"; st.rerun()
+                lk = st.session_state.active_loc_level
+            else:
+                if l1.button("Region", key="reg_btn", type="primary" if st.session_state.active_loc_level == "Region" else "secondary"): st.session_state.active_loc_level = "Region"; st.rerun()
+                if l2.button("State", key="state_btn", type="primary" if st.session_state.active_loc_level == "State" else "secondary"): st.session_state.active_loc_level = "State"; st.rerun()
+                if l3.button("Zip Code", key="zip_btn", type="primary" if st.session_state.active_loc_level == "Zip Code" else "secondary"): st.session_state.active_loc_level = "Zip Code"; st.rerun()
+                lk = st.session_state.active_loc_level
         
-        # 🚨 THE EMPTY STATE FALLBACK
         if lk in dash_data['html_views']: 
             st.markdown(f'<div class="premium-table-container">{dash_data["html_views"][lk]}</div>', unsafe_allow_html=True)
         else:
