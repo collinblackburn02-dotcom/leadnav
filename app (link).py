@@ -12,13 +12,15 @@ PITCH_COMPANY_NAME = "LeadNavigator"
 PITCH_BRAND_COLOR = "#4D148C" 
 AIDAN_WEBHOOK_URL = "https://n8n.srv1144572.hstgr.cloud/webhook/669d6ef0-1393-479e-81c5-5b0bea4262b7"
 
+# 🚨 ADDED SKIPTRACE_CREDIT_RATING TO MAPPER
 N8N_COLUMN_MAPPER = {
     "GENDER": "gender", "MARRIED": "marital_status", "AGE_RANGE": "age",
     "INCOME_RANGE": "income", "PERSONAL_STATE": "state_raw", "PERSONAL_ZIP": "zip_code",
     "HOMEOWNER": "homeowner", "CHILDREN": "children", "NET_WORTH": "net_worth",
     "SENIORITY_LEVEL": "seniority", "COMPANY_REVENUE": "co_revenue",
     "COMPANY_EMPLOYEE_COUNT": "co_size", "COMPANY_INDUSTRY": "industry",
-    "DEPARTMENT": "department", "JOB_TITLE": "job_title"
+    "DEPARTMENT": "department", "JOB_TITLE": "job_title", 
+    "SKIPTRACE_CREDIT_RATING": "credit_rating"
 }
 
 STATE_TO_REGION = {
@@ -45,12 +47,12 @@ def apply_custom_theme(primary_color):
             div[data-testid="stButton"] button {{ border-radius: 8px; font-weight: 600; }}
             div[data-testid="stButton"] button[kind="primary"] {{ background-color: {primary_color} !important; color: #FFFFFF !important; border: none !important; }}
             
-            /* 🚨 TABLE CSS RESTORED */
+            /* 🚨 TABLE CSS: Center Aligned everything and added hover pointer for headers */
             .premium-table-container {{ width: 100% !important; border-radius: 12px; border: 1px solid {primary_color}; background: #FFFFFF; overflow: hidden; margin-top: 1rem; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }}
             .premium-table-container table {{ width: 100% !important; border-collapse: collapse !important; border: none !important; }}
-            .premium-table-container th {{ font-family: 'Outfit', sans-serif !important; background-color: #F8F6FA !important; color: {primary_color} !important; font-weight: 700 !important; text-align: center !important; padding: 15px 12px !important; border-bottom: 2px solid {primary_color} !important; font-size: 0.95rem !important; text-transform: none !important; }}
+            .premium-table-container th {{ font-family: 'Outfit', sans-serif !important; background-color: #F8F6FA !important; color: {primary_color} !important; font-weight: 700 !important; text-align: center !important; padding: 15px 12px !important; border-bottom: 2px solid {primary_color} !important; font-size: 0.95rem !important; text-transform: none !important; transition: background-color 0.2s ease; }}
+            .premium-table-container th:hover {{ background-color: #EBE4F4 !important; color: #0F172A !important; }}
             .premium-table-container td {{ font-family: 'Outfit', sans-serif !important; text-align: center !important; padding: 12px !important; border-bottom: 1px solid #EBE4F4 !important; font-size: 0.9rem !important; color: #1e293b !important; }}
-            .premium-table-container th:first-child, .premium-table-container td:first-child {{ text-align: left !important; padding-left: 20px !important; }}
             .premium-table-container td:first-child {{ font-weight: 700 !important; color: #0F172A !important; }}
             
             .serif-gradient-centerpiece {{ font-family: 'Playfair Display', serif !important; background: linear-gradient(90deg, #4D148C 0%, #20B2AA 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block; font-weight: 700 !important; letter-spacing: -0.5px; }}
@@ -60,17 +62,10 @@ def apply_custom_theme(primary_color):
             .custom-loader {{ border: 3px solid #f3f3f3; border-top: 3px solid {primary_color}; border-radius: 50%; width: 32px; height: 32px; animation: spin 1s linear infinite; margin: 0 auto 30px auto; }}
             @keyframes spin {{ 0% {{ transform: rotate(0deg); }} 100% {{ transform: rotate(360deg); }} }}
 
-            /* 🚀 THE PITCH ROTATOR (80 seconds total, fast start, long hold) */
-            @keyframes fadeLoop {{ 
-                0% {{ opacity: 0; transform: translateY(5px); }} 
-                1%, 24% {{ opacity: 1; transform: translateY(0); }} 
-                25%, 100% {{ opacity: 0; transform: translateY(-5px); }} 
-            }}
+            /* 🚀 THE PITCH ROTATOR (80 seconds total) */
+            @keyframes fadeLoop {{ 0% {{ opacity: 0; transform: translateY(5px); }} 1%, 24% {{ opacity: 1; transform: translateY(0); }} 25%, 100% {{ opacity: 0; transform: translateY(-5px); }} }}
             .pitch-fact {{ font-family: 'Outfit', sans-serif; font-size: 1.15rem; color: #475569; font-weight: 400; font-style: italic; position: absolute; width: 100%; opacity: 0; animation: fadeLoop 80s infinite; line-height: 1.5; text-align: center; }}
-            .fact-1 {{ animation-delay: 0s; }}
-            .fact-2 {{ animation-delay: 20s; }}
-            .fact-3 {{ animation-delay: 40s; }}
-            .fact-4 {{ animation-delay: 60s; }}
+            .fact-1 {{ animation-delay: 0s; }} .fact-2 {{ animation-delay: 20s; }} .fact-3 {{ animation-delay: 40s; }} .fact-4 {{ animation-delay: 60s; }}
         </style>
     """, unsafe_allow_html=True)
 
@@ -89,7 +84,6 @@ def clean_api_response(df):
     df = df.rename(columns=N8N_COLUMN_MAPPER)
     df.columns = [c.lower() for c in df.columns]
     
-    # 🚨 DATA MAPPING FIX (Y/N -> Yes/No, M/F -> Male/Female)
     clean_map = {'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female', 'YES': 'Yes', 'NO': 'No', 'MALE': 'Male', 'FEMALE': 'Female'}
     for col in ['gender', 'homeowner', 'children', 'marital_status']:
         if col in df.columns:
@@ -125,9 +119,13 @@ def build_dashboard_views(orders_df, enriched_df, start_date, end_date, biz_type
     unique_shopify = f_orders['email_match'].nunique()
     match_rate = (matched_count / unique_shopify * 100) if unique_shopify > 0 else 0
     
-    # 🚨 ADDED "CHILDREN" BACK TO DTC VARIABLES
-    vars = ([("Industry", "industry"), ("Seniority", "seniority"), ("Company Revenue", "co_revenue"), ("Company Size", "co_size"), ("Department", "department"), ("Job Title", "job_title"), ("Region", "region"), ("State", "state_raw")] if biz_type == "B2B / Enterprise Sales" else [("Gender", "gender"), ("Age", "age"), ("Marital Status", "marital_status"), ("Region", "region"), ("State", "state_raw"), ("Income", "income"), ("Homeowner", "homeowner"), ("Children", "children"), ("Net Worth", "net_worth")])
+    # 🚨 ADDED CREDIT RATING TO DTC VARIABLES
+    vars = ([("Industry", "industry"), ("Seniority", "seniority"), ("Company Revenue", "co_revenue"), ("Company Size", "co_size"), ("Department", "department"), ("Job Title", "job_title"), ("Region", "region"), ("State", "state_raw")] if biz_type == "B2B / Enterprise Sales" else [("Gender", "gender"), ("Age", "age"), ("Marital Status", "marital_status"), ("Region", "region"), ("State", "state_raw"), ("Income", "income"), ("Homeowner", "homeowner"), ("Children", "children"), ("Net Worth", "net_worth"), ("Credit Rating", "credit_rating")])
     top_perf, all_html = {}, {}
+    
+    # 🚨 JAVASCRIPT ENGINE FOR SORTING TABLES
+    sort_js = "let a=this.dataset.asc==='true';this.dataset.asc=!a;const b=this.closest('table').querySelector('tbody');Array.from(b.querySelectorAll('tr')).sort((x,y)=>{let t1=x.children[this.cellIndex].innerText.trim(),t2=y.children[this.cellIndex].innerText.trim(),n1=parseFloat(t1.replace(/[^0-9.-]+/g,'')),n2=parseFloat(t2.replace(/[^0-9.-]+/g,''));if(!isNaN(n1)&&!isNaN(n2))return a?n1-n2:n2-n1;return a?t1.localeCompare(t2):t2.localeCompare(t1)}).forEach(tr=>b.appendChild(tr));"
+
     for label, col_key in vars:
         if col_key in df_joined.columns:
             df_joined[col_key] = df_joined[col_key].astype(str).str.strip()
@@ -139,7 +137,12 @@ def build_dashboard_views(orders_df, enriched_df, start_date, end_date, biz_type
                 grp['% of Buyers'], grp['Rev / Purchaser'] = (grp['Revenue'] / v_total) * 100, (grp['Revenue'] / grp['Purchasers'])
                 
                 f_v = grp.rename(columns={col_key: label}).sort_values('Revenue', ascending=False).head(50)
-                all_html[label] = f_v.style.format({'Purchasers': '{:,.0f}', 'Revenue': '${:,.2f}', '% of Buyers': '{:.1f}%', 'Rev / Purchaser': '${:,.2f}'}).background_gradient(subset=['Revenue', '% of Buyers'], cmap=brand_gradient).hide(axis="index").to_html()
+                html = f_v.style.format({'Purchasers': '{:,.0f}', 'Revenue': '${:,.2f}', '% of Buyers': '{:.1f}%', 'Rev / Purchaser': '${:,.2f}'}).background_gradient(subset=['Revenue', '% of Buyers'], cmap=brand_gradient).hide(axis="index").to_html()
+                
+                # 🚨 INJECT JAVASCRIPT INTO THE HEADERS
+                html = html.replace('<th ', f'<th style="cursor: pointer;" title="Click to sort" onclick="{sort_js}" ')
+                all_html[label] = html
+                
     return {"total_revenue": total_rev, "total_buyers": matched_count, "unique_shopify": unique_shopify, "match_rate": match_rate, "top_performers": top_perf, "html_views": all_html}
 
 # ================ 3. APP FLOW =================
@@ -216,8 +219,6 @@ elif st.session_state.app_state == "dashboard":
     
     if dash_data:
         m1, m2 = st.columns(2)
-        
-        # 🚨 METRICS SIZE STANDARDIZED
         with m1: st.markdown(f"""<div style="background-color: #F8F5FA; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 25px 20px; text-align: center;"><h3 style="margin: 0; font-size: 1.5rem; color: #0F172A; font-weight: 700;">Resolved Customers</h3><h4 style="margin: 5px 0 15px 0; font-size: 2.2rem; color: {PITCH_BRAND_COLOR}; font-weight: 700;">{dash_data['total_buyers']:,.0f}</h4><p style="margin: 0; font-size: 0.9rem; color: #1e293b;">Matched <b>{dash_data['match_rate']:.1f}%</b> of buyers.</p></div>""", unsafe_allow_html=True)
         with m2: st.markdown(f"""<div style="background-color: #F8F5FA; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 25px 20px; text-align: center; height: 100%; display: flex; flex-direction: column; justify-content: center;"><h3 style="margin: 0; font-size: 1.5rem; color: #0F172A; font-weight: 700;">Attributed Sales</h3><h4 style="margin: 5px 0 0 0; font-size: 2.2rem; color: {PITCH_BRAND_COLOR}; font-weight: 700;">${dash_data['total_revenue']:,.2f}</h4></div>""", unsafe_allow_html=True)
         
@@ -227,20 +228,24 @@ elif st.session_state.app_state == "dashboard":
         for i in range(0, len(items), 5):
             chunk = items[i:i+5]; cols = st.columns(5)
             for j, (label, data) in enumerate(chunk):
-                # 🚨 CATEGORY HIERARCHY FIXED (Label big, Data smaller)
                 with cols[j]: st.markdown(f'''<div style="background-color: #F8F5FA; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 15px; text-align: center; min-height: 120px; display: flex; flex-direction: column; justify-content: center; align-items: center; margin-bottom: 2rem;"><p style="margin: 0; font-size: 1.1rem; color: #0F172A; font-weight: 800; text-transform: uppercase;">{label}</p><h3 style="margin: 8px 0 10px 0; font-size: 0.95rem; color: {PITCH_BRAND_COLOR}; font-weight: 600;">{data[0]}</h3><p style="margin: 0; font-size: 0.85rem; color: {PITCH_BRAND_COLOR}; background-color: #EBE4F4; border-radius: 20px; padding: 4px 10px; display: inline-block; font-weight: 600;">{data[1]:.1f}% of Rev</p></div>''', unsafe_allow_html=True)
         
         st.markdown("<div style='margin-top: 3rem;'></div>", unsafe_allow_html=True)
-        st.markdown("""<h2 class="modern-serif-title" style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 10px;"><span style="font-size: 2rem;">🔍</span> Audience Deep Dive</h2>""", unsafe_allow_html=True)
+        st.markdown("""<h2 class="modern-serif-title" style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 10px;"><span style="font-size: 2rem;">🔍</span> Audience Deep Dive <span style="font-size: 0.9rem; color: #64748B; font-weight: 400; font-family: 'Outfit', sans-serif;">(Click headers to sort)</span></h2>""", unsafe_allow_html=True)
         
-        # 🚨 ADDED "CHILDREN" TO THE BUTTON ARRAY
-        v_labels = (["Industry", "Seniority", "Company Revenue", "Company Size", "Department", "Job Title", "Location", "Income"] if st.session_state.biz_type == "B2B / Enterprise Sales" else ["Gender", "Age", "Location", "Marital Status", "Income", "Homeowner", "Children", "Net Worth"])
-        var_cols = st.columns(len(v_labels))
-        for i, label in enumerate(v_labels):
-            if var_cols[i].button(label, key=f"btn_{label}", type="primary" if st.session_state.active_var == label else "secondary", use_container_width=True):
-                st.session_state.active_var = label; st.rerun()
+        # 🚨 ADDED CREDIT RATING TO DTC LABELS
+        v_labels = (["Industry", "Seniority", "Company Revenue", "Company Size", "Department", "Job Title", "Location", "Income"] if st.session_state.biz_type == "B2B / Enterprise Sales" else ["Gender", "Age", "Location", "Marital Status", "Income", "Homeowner", "Children", "Net Worth", "Credit Rating"])
+        
+        # Group buttons dynamically into rows of 5 for a cleaner look
+        for i in range(0, len(v_labels), 5):
+            var_cols = st.columns(5)
+            for j, label in enumerate(v_labels[i:i+5]):
+                if var_cols[j].button(label, key=f"btn_{label}", type="primary" if st.session_state.active_var == label else "secondary", use_container_width=True):
+                    st.session_state.active_var = label; st.rerun()
+                    
         lk = st.session_state.active_var
         if lk == "Location":
+            st.markdown("<div style='margin-top: 1rem;'></div>", unsafe_allow_html=True)
             l1, l2, l3, _ = st.columns([1, 1, 1, 5])
             if l1.button("Region", key="reg_btn", type="primary" if st.session_state.active_loc_level == "Region" else "secondary"): st.session_state.active_loc_level = "Region"; st.rerun()
             if l2.button("State", key="state_btn", type="primary" if st.session_state.active_loc_level == "State" else "secondary"): st.session_state.active_loc_level = "State"; st.rerun()
