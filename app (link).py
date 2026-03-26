@@ -88,7 +88,6 @@ def clean_api_response(df):
                 break
                 
     if not found_email_col:
-        st.error(f"🚨 Data Mapping Error: Aidan's CSV headers don't contain an email column. Received: {list(df.columns)}")
         return pd.DataFrame(columns=['email_match'])
 
     df = df.rename(columns={found_email_col: 'email_match'})
@@ -98,7 +97,7 @@ def clean_api_response(df):
     if 'state_raw' in df.columns: 
         df['region'] = df['state_raw'].str.strip().str.upper().map(STATE_TO_REGION).fillna('Unknown')
     
-    # Force lowercase for better matching
+    # Matching normalization
     df['email_match'] = df['email_match'].astype(str).str.lower().str.replace(r'[^a-z0-9@._,-]', '', regex=True).str.split(',')
     df = df.explode('email_match').reset_index(drop=True)
     return df
@@ -143,8 +142,7 @@ def build_dashboard_views(orders_df, enriched_df, start_date, end_date, biz_type
     for label, col_key in summary_vars:
         if col_key in df_joined.columns:
             df_joined[col_key] = df_joined[col_key].astype(str).str.strip()
-            invalid_list = ['unknown', 'nan', 'u', 'none', 'null', '', 'n/a', 'undefined']
-            valid_rows = df_joined[~df_joined[col_key].str.lower().isin(invalid_list)]
+            valid_rows = df_joined[~df_joined[col_key].str.lower().isin(['unknown', 'nan', 'none', 'null', ''])]
             if not valid_rows.empty:
                 var_total = valid_rows['revenue'].sum()
                 rs = valid_rows.groupby(col_key)['revenue'].sum()
@@ -196,12 +194,11 @@ if st.session_state.app_state == "onboarding":
                 try:
                     response = requests.post(AIDAN_WEBHOOK_URL, json=payload, timeout=120)
                     if response.status_code == 200:
-                        csv_text = response.text
-                        total_lines = len(csv_text.strip().split('\n')) - 1
-                        csv_stream = io.StringIO(csv_text)
+                        st.session_state.raw_api_text = response.text 
+                        csv_stream = io.StringIO(response.text)
                         raw_enriched_df = pd.read_csv(csv_stream, on_bad_lines='skip', engine='python')
                         
-                        st.session_state.integrity_stats = {"processed": len(raw_enriched_df), "skipped": max(0, total_lines - len(raw_enriched_df))}
+                        st.session_state.integrity_stats = {"processed": len(raw_enriched_df), "total": len(response.text.strip().split('\n')) - 1}
                         st.session_state.cleaned_n8n = clean_api_response(raw_enriched_df).drop_duplicates(subset=['email_match'])
                         st.session_state.cleaned_orders = cleaned_orders
                         st.session_state.min_date, st.session_state.max_date = cleaned_orders['order_date'].min(), cleaned_orders['order_date'].max()
@@ -222,8 +219,9 @@ elif st.session_state.app_state == "dashboard":
     
     if "integrity_stats" in st.session_state:
         stats = st.session_state.integrity_stats
-        if stats["skipped"] > 0:
-            st.info(f"💡 **Data Integrity:** Successfully enriched {stats['processed']:,} profiles. {stats['skipped']:,} records omitted due to formatting errors.")
+        skipped = stats["total"] - stats["processed"]
+        if skipped > 0:
+            st.info(f"💡 **Data Integrity:** Successfully enriched {stats['processed']:,} profiles. {skipped:,} records omitted due to formatting.")
 
     _, c2, _ = st.columns([1, 4, 1])
     with c2: st.slider("Filter Date", min_value=st.session_state.min_date, max_value=st.session_state.max_date, key="date_filter", format="MMM DD, YYYY")
@@ -267,11 +265,15 @@ elif st.session_state.app_state == "dashboard":
             
         if lk in dash_data['html_views']: st.markdown(f'<div class="premium-table-container">{dash_data["html_views"][lk]}</div>', unsafe_allow_html=True)
     else:
-        st.warning("⚠️ **No Matches Found:** 0% of the customers matched the enrichment data.")
-        with st.expander("🔍 Debug: Data Handshake"):
-            st.write("Aidan's Columns:", list(st.session_state.cleaned_n8n.columns))
-            st.write("Sample Emails (Aidan):", st.session_state.cleaned_n8n['email_match'].head(5).tolist())
-            st.write("Sample Emails (Shopify):", st.session_state.cleaned_orders['email_match'].head(5).tolist())
+        st.warning("⚠️ **No Matches Found:** The analysis ran, but 0% of customers matched the enrichment data.")
+        st.subheader("🕵️ Data Inspector")
+        if not st.session_state.cleaned_n8n.empty:
+            st.dataframe(st.session_state.cleaned_n8n, use_container_width=True)
+            st.download_button("📥 Download Raw CSV", st.session_state.raw_api_text, file_name="aidan_raw.csv")
+        else:
+            st.error("The API response text was empty (only headers received).")
+            st.text("Raw Response Text:")
+            st.code(st.session_state.raw_api_text if 'raw_api_text' in st.session_state else "No data received.")
 
     st.markdown("<br><hr style='border-top: 1px solid #E2E8F0; margin: 2rem 0;'><br>", unsafe_allow_html=True)
     _, reset_col, _ = st.columns([2, 1, 2])
