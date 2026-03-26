@@ -71,26 +71,47 @@ brand_gradient = mcolors.LinearSegmentedColormap.from_list("brand_purple", ["#FF
 # ================ 2. DATA ENGINE =================
 @st.cache_data(show_spinner=False)
 def clean_api_response(df):
+    """Processes DataFrame from Aidan's CSV response with a 'Safety Net' for emails"""
+    # 1. Clean headers (Upper and Strip)
     df.columns = [str(c).strip().upper() for c in df.columns]
+    
+    # 2. Try to find the email column if our standard ones are missing
+    standard_emails = ['PERSONAL_EMAILS', 'BUSINESS_EMAIL', 'EMAIL_MATCH', 'DEEP_VERIFIED_EMAILS']
+    found_email_col = None
+    
+    # Check standard list first
+    for col in standard_emails:
+        if col in df.columns:
+            found_email_col = col
+            break
+            
+    # If still not found, hunt for ANY column with 'EMAIL' in the name (Safety Net)
+    if not found_email_col:
+        for col in df.columns:
+            if 'EMAIL' in col:
+                found_email_col = col
+                break
+                
+    if not found_email_col:
+        # If we literally can't find an email column, we print the headers to the console
+        st.error(f"🚨 Data Mapping Error: Aidan's CSV headers don't contain an email column. Received: {list(df.columns)}")
+        return pd.DataFrame(columns=['email_match']) # Return empty to prevent crash
+
+    # 3. Rename found column to our internal 'email_match'
+    df = df.rename(columns={found_email_col: 'email_match'})
+    
+    # 4. Map the rest of the B2B/DTC headers
     df = df.rename(columns=N8N_COLUMN_MAPPER)
     df.columns = [c.lower() for c in df.columns]
     
+    # 5. Core cleaning (State/Gender/etc)
     if 'state_raw' in df.columns: 
         df['region'] = df['state_raw'].str.strip().str.upper().map(STATE_TO_REGION).fillna('Unknown')
-    if 'gender' in df.columns:
-        df['gender'] = df['gender'].astype(str).str.strip().map({'M': 'Male', 'F': 'Female', 'Male': 'Male', 'Female': 'Female'}).fillna('Unknown')
     
-    if 'homeowner' in df.columns:
-        yes_patterns = ['y', 'homeowner', 'owner']
-        df['homeowner'] = df['homeowner'].apply(lambda x: 'Yes' if any(p in str(x).lower() for p in yes_patterns) else ('Unknown' if str(x).lower() in ['nan','none','null',''] else 'No'))
-
-    if 'zip_code' in df.columns: 
-        df['zip_code'] = df['zip_code'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(5)
+    # 6. Explode emails in case Aidan sends multiple in one cell (separated by commas)
+    df['email_match'] = df['email_match'].astype(str).str.lower().str.replace(r'[^a-z0-9@._,-]', '', regex=True).str.split(',')
+    df = df.explode('email_match').reset_index(drop=True)
     
-    email_col = 'personal_emails' if 'personal_emails' in df.columns else ('business_email' if 'business_email' in df.columns else 'email_match')
-    if email_col in df.columns:
-        df['email_match'] = df[email_col].astype(str).str.lower().str.replace(r'[^a-z0-9@._,-]', '', regex=True).str.split(',')
-        df = df.explode('email_match').reset_index(drop=True)
     return df
 
 @st.cache_data(show_spinner=False)
