@@ -43,33 +43,22 @@ def apply_custom_theme(primary_color):
             .stMarkdown a svg {{ display: none !important; }}
             div[data-testid="stSlider"] label p {{ font-size: 1.2rem !important; font-weight: 700 !important; color: #0F172A !important; }}
             div[data-testid="stButton"] button {{ border-radius: 8px; font-weight: 600; }}
-            div[data-testid="stButton"] button[kind="primary"] {{ background-color: {primary_color} !important; color: #FFFFFF !important; }}
-            .premium-table-container {{ border-radius: 12px; border: 1px solid {primary_color}; background: #FFFFFF; overflow: hidden; margin-top: 1rem; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }}
+            div[data-testid="stButton"] button[kind="primary"] {{ background-color: {primary_color} !important; color: #FFFFFF !important; border: none !important; }}
+            
+            /* 🚨 TABLE FIX: Force Full Width */
+            .premium-table-container {{ width: 100% !important; border-radius: 12px; border: 1px solid {primary_color}; background: #FFFFFF; overflow: hidden; margin-top: 1rem; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }}
+            .premium-table-container table {{ width: 100% !important; border-collapse: collapse !important; }}
+            
             .serif-gradient-centerpiece {{ font-family: 'Playfair Display', serif !important; background: linear-gradient(90deg, #4D148C 0%, #20B2AA 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block; font-weight: 700 !important; letter-spacing: -0.5px; }}
             .modern-serif-title {{ font-family: 'Playfair Display', serif !important; color: #0F172A !important; font-weight: 700 !important; }}
             
-            /* 🌀 CUSTOM CENTERED SPINNER */
-            .loader {{
-                border: 3px solid #f3f3f3;
-                border-top: 3px solid {primary_color};
-                border-radius: 50%;
-                width: 32px;
-                height: 32px;
-                animation: spin 1s linear infinite;
-                margin: 0 auto 30px auto;
-            }}
-            @keyframes spin {{
-                0% {{ transform: rotate(0deg); }}
-                100% {{ transform: rotate(360deg); }}
-            }}
+            /* 🌀 CENTERED SPINNER */
+            .custom-loader {{ border: 3px solid #f3f3f3; border-top: 3px solid {primary_color}; border-radius: 50%; width: 32px; height: 32px; animation: spin 1s linear infinite; margin: 0 auto 30px auto; }}
+            @keyframes spin {{ 0% {{ transform: rotate(0deg); }} 100% {{ transform: rotate(360deg); }} }}
 
-            /* 🚀 THE PITCH ROTATOR */
-            @keyframes fadeLoop {{
-                0%, 20% {{ opacity: 0; transform: translateY(10px); }}
-                25%, 45% {{ opacity: 1; transform: translateY(0); }}
-                50%, 100% {{ opacity: 0; transform: translateY(-10px); }}
-            }}
-            .pitch-fact {{ font-family: 'Outfit', sans-serif; font-size: 1.15rem; color: #475569; font-weight: 400; font-style: italic; position: absolute; width: 100%; opacity: 0; animation: fadeLoop 20s infinite; line-height: 1.5; }}
+            /* 🚀 THE PITCH ROTATOR (Italicized) */
+            @keyframes fadeLoop {{ 0%, 20% {{ opacity: 0; transform: translateY(10px); }} 25%, 45% {{ opacity: 1; transform: translateY(0); }} 50%, 100% {{ opacity: 0; transform: translateY(-10px); }} }}
+            .pitch-fact {{ font-family: 'Outfit', sans-serif; font-size: 1.15rem; color: #475569; font-weight: 400; font-style: italic; position: absolute; width: 100%; opacity: 0; animation: fadeLoop 20s infinite; line-height: 1.5; text-align: center; }}
             .fact-1 {{ animation-delay: 0s; }}
             .fact-2 {{ animation-delay: 5s; }}
             .fact-3 {{ animation-delay: 10s; }}
@@ -80,14 +69,13 @@ def apply_custom_theme(primary_color):
 apply_custom_theme(PITCH_BRAND_COLOR)
 brand_gradient = mcolors.LinearSegmentedColormap.from_list("brand_purple", ["#FFFFFF", "#FBF9FC", "#EBE4F4"])
 
-# ... [DATA ENGINE FUNCTIONS - NO CHANGES] ...
+# ================ 2. DATA ENGINE =================
 @st.cache_data(show_spinner=False)
 def clean_api_response(df):
     df.columns = [str(c).strip().upper() for c in df.columns]
     standard_emails = ['PERSONAL_EMAILS', 'BUSINESS_EMAIL', 'EMAIL_MATCH', 'DEEP_VERIFIED_EMAILS']
     found_email_col = next((col for col in standard_emails if col in df.columns), None)
-    if not found_email_col:
-        found_email_col = next((col for col in df.columns if 'EMAIL' in col), None)
+    if not found_email_col: found_email_col = next((col for col in df.columns if 'EMAIL' in col), None)
     if not found_email_col: return pd.DataFrame(columns=['email_match'])
     df = df.rename(columns={found_email_col: 'email_match'})
     df = df.rename(columns=N8N_COLUMN_MAPPER)
@@ -158,15 +146,13 @@ if st.session_state.app_state == "onboarding":
         if not st.session_state.orders_vault: st.error("Please upload your order file.")
         else:
             status_placeholder = st.empty()
-            with status_placeholder.container():
+            with status_placeholder:
                 st.markdown(f"""
-                    <div style="text-align: center; padding: 60px 40px; background: #F8F6FA; border-radius: 12px; border: 1px solid {PITCH_BRAND_COLOR}; position: relative; min-height: 340px;">
+                    <div style="text-align: center; padding: 60px 40px; background: #F8F6FA; border-radius: 12px; border: 1px solid {PITCH_BRAND_COLOR}; min-height: 380px;">
                         <h3 class="modern-serif-title" style="color: {PITCH_BRAND_COLOR}; margin-bottom: 10px;">LeadNavigator Intelligence is active...</h3>
                         <p style="color: #64748B; font-family: 'Outfit', sans-serif; margin-bottom: 40px;">Enriching profiles via Identity Graph (Est. 2-3 mins)</p>
-                        
-                        <div class="loader"></div>
-                        
-                        <div style="position: relative; height: 120px; padding: 0 20px;">
+                        <div class="custom-loader"></div>
+                        <div style="position: relative; height: 120px;">
                             <div class="pitch-fact fact-1">Organizations that leverage customer behavioral insights outperform peers by 85% in sales growth and more than 25% in gross margin.<br><span style="font-style: normal; font-weight: 700; color: #1e293b;">— McKinsey & Co</span></div>
                             <div class="pitch-fact fact-2">Data-driven organizations are 23 times more likely to acquire customers and 6 times more likely to retain them.<br><span style="font-style: normal; font-weight: 700; color: #1e293b;">— MIT Sloan</span></div>
                             <div class="pitch-fact fact-3">Companies that use data-driven marketing are 6x more likely to be profitable year-over-year.<br><span style="font-style: normal; font-weight: 700; color: #1e293b;">— Forbes</span></div>
@@ -175,15 +161,13 @@ if st.session_state.app_state == "onboarding":
                     </div>
                 """, unsafe_allow_html=True)
                 
-                # Processing Logic
+                # Processing 
                 raw_df = pd.concat([pd.read_csv(f, encoding='latin1', on_bad_lines='skip') for f in st.session_state.orders_vault], ignore_index=True)
                 cleaned_orders = clean_orders_data(raw_df).drop_duplicates(subset=['order_id'])
                 unique_emails = cleaned_orders['email_match'].unique().tolist()
                 try:
-                    # 🚨 180 SECOND WAIT TIME
                     response = requests.post(AIDAN_WEBHOOK_URL, json={"emails": unique_emails}, timeout=180)
                     if response.status_code == 200:
-                        st.session_state.raw_api_text = response.text 
                         raw_enriched_df = pd.read_csv(io.StringIO(response.text), on_bad_lines='skip', engine='python')
                         st.session_state.integrity_stats = {"processed": len(raw_enriched_df), "total": len(response.text.strip().split('\n')) - 1}
                         st.session_state.cleaned_n8n = clean_api_response(raw_enriched_df).drop_duplicates(subset=['email_match'])
@@ -192,10 +176,9 @@ if st.session_state.app_state == "onboarding":
                         st.session_state.date_filter = (st.session_state.min_date, st.session_state.max_date)
                         st.session_state.app_state = "dashboard"
                         st.rerun()
-                    else: st.error(f"API Error: {response.status_code}")
+                    else: st.error(f"Error {response.status_code}")
                 except Exception as e: st.error(f"Error: {str(e)}")
 
-# ... [DASHBOARD SECTION - NO CHANGES] ...
 elif st.session_state.app_state == "dashboard":
     if "active_var" not in st.session_state: st.session_state.active_var = "Location"
     if "active_loc_level" not in st.session_state: st.session_state.active_loc_level = "Region"
@@ -225,7 +208,9 @@ elif st.session_state.app_state == "dashboard":
                 with cols[j]: st.markdown(f'''<div style="background-color: #F8F5FA; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 15px; text-align: center; min-height: 120px; display: flex; flex-direction: column; justify-content: center; align-items: center; margin-bottom: 2rem;"><p style="margin: 0; font-size: 0.9rem; color: #0F172A; font-weight: 700; text-transform: uppercase;">{label}</p><h3 style="margin: 5px 0 10px 0; font-size: 1.1rem; color: {PITCH_BRAND_COLOR}; font-weight: 600;">{data[0]}</h3><p style="margin: 0; font-size: 0.85rem; color: {PITCH_BRAND_COLOR}; background-color: #EBE4F4; border-radius: 20px; padding: 4px 10px; display: inline-block; font-weight: 600;">{data[1]:.1f}% of Rev</p></div>''', unsafe_allow_html=True)
         st.markdown("<div style='margin-top: 3rem;'></div>", unsafe_allow_html=True)
         st.markdown("""<h2 class="modern-serif-title" style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 10px;"><span style="font-size: 2rem;">🔍</span> Audience Deep Dive</h2>""", unsafe_allow_html=True)
-        v_labels = (["Industry", "Seniority", "Company Revenue", "Company Size", "Department", "Job Title", "Location", "Income"] if st.session_state.biz_type == "B2B / Enterprise Sales" else ["Gender", "Age", "Location", "Status", "Income", "Homeowner", "Children", "Net Worth"])
+        
+        # 🚨 BUTTONS FIX: Marital Status restored
+        v_labels = (["Industry", "Seniority", "Company Revenue", "Company Size", "Department", "Job Title", "Location", "Income"] if st.session_state.biz_type == "B2B / Enterprise Sales" else ["Gender", "Age", "Location", "Marital Status", "Income", "Homeowner", "Children", "Net Worth"])
         var_cols = st.columns(len(v_labels))
         for i, label in enumerate(v_labels):
             if var_cols[i].button(label, key=f"btn_{label}", type="primary" if st.session_state.active_var == label else "secondary", use_container_width=True):
@@ -233,16 +218,15 @@ elif st.session_state.app_state == "dashboard":
         lk = st.session_state.active_var
         if lk == "Location":
             l1, l2, l3, _ = st.columns([1, 1, 1, 5])
-            if l1.button("Region", type="primary" if st.session_state.active_loc_level == "Region" else "secondary"): st.session_state.active_loc_level = "Region"; st.rerun()
-            if l2.button("State", type="primary" if st.session_state.active_loc_level == "State" else "secondary"): st.session_state.active_loc_level = "State"; st.rerun()
-            if l3.button("Zip Code", type="primary" if st.session_state.active_loc_level == "Zip Code" else "secondary"): st.session_state.active_loc_level = "Zip Code"; st.rerun()
+            if l1.button("Region", key="reg_btn", type="primary" if st.session_state.active_loc_level == "Region" else "secondary"): st.session_state.active_loc_level = "Region"; st.rerun()
+            if l2.button("State", key="state_btn", type="primary" if st.session_state.active_loc_level == "State" else "secondary"): st.session_state.active_loc_level = "State"; st.rerun()
+            if l3.button("Zip Code", key="zip_btn", type="primary" if st.session_state.active_loc_level == "Zip Code" else "secondary"): st.session_state.active_loc_level = "Zip Code"; st.rerun()
             lk = st.session_state.active_loc_level
-        if lk in dash_data['html_views']: st.markdown(f'<div class="premium-table-container">{dash_data["html_views"][lk]}</div>', unsafe_allow_html=True)
-    else:
-        st.warning("⚠️ **No Matches Found.**")
-        with st.expander("🔍 Debug"):
-            st.write("Aidan's Columns:", list(st.session_state.cleaned_n8n.columns))
-            st.write("Raw:", st.session_state.raw_api_text[:500] if 'raw_api_text' in st.session_state else "Empty")
+        
+        # 🚨 TABLE WRAPPER FIX: Wrapped in the wide container class
+        if lk in dash_data['html_views']: 
+            st.markdown(f'<div class="premium-table-container">{dash_data["html_views"][lk]}</div>', unsafe_allow_html=True)
+    
     st.markdown("<br><hr style='border-top: 1px solid #E2E8F0; margin: 2rem 0;'><br>", unsafe_allow_html=True)
     _, reset_col, _ = st.columns([2, 1, 2])
     if reset_col.button("← Go Back", use_container_width=True, type="secondary"): 
