@@ -52,7 +52,7 @@ def apply_custom_theme(primary_color):
             .premium-table-container table {{ width: 100% !important; border-collapse: collapse !important; border: none !important; }}
             .premium-table-container th {{ font-family: 'Outfit', sans-serif !important; background-color: #F8F6FA !important; color: {primary_color} !important; font-weight: 700 !important; text-align: center !important; padding: 15px 12px !important; border-bottom: 2px solid {primary_color} !important; font-size: 0.95rem !important; text-transform: none !important; }}
             .premium-table-container td {{ font-family: 'Outfit', sans-serif !important; text-align: center !important; padding: 12px !important; border-bottom: 1px solid #EBE4F4 !important; font-size: 0.9rem !important; color: #1e293b !important; }}
-            .premium-table-container td:first-child {{ font-weight: 700 !important; color: #0F172A !important; }}
+            .premium-table-container td:first-child {{ font-weight: 700 !important; color: #0F172A !important; text-align: center !important; }}
             
             .serif-gradient-centerpiece {{ font-family: 'Playfair Display', serif !important; background: linear-gradient(90deg, #4D148C 0%, #20B2AA 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block; font-weight: 700 !important; letter-spacing: -0.5px; }}
             .modern-serif-title {{ font-family: 'Playfair Display', serif !important; color: #0F172A !important; font-weight: 700 !important; }}
@@ -98,29 +98,35 @@ def clean_api_response(df):
         df['state_raw'] = df['state_raw'].astype(str).str.strip().str.upper()
         df['region'] = df['state_raw'].map(STATE_TO_REGION).fillna('Unknown')
         
-    # 🚨 B2B STATE & REGION MAPPING
     if 'co_state' in df.columns:
         df['co_state'] = df['co_state'].astype(str).str.strip().str.upper()
         df['co_region'] = df['co_state'].map(STATE_TO_REGION).fillna('Unknown')
         
-    # 🚨 B2B NAICS DICTIONARY & CLEANER
+    # 🚨 B2B NAICS 4-DIGIT ROLLUP LOGIC
     if 'naics' in df.columns:
         def map_naics(code):
-            c = str(code).split('.')[0].strip() # Clean floats like 236.0
-            if c in ['nan', 'None', '', 'null', '0', 'UNKNOWN']: return 'Unknown'
-            prefix = c[:2]
+            c = str(code).split('.')[0].strip() 
+            if c in ['nan', 'None', '', 'null', '0', 'UNKNOWN'] or len(c) < 2: return 'Unknown'
+            
+            rollup_code = c[:4] # Grab up to the first 4 digits for granularity
+            prefix = c[:2] # Grab the 2-digit prefix for the broad English category
+            
             mapping = {
                 '11': 'Agriculture', '21': 'Mining', '22': 'Utilities', '23': 'Construction',
                 '31': 'Manufacturing', '32': 'Manufacturing', '33': 'Manufacturing',
                 '42': 'Wholesale', '44': 'Retail', '45': 'Retail',
                 '48': 'Transportation', '49': 'Transportation', '51': 'Information',
-                '52': 'Finance/Insurance', '53': 'Real Estate', '54': 'Professional Services',
+                '52': 'Finance & Insurance', '53': 'Real Estate', '54': 'Professional Services',
                 '55': 'Management', '56': 'Administrative', '61': 'Education',
-                '62': 'Health Care', '71': 'Arts/Entertainment', '72': 'Accommodation/Food',
+                '62': 'Health Care', '71': 'Arts & Entertainment', '72': 'Accommodation & Food',
                 '81': 'Other Services', '92': 'Public Admin'
             }
-            desc = mapping.get(prefix, 'Industry')
-            return f"{c} ({desc})"
+            desc = mapping.get(prefix, 'Other/Unknown')
+            if desc == 'Other/Unknown': return 'Unknown'
+            
+            # Example Output: "5415 - Professional Services"
+            return f"{rollup_code} - {desc}" 
+            
         df['naics'] = df['naics'].apply(map_naics)
         
     df['email_match'] = df['email_match'].astype(str).str.lower().str.replace(r'[^a-z0-9@._,-]', '', regex=True).str.split(',')
@@ -151,7 +157,6 @@ def build_dashboard_views(orders_df, enriched_df, start_date, end_date, biz_type
     unique_shopify = f_orders['email_match'].nunique()
     match_rate = (matched_count / unique_shopify * 100) if unique_shopify > 0 else 0
     
-    # 🚨 DYNAMIC B2B/DTC VARIABLE ALLOCATION
     if biz_type == "B2B / Enterprise Sales":
         vars = [("Industry", "industry"), ("Seniority", "seniority"), ("Company Revenue", "co_revenue"), ("Company Size", "co_size"), ("Department", "department"), ("Job Title", "job_title"), ("NAICS Code", "naics"), ("Company Region", "co_region"), ("Company State", "co_state")]
     else:
@@ -225,7 +230,6 @@ if st.session_state.app_state == "onboarding":
                         st.session_state.min_date, st.session_state.max_date = cleaned_orders['order_date'].min(), cleaned_orders['order_date'].max()
                         st.session_state.date_filter = (st.session_state.min_date, st.session_state.max_date)
                         
-                        # 🚨 RESET UI STATE ON SUCCESSFUL RUN
                         if st.session_state.biz_type == "B2B / Enterprise Sales":
                             st.session_state.active_var = "Industry"
                             st.session_state.active_loc_level = "Company Region"
@@ -269,7 +273,6 @@ elif st.session_state.app_state == "dashboard":
         st.markdown("<div style='margin-top: 3rem;'></div>", unsafe_allow_html=True)
         st.markdown("""<h2 class="modern-serif-title" style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 10px;"><span style="font-size: 2rem;">🔍</span> Audience Deep Dive</h2>""", unsafe_allow_html=True)
         
-        # 🚨 DYNAMIC BUTTON GENERATION (B2B vs DTC)
         if st.session_state.biz_type == "B2B / Enterprise Sales":
             v_labels = ["Industry", "Seniority", "Company Revenue", "Company Size", "Department", "Job Title", "Company Location", "NAICS Code"]
         else:
