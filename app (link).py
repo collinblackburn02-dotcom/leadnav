@@ -47,7 +47,6 @@ def apply_custom_theme(primary_color):
             div[data-testid="stButton"] button {{ border-radius: 8px; font-weight: 600; }}
             div[data-testid="stButton"] button[kind="primary"] {{ background-color: {primary_color} !important; color: #FFFFFF !important; border: none !important; }}
             
-            /* 🚨 TABLE CSS */
             .premium-table-container {{ width: 100% !important; border-radius: 12px; border: 1px solid {primary_color}; background: #FFFFFF; overflow: hidden; margin-top: 1rem; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }}
             .premium-table-container table {{ width: 100% !important; border-collapse: collapse !important; border: none !important; }}
             .premium-table-container th {{ font-family: 'Outfit', sans-serif !important; background-color: #F8F6FA !important; color: {primary_color} !important; font-weight: 700 !important; text-align: center !important; padding: 15px 12px !important; border-bottom: 2px solid {primary_color} !important; font-size: 0.95rem !important; text-transform: none !important; }}
@@ -57,11 +56,9 @@ def apply_custom_theme(primary_color):
             .serif-gradient-centerpiece {{ font-family: 'Playfair Display', serif !important; background: linear-gradient(90deg, #4D148C 0%, #20B2AA 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block; font-weight: 700 !important; letter-spacing: -0.5px; }}
             .modern-serif-title {{ font-family: 'Playfair Display', serif !important; color: #0F172A !important; font-weight: 700 !important; }}
             
-            /* 🌀 CENTERED SPINNER */
             .custom-loader {{ border: 3px solid #f3f3f3; border-top: 3px solid {primary_color}; border-radius: 50%; width: 32px; height: 32px; animation: spin 1s linear infinite; margin: 0 auto 30px auto; }}
             @keyframes spin {{ 0% {{ transform: rotate(0deg); }} 100% {{ transform: rotate(360deg); }} }}
 
-            /* 🚀 THE PITCH ROTATOR */
             @keyframes fadeLoop {{ 0% {{ opacity: 0; transform: translateY(5px); }} 1%, 24% {{ opacity: 1; transform: translateY(0); }} 25%, 100% {{ opacity: 0; transform: translateY(-5px); }} }}
             .pitch-fact {{ font-family: 'Outfit', sans-serif; font-size: 1.15rem; color: #475569; font-weight: 400; font-style: italic; position: absolute; width: 100%; opacity: 0; animation: fadeLoop 80s infinite; line-height: 1.5; text-align: center; }}
             .fact-1 {{ animation-delay: 0s; }} .fact-2 {{ animation-delay: 20s; }} .fact-3 {{ animation-delay: 40s; }} .fact-4 {{ animation-delay: 60s; }}
@@ -102,14 +99,16 @@ def clean_api_response(df):
         df['co_state'] = df['co_state'].astype(str).str.strip().str.upper()
         df['co_region'] = df['co_state'].map(STATE_TO_REGION).fillna('Unknown')
         
-    # 🚨 B2B NAICS 4-DIGIT ROLLUP LOGIC
+    # 🚨 STRICT 3-DIGIT B2B NAICS ROLLUP LOGIC
     if 'naics' in df.columns:
         def map_naics(code):
             c = str(code).split('.')[0].strip() 
             if c in ['nan', 'None', '', 'null', '0', 'UNKNOWN'] or len(c) < 2: return 'Unknown'
             
-            rollup_code = c[:4] # Grab up to the first 4 digits for granularity
-            prefix = c[:2] # Grab the 2-digit prefix for the broad English category
+            # Force everything to 3 digits for perfect aggregation
+            # If it's only 2 digits, pad it with a 0 to maintain grouping
+            rollup_code = c[:3].ljust(3, '0') 
+            prefix = c[:2] 
             
             mapping = {
                 '11': 'Agriculture', '21': 'Mining', '22': 'Utilities', '23': 'Construction',
@@ -124,7 +123,7 @@ def clean_api_response(df):
             desc = mapping.get(prefix, 'Other/Unknown')
             if desc == 'Other/Unknown': return 'Unknown'
             
-            # Example Output: "5415 - Professional Services"
+            # Returns strictly e.g. "541 - Professional Services"
             return f"{rollup_code} - {desc}" 
             
         df['naics'] = df['naics'].apply(map_naics)
