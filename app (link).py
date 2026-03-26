@@ -13,21 +13,12 @@ PITCH_BRAND_COLOR = "#4D148C" # LeadNavigator Deep Purple
 AIDAN_WEBHOOK_URL = "https://n8n.srv1144572.hstgr.cloud/webhook/669d6ef0-1393-479e-81c5-5b0bea4262b7"
 
 N8N_COLUMN_MAPPER = {
-    "GENDER": "gender",
-    "MARRIED": "marital_status",
-    "AGE_RANGE": "age",
-    "INCOME_RANGE": "income",
-    "PERSONAL_STATE": "state_raw",
-    "PERSONAL_ZIP": "zip_code",
-    "HOMEOWNER": "homeowner",
-    "CHILDREN": "children",
-    "NET_WORTH": "net_worth",
-    "SENIORITY_LEVEL": "seniority",
-    "COMPANY_REVENUE": "co_revenue",
-    "COMPANY_EMPLOYEE_COUNT": "co_size",
-    "COMPANY_INDUSTRY": "industry",
-    "DEPARTMENT": "department",
-    "JOB_TITLE": "job_title"
+    "GENDER": "gender", "MARRIED": "marital_status", "AGE_RANGE": "age",
+    "INCOME_RANGE": "income", "PERSONAL_STATE": "state_raw", "PERSONAL_ZIP": "zip_code",
+    "HOMEOWNER": "homeowner", "CHILDREN": "children", "NET_WORTH": "net_worth",
+    "SENIORITY_LEVEL": "seniority", "COMPANY_REVENUE": "co_revenue",
+    "COMPANY_EMPLOYEE_COUNT": "co_size", "COMPANY_INDUSTRY": "industry",
+    "DEPARTMENT": "department", "JOB_TITLE": "job_title"
 }
 
 STATE_TO_REGION = {
@@ -50,18 +41,24 @@ def apply_custom_theme(primary_color):
             footer {{ visibility: hidden; }}
             [data-testid="stSidebar"], [data-testid="collapsedControl"] {{ display: none !important; }}
             .stMarkdown a svg {{ display: none !important; }}
-            .stMarkdown a {{ text-decoration: none !important; color: inherit !important; cursor: default !important; pointer-events: none !important; }}
-            div[data-testid="stSlider"] label p {{ font-size: 1.2rem !important; font-weight: 700 !important; color: #0F172A !important; margin-bottom: 8px !important; }}
-            div[data-testid="stButton"] button {{ border-radius: 8px; font-weight: 600; transition: all 0.2s ease; }}
-            div[data-testid="stButton"] button[kind="primary"] {{ background-color: {primary_color} !important; color: #FFFFFF !important; border: none !important; }}
-            div[data-testid="stButton"] button[kind="secondary"] {{ background-color: #FFFFFF !important; color: {primary_color} !important; border: 1px solid {primary_color} !important; }}
-            .premium-table-container {{ border-radius: 12px; border: 1px solid {primary_color}; background: #FFFFFF; overflow: hidden; margin-top: 1rem; margin-bottom: 2rem; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }}
-            .premium-table-container table {{ width: 100% !important; border-collapse: collapse !important; }}
-            .premium-table-container th {{ font-family: 'Outfit', sans-serif !important; background-color: #F8F6FA !important; color: {primary_color} !important; font-weight: 700 !important; text-align: center !important; padding: 15px 12px !important; border-bottom: 2px solid {primary_color} !important; border-right: 1px solid #EBE4F4 !important; text-transform: uppercase !important; font-size: 0.95rem !important; }}
-            .premium-table-container td {{ font-family: 'Outfit', sans-serif !important; text-align: center !important; padding: 12px !important; border-bottom: 1px solid #EBE4F4 !important; border-right: 1px solid #EBE4F4 !important; font-size: 0.85rem !important; }}
+            div[data-testid="stSlider"] label p {{ font-size: 1.2rem !important; font-weight: 700 !important; color: #0F172A !important; }}
+            div[data-testid="stButton"] button {{ border-radius: 8px; font-weight: 600; }}
+            div[data-testid="stButton"] button[kind="primary"] {{ background-color: {primary_color} !important; color: #FFFFFF !important; }}
+            .premium-table-container {{ border-radius: 12px; border: 1px solid {primary_color}; background: #FFFFFF; overflow: hidden; margin-top: 1rem; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }}
             .serif-gradient-centerpiece {{ font-family: 'Playfair Display', serif !important; background: linear-gradient(90deg, #4D148C 0%, #20B2AA 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block; font-weight: 700 !important; letter-spacing: -0.5px; }}
-            .serif-subheadline {{ font-family: 'Playfair Display', serif !important; color: #0F172A !important; font-weight: 700 !important; letter-spacing: -0.5px; }}
-            .modern-serif-title {{ font-family: 'Playfair Display', serif !important; color: #0F172A !important; font-weight: 700 !important; letter-spacing: -0.5px; }}
+            .modern-serif-title {{ font-family: 'Playfair Display', serif !important; color: #0F172A !important; font-weight: 700 !important; }}
+            
+            /* 🚀 THE PITCH ROTATOR ANIMATION */
+            @keyframes fadeLoop {{
+                0%, 20% {{ opacity: 0; transform: translateY(10px); }}
+                25%, 45% {{ opacity: 1; transform: translateY(0); }}
+                50%, 100% {{ opacity: 0; transform: translateY(-10px); }}
+            }}
+            .pitch-fact {{ font-family: 'Outfit', sans-serif; font-size: 1.1rem; color: #475569; font-weight: 500; position: absolute; width: 100%; opacity: 0; animation: fadeLoop 20s infinite; }}
+            .fact-1 {{ animation-delay: 0s; }}
+            .fact-2 {{ animation-delay: 5s; }}
+            .fact-3 {{ animation-delay: 10s; }}
+            .fact-4 {{ animation-delay: 15s; }}
         </style>
     """, unsafe_allow_html=True)
 
@@ -73,12 +70,9 @@ brand_gradient = mcolors.LinearSegmentedColormap.from_list("brand_purple", ["#FF
 def clean_api_response(df):
     df.columns = [str(c).strip().upper() for c in df.columns]
     standard_emails = ['PERSONAL_EMAILS', 'BUSINESS_EMAIL', 'EMAIL_MATCH', 'DEEP_VERIFIED_EMAILS']
-    found_email_col = None
-    for col in standard_emails:
-        if col in df.columns: found_email_col = col; break
+    found_email_col = next((col for col in standard_emails if col in df.columns), None)
     if not found_email_col:
-        for col in df.columns:
-            if 'EMAIL' in col: found_email_col = col; break
+        found_email_col = next((col for col in df.columns if 'EMAIL' in col), None)
     if not found_email_col: return pd.DataFrame(columns=['email_match'])
     df = df.rename(columns={found_email_col: 'email_match'})
     df = df.rename(columns=N8N_COLUMN_MAPPER)
@@ -91,47 +85,41 @@ def clean_api_response(df):
 
 @st.cache_data(show_spinner=False)
 def clean_orders_data(df):
-    email_col = next((c for c in df.columns if 'email' in c.lower()), 'Email')
-    order_col = next((c for c in df.columns if 'name' in c.lower() or 'order' in c.lower()), 'Order ID')
-    total_col = next((c for c in df.columns if 'total' in c.lower() or 'price' in c.lower()), 'Total')
-    date_col = next((c for c in df.columns if 'created' in c.lower() or 'date' in c.lower()), 'Date')
-    df = df.rename(columns={email_col: 'email_match', order_col: 'order_id', total_col: 'revenue_raw', date_col: 'order_date'})
+    e_col = next((c for c in df.columns if 'email' in c.lower()), 'Email')
+    o_col = next((c for c in df.columns if 'name' in c.lower() or 'order' in c.lower()), 'Order ID')
+    t_col = next((c for c in df.columns if 'total' in c.lower() or 'price' in c.lower()), 'Total')
+    d_col = next((c for c in df.columns if 'created' in c.lower() or 'date' in c.lower()), 'Date')
+    df = df.rename(columns={e_col: 'email_match', o_col: 'order_id', t_col: 'revenue_raw', d_col: 'order_date'})
     df['email_match'] = df['email_match'].astype(str).str.lower().str.strip()
     df['revenue_raw'] = pd.to_numeric(df['revenue_raw'].astype(str).str.replace(r'[^\d.-]', '', regex=True), errors='coerce').fillna(0)
     df = df[df['revenue_raw'] > 0]
-    df['order_date'] = pd.to_datetime(df['order_date'], errors='coerce', utc=True)
-    df = df.dropna(subset=['order_date'])
-    df['order_date'] = df['order_date'].dt.date
-    return df.reset_index(drop=True)
+    df['order_date'] = pd.to_datetime(df['order_date'], errors='coerce', utc=True).dt.date
+    return df.dropna(subset=['order_date']).reset_index(drop=True)
 
 def build_dashboard_views(orders_df, enriched_df, start_date, end_date, biz_type):
     mask = (orders_df['order_date'] >= start_date) & (orders_df['order_date'] <= end_date)
-    filtered_orders = orders_df.loc[mask]
-    if filtered_orders.empty: return None
-    purchasers = filtered_orders.groupby('email_match').agg(revenue=('revenue_raw', 'sum')).reset_index()
+    f_orders = orders_df.loc[mask]
+    if f_orders.empty: return None
+    purchasers = f_orders.groupby('email_match').agg(revenue=('revenue_raw', 'sum')).reset_index()
     df_joined = pd.merge(purchasers, enriched_df, on='email_match', how='inner').reset_index(drop=True)
     if df_joined.empty: return None
-    total_rev = df_joined['revenue'].sum()
-    matched_count = df_joined['email_match'].nunique()
-    unique_shopify_humans = filtered_orders['email_match'].nunique()
-    match_rate = (matched_count / unique_shopify_humans * 100) if unique_shopify_humans > 0 else 0
-    summary_vars = ([("Industry", "industry"), ("Seniority", "seniority"), ("Company Revenue", "co_revenue"), ("Company Size", "co_size"), ("Department", "department"), ("Job Title", "job_title"), ("Region", "region"), ("State", "state_raw")] if biz_type == "B2B / Enterprise Sales" else [("Gender", "gender"), ("Age", "age"), ("Marital Status", "marital_status"), ("Region", "region"), ("State", "state_raw"), ("Income", "income"), ("Homeowner", "homeowner"), ("Net Worth", "net_worth")])
-    top_perf, all_html_views = {}, {}
-    for label, col_key in summary_vars:
+    total_rev, matched_count = df_joined['revenue'].sum(), df_joined['email_match'].nunique()
+    unique_shopify = f_orders['email_match'].nunique()
+    match_rate = (matched_count / unique_shopify * 100) if unique_shopify > 0 else 0
+    vars = ([("Industry", "industry"), ("Seniority", "seniority"), ("Company Revenue", "co_revenue"), ("Company Size", "co_size"), ("Department", "department"), ("Job Title", "job_title"), ("Region", "region"), ("State", "state_raw")] if biz_type == "B2B / Enterprise Sales" else [("Gender", "gender"), ("Age", "age"), ("Marital Status", "marital_status"), ("Region", "region"), ("State", "state_raw"), ("Income", "income"), ("Homeowner", "homeowner"), ("Net Worth", "net_worth")])
+    top_perf, all_html = {}, {}
+    for label, col_key in vars:
         if col_key in df_joined.columns:
             df_joined[col_key] = df_joined[col_key].astype(str).str.strip()
-            valid_rows = df_joined[~df_joined[col_key].str.lower().isin(['unknown', 'nan', 'none', 'null', ''])]
-            if not valid_rows.empty:
-                var_total = valid_rows['revenue'].sum()
-                rs = valid_rows.groupby(col_key)['revenue'].sum()
-                top_perf[label] = (rs.idxmax(), (rs.max() / var_total * 100))
-                grp = valid_rows.groupby(col_key).agg(Purchasers=('email_match', 'nunique'), Revenue=('revenue', 'sum')).reset_index()
-                grp['% of Buyers'] = (grp['Revenue'] / var_total) * 100
-                grp['Rev / Purchaser'] = (grp['Revenue'] / grp['Purchasers'])
-                final_v = grp.rename(columns={col_key: label.upper()}).sort_values('Revenue', ascending=False).head(50)
-                styler = final_v.style.format({'Purchasers': '{:,.0f}', 'Revenue': '${:,.2f}', '% of Buyers': '{:.1f}%', 'Rev / Purchaser': '${:,.2f}'}).background_gradient(subset=['Revenue', '% of Buyers'], cmap=brand_gradient)
-                all_html_views[label] = styler.hide(axis="index").to_html()
-    return {"total_revenue": total_rev, "total_buyers": matched_count, "unique_shopify_customers": unique_shopify_humans, "match_rate": match_rate, "top_performers": top_perf, "html_views": all_html_views}
+            valid = df_joined[~df_joined[col_key].str.lower().isin(['unknown', 'nan', 'none', 'null', ''])]
+            if not valid.empty:
+                v_total, rs = valid['revenue'].sum(), valid.groupby(col_key)['revenue'].sum()
+                top_perf[label] = (rs.idxmax(), (rs.max() / v_total * 100))
+                grp = valid.groupby(col_key).agg(Purchasers=('email_match', 'nunique'), Revenue=('revenue', 'sum')).reset_index()
+                grp['% of Buyers'], grp['Rev / Purchaser'] = (grp['Revenue'] / v_total) * 100, (grp['Revenue'] / grp['Purchasers'])
+                f_v = grp.rename(columns={col_key: label.upper()}).sort_values('Revenue', ascending=False).head(50)
+                all_html[label] = f_v.style.format({'Purchasers': '{:,.0f}', 'Revenue': '${:,.2f}', '% of Buyers': '{:.1f}%', 'Rev / Purchaser': '${:,.2f}'}).background_gradient(subset=['Revenue', '% of Buyers'], cmap=brand_gradient).hide(axis="index").to_html()
+    return {"total_revenue": total_rev, "total_buyers": matched_count, "unique_shopify": unique_shopify, "match_rate": match_rate, "top_performers": top_perf, "html_views": all_html}
 
 # ================ 3. APP FLOW =================
 if "app_state" not in st.session_state: 
@@ -154,24 +142,31 @@ if st.session_state.app_state == "onboarding":
     if center_col.button("🚀 Run Analysis", type="primary", use_container_width=True):
         if not st.session_state.orders_vault: st.error("Please upload your order file.")
         else:
-            status_container = st.empty()
-            with status_container.container():
-                st.markdown(f"""<div style="text-align: center; padding: 40px; background: #F8F6FA; border-radius: 12px; border: 1px solid {PITCH_BRAND_COLOR};"><h3 class="modern-serif-title" style="color: {PITCH_BRAND_COLOR};">LeadNavigator Intelligence is active...</h3><p style="color: #64748B; font-family: 'Outfit', sans-serif;">Enriching profiles via Identity Graph (This may take up to 3 mins)</p></div>""", unsafe_allow_html=True)
+            status_placeholder = st.empty()
+            with status_placeholder.container():
+                st.markdown(f"""
+                    <div style="text-align: center; padding: 60px 40px; background: #F8F6FA; border-radius: 12px; border: 1px solid {PITCH_BRAND_COLOR}; position: relative; min-height: 280px;">
+                        <h3 class="modern-serif-title" style="color: {PITCH_BRAND_COLOR}; margin-bottom: 10px;">LeadNavigator Intelligence is active...</h3>
+                        <p style="color: #64748B; font-family: 'Outfit', sans-serif; margin-bottom: 30px;">Enriching profiles via Identity Graph (Est. 2-3 mins)</p>
+                        <div style="position: relative; height: 100px; margin-top: 20px;">
+                            <div class="pitch-fact fact-1">Organizations that leverage customer behavioral insights outperform peers by 85% in sales growth and more than 25% in gross margin.<br><b>— McKinsey & Co</b></div>
+                            <div class="pitch-fact fact-2">Data-driven organizations are 23 times more likely to acquire customers and 6 times more likely to retain them.<br><b>— MIT Sloan</b></div>
+                            <div class="pitch-fact fact-3">Companies that use data-driven marketing are 6x more likely to be profitable year-over-year.<br><b>— Forbes</b></div>
+                            <div class="pitch-fact fact-4">Acquiring a new customer is up to 25x more expensive than retaining one. Knowledge of your current buyer is your greatest asset.<br><b>— Harvard Business Review</b></div>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
                 
-                with st.spinner("LeadNavigator is syncing with Aidan's Data Engine..."):
-                    # Logic Start
+                with st.spinner(" "): # Hidden spinner to allow our CSS animation to shine
                     raw_df = pd.concat([pd.read_csv(f, encoding='latin1', on_bad_lines='skip') for f in st.session_state.orders_vault], ignore_index=True)
                     cleaned_orders = clean_orders_data(raw_df).drop_duplicates(subset=['order_id'])
                     unique_emails = cleaned_orders['email_match'].unique().tolist()
-                    
-                    payload = {"emails": unique_emails}
                     try:
-                        # 🚨 UPDATED TIMEOUT TO 180 SECONDS
-                        response = requests.post(AIDAN_WEBHOOK_URL, json=payload, timeout=180)
+                        # 🚨 180 SECOND WAIT TIME
+                        response = requests.post(AIDAN_WEBHOOK_URL, json={"emails": unique_emails}, timeout=180)
                         if response.status_code == 200:
                             st.session_state.raw_api_text = response.text 
-                            csv_stream = io.StringIO(response.text)
-                            raw_enriched_df = pd.read_csv(csv_stream, on_bad_lines='skip', engine='python')
+                            raw_enriched_df = pd.read_csv(io.StringIO(response.text), on_bad_lines='skip', engine='python')
                             st.session_state.integrity_stats = {"processed": len(raw_enriched_df), "total": len(response.text.strip().split('\n')) - 1}
                             st.session_state.cleaned_n8n = clean_api_response(raw_enriched_df).drop_duplicates(subset=['email_match'])
                             st.session_state.cleaned_orders = cleaned_orders
@@ -179,31 +174,34 @@ if st.session_state.app_state == "onboarding":
                             st.session_state.date_filter = (st.session_state.min_date, st.session_state.max_date)
                             st.session_state.app_state = "dashboard"
                             st.rerun()
-                        else: st.error(f"API Error: Server returned {response.status_code}.")
-                    except Exception as e: st.error(f"Connection Failed: {str(e)}")
+                        else: st.error(f"API Error: {response.status_code}")
+                    except Exception as e: st.error(f"Error: {str(e)}")
 
 elif st.session_state.app_state == "dashboard":
     if "active_var" not in st.session_state: st.session_state.active_var = "Location"
     if "active_loc_level" not in st.session_state: st.session_state.active_loc_level = "Region"
     st.image("logo.png", width=180)
     st.markdown(f"""<div style="text-align: center; margin-top: -10px; margin-bottom: 30px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.5rem; margin-bottom: 0px;">Customer Insights Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 2.8rem; color: #0F172A !important; margin-top: -5px;">{st.session_state.biz_type} Profile.</h2></div>""", unsafe_allow_html=True)
+    
     if "integrity_stats" in st.session_state:
         stats = st.session_state.integrity_stats
         skipped = stats["total"] - stats["processed"]
-        if skipped > 0: st.info(f"💡 **Data Integrity:** Successfully enriched {stats['processed']:,}. {skipped:,} records omitted.")
+        if skipped > 0: st.info(f"💡 **Data Integrity:** {stats['processed']:,} matched. {skipped:,} skipped.")
+        
     _, c2, _ = st.columns([1, 4, 1])
     with c2: st.slider("Filter Date", min_value=st.session_state.min_date, max_value=st.session_state.max_date, key="date_filter", format="MMM DD, YYYY")
+    
     current_dates = st.session_state.get("date_filter")
     if current_dates and st.session_state.get("last_computed_dates") != current_dates:
         st.session_state.last_computed_dates = current_dates
         st.session_state.dash_data = build_dashboard_views(st.session_state.cleaned_orders, st.session_state.cleaned_n8n, current_dates[0], current_dates[1], st.session_state.biz_type)
+    
     dash_data = st.session_state.get("dash_data")
     if dash_data:
         m1, m2 = st.columns(2)
         with m1: st.markdown(f"""<div style="background-color: #F8F5FA; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 25px 20px; text-align: center;"><h3 style="margin: 0; font-size: 1.6rem; color: #0F172A; font-weight: 700;">Resolved Customers</h3><h4 style="margin: 5px 0 15px 0; font-size: 1.6rem; color: {PITCH_BRAND_COLOR}; font-weight: 700;">{dash_data['total_buyers']:,.0f}</h4><p style="margin: 0; font-size: 0.9rem; color: #1e293b;">Matched <b>{dash_data['match_rate']:.1f}%</b> of buyers.</p></div>""", unsafe_allow_html=True)
         with m2: st.markdown(f"""<div style="background-color: #F8F5FA; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 25px 20px; text-align: center; height: 100%; display: flex; flex-direction: column; justify-content: center;"><h3 style="margin: 0; font-size: 1.75rem; color: #0F172A; font-weight: 700;">Attributed Sales</h3><h4 style="margin: 5px 0 0 0; font-size: 1.75rem; color: {PITCH_BRAND_COLOR}; font-weight: 700;">${dash_data['total_revenue']:,.2f}</h4></div>""", unsafe_allow_html=True)
         
-        # 🚨 HTML FIX: Added unsafe_allow_html=True
         st.markdown("<div style='margin-top: 4rem;'></div>", unsafe_allow_html=True)
         st.markdown("""<h2 class="modern-serif-title" style="margin-bottom: 2rem; display: flex; align-items: center; gap: 10px;"><span style="font-size: 2rem;">🏆</span> Top Performing Segments</h2>""", unsafe_allow_html=True)
         items = list(dash_data['top_performers'].items())
@@ -211,9 +209,10 @@ elif st.session_state.app_state == "dashboard":
             chunk = items[i:i+5]; cols = st.columns(5)
             for j, (label, data) in enumerate(chunk):
                 with cols[j]: st.markdown(f'''<div style="background-color: #F8F5FA; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 15px; text-align: center; min-height: 120px; display: flex; flex-direction: column; justify-content: center; align-items: center; margin-bottom: 2rem;"><p style="margin: 0; font-size: 0.9rem; color: #0F172A; font-weight: 700; text-transform: uppercase;">{label}</p><h3 style="margin: 5px 0 10px 0; font-size: 1.1rem; color: {PITCH_BRAND_COLOR}; font-weight: 600;">{data[0]}</h3><p style="margin: 0; font-size: 0.85rem; color: {PITCH_BRAND_COLOR}; background-color: #EBE4F4; border-radius: 20px; padding: 4px 10px; display: inline-block; font-weight: 600;">{data[1]:.1f}% of Rev</p></div>''', unsafe_allow_html=True)
+
         st.markdown("<div style='margin-top: 3rem;'></div>", unsafe_allow_html=True)
         st.markdown("""<h2 class="modern-serif-title" style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 10px;"><span style="font-size: 2rem;">🔍</span> Audience Deep Dive</h2>""", unsafe_allow_html=True)
-        v_labels = (["Industry", "Seniority", "Company Revenue", "Company Size", "Department", "Job Title", "Location", "Income"] if st.session_state.biz_type == "B2B / Enterprise Sales" else ["Gender", "Age", "Location", "Marital Status", "Income", "Homeowner", "Children", "Net Worth"])
+        v_labels = (["Industry", "Seniority", "Company Revenue", "Company Size", "Department", "Job Title", "Location", "Income"] if st.session_state.biz_type == "B2B / Enterprise Sales" else ["Gender", "Age", "Location", "Status", "Income", "Homeowner", "Children", "Net Worth"])
         var_cols = st.columns(len(v_labels))
         for i, label in enumerate(v_labels):
             if var_cols[i].button(label, key=f"btn_{label}", type="primary" if st.session_state.active_var == label else "secondary", use_container_width=True):
@@ -227,14 +226,14 @@ elif st.session_state.app_state == "dashboard":
             lk = st.session_state.active_loc_level
         if lk in dash_data['html_views']: st.markdown(f'<div class="premium-table-container">{dash_data["html_views"][lk]}</div>', unsafe_allow_html=True)
     else:
-        st.warning("⚠️ **No Matches Found:** The analysis ran, but 0% of customers matched the enrichment data.")
-        st.subheader("🕵️ Data Inspector")
-        if not st.session_state.cleaned_n8n.empty:
-            st.dataframe(st.session_state.cleaned_n8n, use_container_width=True)
-        else:
-            st.error("The API response text was empty.")
-            st.code(st.session_state.raw_api_text if 'raw_api_text' in st.session_state else "No data received.")
+        st.warning("⚠️ **No Matches Found.**")
+        with st.expander("🔍 Debug"):
+            st.write("Aidan's Columns:", list(st.session_state.cleaned_n8n.columns))
+            st.write("Raw:", st.session_state.raw_api_text[:500] if 'raw_api_text' in st.session_state else "Empty")
     st.markdown("<br><hr style='border-top: 1px solid #E2E8F0; margin: 2rem 0;'><br>", unsafe_allow_html=True)
+    _, reset_col, _ = st.columns([2, 1, 2])
+    if reset_col.button("← Go Back", use_container_width=True, type="secondary"): 
+        st.session_state.app_state = "onboarding"; st.rerun()
     _, reset_col, _ = st.columns([2, 1, 2])
     if reset_col.button("← Go Back", use_container_width=True, type="secondary"): 
         st.session_state.app_state = "onboarding"; st.rerun()
