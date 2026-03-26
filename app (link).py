@@ -20,7 +20,8 @@ N8N_COLUMN_MAPPER = {
     "COMPANY_EMPLOYEE_COUNT": "co_size", "COMPANY_INDUSTRY": "industry",
     "DEPARTMENT": "department", "JOB_TITLE": "job_title", 
     "SKIPTRACE_CREDIT_RATING": "credit_rating",
-    "COMPANY_STATE": "co_state", "COMPANY_NAICS": "naics"
+    "COMPANY_STATE": "co_state", "COMPANY_NAICS": "naics",
+    "COMPANY_ZIP": "co_zip_code"
 }
 
 STATE_TO_REGION = {
@@ -99,6 +100,13 @@ def clean_api_response(df):
         df['co_state'] = df['co_state'].astype(str).str.strip().str.upper()
         df['co_region'] = df['co_state'].map(STATE_TO_REGION).fillna('Unknown')
         
+    # 🚨 ZIP CODE SCRUBBER: Cleans up formatting so it doesn't show as a float (e.g. 90210.0)
+    if 'zip_code' in df.columns:
+        df['zip_code'] = df['zip_code'].astype(str).str.split('-').str[0].str.split('.').str[0]
+        
+    if 'co_zip_code' in df.columns:
+        df['co_zip_code'] = df['co_zip_code'].astype(str).str.split('-').str[0].str.split('.').str[0]
+        
     if 'naics' in df.columns:
         def map_naics(code):
             c = ''.join(filter(str.isdigit, str(code))) 
@@ -148,20 +156,15 @@ def clean_api_response(df):
 
 @st.cache_data(show_spinner=False)
 def clean_orders_data(df):
-    # 🚨 BULLETPROOF COLUMN FINDER: Forces exact Shopify matches first to prevent grabbing random data
     cols_lower = [str(c).strip().lower() for c in df.columns]
     
     e_col = df.columns[cols_lower.index('email')] if 'email' in cols_lower else next((c for c in df.columns if 'email' in str(c).lower()), 'Email')
     o_col = df.columns[cols_lower.index('name')] if 'name' in cols_lower else next((c for c in df.columns if 'order' in str(c).lower()), 'Order ID')
-    
-    # 🚨 UPDATED: Now aggressively targets "Total" instead of "Subtotal"
     t_col = df.columns[cols_lower.index('total')] if 'total' in cols_lower else next((c for c in df.columns if 'total' in str(c).lower()), 'Total')
-    
     d_col = df.columns[cols_lower.index('created at')] if 'created at' in cols_lower else next((c for c in df.columns if 'date' in str(c).lower()), 'Date')
 
     df = df.rename(columns={e_col: 'email_match', o_col: 'order_id', t_col: 'revenue_raw', d_col: 'order_date'})
     
-    # 🚨 KILL GHOST PURCHASERS: Only keep rows with a valid email format
     df['email_match'] = df['email_match'].astype(str).str.lower().str.strip()
     df = df[df['email_match'].str.contains('@', na=False)] 
     
@@ -169,7 +172,6 @@ def clean_orders_data(df):
     df = df[df['revenue_raw'] > 0]
     df['order_date'] = pd.to_datetime(df['order_date'], errors='coerce', utc=True).dt.date
     
-    # 🚨 STRICT DEDUPLICATION: Ensures multi-item orders are never double counted
     df['order_id'] = df['order_id'].astype(str).str.strip()
     return df.dropna(subset=['order_date']).drop_duplicates(subset=['order_id']).reset_index(drop=True)
 
@@ -184,10 +186,11 @@ def build_dashboard_views(orders_df, enriched_df, start_date, end_date, biz_type
     unique_shopify = f_orders['email_match'].nunique()
     match_rate = (matched_count / unique_shopify * 100) if unique_shopify > 0 else 0
     
+    # 🚨 FIX: "Zip Code" added back to both DTC and B2B processing arrays
     if biz_type == "B2B / Enterprise Sales":
-        vars = [("Industry", "industry"), ("Seniority", "seniority"), ("Company Revenue", "co_revenue"), ("Company Size", "co_size"), ("Department", "department"), ("Job Title", "job_title"), ("NAICS Code", "naics"), ("Company Region", "co_region"), ("Company State", "co_state")]
+        vars = [("Industry", "industry"), ("Seniority", "seniority"), ("Company Revenue", "co_revenue"), ("Company Size", "co_size"), ("Department", "department"), ("Job Title", "job_title"), ("NAICS Code", "naics"), ("Company Region", "co_region"), ("Company State", "co_state"), ("Company Zip Code", "co_zip_code")]
     else:
-        vars = [("Gender", "gender"), ("Age", "age"), ("Marital Status", "marital_status"), ("Region", "region"), ("State", "state_raw"), ("Income", "income"), ("Homeowner", "homeowner"), ("Children", "children"), ("Net Worth", "net_worth"), ("Credit Rating", "credit_rating")]
+        vars = [("Gender", "gender"), ("Age", "age"), ("Marital Status", "marital_status"), ("Region", "region"), ("State", "state_raw"), ("Zip Code", "zip_code"), ("Income", "income"), ("Homeowner", "homeowner"), ("Children", "children"), ("Net Worth", "net_worth"), ("Credit Rating", "credit_rating")]
         
     top_perf, all_html = {}, {}
 
@@ -319,6 +322,7 @@ elif st.session_state.app_state == "dashboard":
             if st.session_state.biz_type == "B2B / Enterprise Sales":
                 if l1.button("Company Region", key="co_reg_btn", type="primary" if st.session_state.active_loc_level == "Company Region" else "secondary"): st.session_state.active_loc_level = "Company Region"; st.rerun()
                 if l2.button("Company State", key="co_state_btn", type="primary" if st.session_state.active_loc_level == "Company State" else "secondary"): st.session_state.active_loc_level = "Company State"; st.rerun()
+                if l3.button("Company Zip Code", key="co_zip_btn", type="primary" if st.session_state.active_loc_level == "Company Zip Code" else "secondary"): st.session_state.active_loc_level = "Company Zip Code"; st.rerun()
                 lk = st.session_state.active_loc_level
             else:
                 if l1.button("Region", key="reg_btn", type="primary" if st.session_state.active_loc_level == "Region" else "secondary"): st.session_state.active_loc_level = "Region"; st.rerun()
