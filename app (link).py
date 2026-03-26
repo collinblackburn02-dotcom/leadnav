@@ -9,7 +9,7 @@ import io
 
 # ================ 1. CONFIGURATION & THEME =================
 PITCH_COMPANY_NAME = "LeadNavigator" 
-PITCH_BRAND_COLOR = "#4D148C" # LeadNavigator Deep Purple
+PITCH_BRAND_COLOR = "#4D148C" 
 AIDAN_WEBHOOK_URL = "https://n8n.srv1144572.hstgr.cloud/webhook/669d6ef0-1393-479e-81c5-5b0bea4262b7"
 
 N8N_COLUMN_MAPPER = {
@@ -48,13 +48,28 @@ def apply_custom_theme(primary_color):
             .serif-gradient-centerpiece {{ font-family: 'Playfair Display', serif !important; background: linear-gradient(90deg, #4D148C 0%, #20B2AA 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block; font-weight: 700 !important; letter-spacing: -0.5px; }}
             .modern-serif-title {{ font-family: 'Playfair Display', serif !important; color: #0F172A !important; font-weight: 700 !important; }}
             
-            /* 🚀 THE PITCH ROTATOR ANIMATION */
+            /* 🌀 CUSTOM CENTERED SPINNER */
+            .loader {{
+                border: 3px solid #f3f3f3;
+                border-top: 3px solid {primary_color};
+                border-radius: 50%;
+                width: 32px;
+                height: 32px;
+                animation: spin 1s linear infinite;
+                margin: 0 auto 30px auto;
+            }}
+            @keyframes spin {{
+                0% {{ transform: rotate(0deg); }}
+                100% {{ transform: rotate(360deg); }}
+            }}
+
+            /* 🚀 THE PITCH ROTATOR */
             @keyframes fadeLoop {{
                 0%, 20% {{ opacity: 0; transform: translateY(10px); }}
                 25%, 45% {{ opacity: 1; transform: translateY(0); }}
                 50%, 100% {{ opacity: 0; transform: translateY(-10px); }}
             }}
-            .pitch-fact {{ font-family: 'Outfit', sans-serif; font-size: 1.1rem; color: #475569; font-weight: 500; position: absolute; width: 100%; opacity: 0; animation: fadeLoop 20s infinite; }}
+            .pitch-fact {{ font-family: 'Outfit', sans-serif; font-size: 1.15rem; color: #475569; font-weight: 400; font-style: italic; position: absolute; width: 100%; opacity: 0; animation: fadeLoop 20s infinite; line-height: 1.5; }}
             .fact-1 {{ animation-delay: 0s; }}
             .fact-2 {{ animation-delay: 5s; }}
             .fact-3 {{ animation-delay: 10s; }}
@@ -65,7 +80,7 @@ def apply_custom_theme(primary_color):
 apply_custom_theme(PITCH_BRAND_COLOR)
 brand_gradient = mcolors.LinearSegmentedColormap.from_list("brand_purple", ["#FFFFFF", "#FBF9FC", "#EBE4F4"])
 
-# ================ 2. DATA ENGINE =================
+# ... [DATA ENGINE FUNCTIONS - NO CHANGES] ...
 @st.cache_data(show_spinner=False)
 def clean_api_response(df):
     df.columns = [str(c).strip().upper() for c in df.columns]
@@ -145,63 +160,62 @@ if st.session_state.app_state == "onboarding":
             status_placeholder = st.empty()
             with status_placeholder.container():
                 st.markdown(f"""
-                    <div style="text-align: center; padding: 60px 40px; background: #F8F6FA; border-radius: 12px; border: 1px solid {PITCH_BRAND_COLOR}; position: relative; min-height: 280px;">
+                    <div style="text-align: center; padding: 60px 40px; background: #F8F6FA; border-radius: 12px; border: 1px solid {PITCH_BRAND_COLOR}; position: relative; min-height: 340px;">
                         <h3 class="modern-serif-title" style="color: {PITCH_BRAND_COLOR}; margin-bottom: 10px;">LeadNavigator Intelligence is active...</h3>
-                        <p style="color: #64748B; font-family: 'Outfit', sans-serif; margin-bottom: 30px;">Enriching profiles via Identity Graph (Est. 2-3 mins)</p>
-                        <div style="position: relative; height: 100px; margin-top: 20px;">
-                            <div class="pitch-fact fact-1">Organizations that leverage customer behavioral insights outperform peers by 85% in sales growth and more than 25% in gross margin.<br><b>— McKinsey & Co</b></div>
-                            <div class="pitch-fact fact-2">Data-driven organizations are 23 times more likely to acquire customers and 6 times more likely to retain them.<br><b>— MIT Sloan</b></div>
-                            <div class="pitch-fact fact-3">Companies that use data-driven marketing are 6x more likely to be profitable year-over-year.<br><b>— Forbes</b></div>
-                            <div class="pitch-fact fact-4">Acquiring a new customer is up to 25x more expensive than retaining one. Knowledge of your current buyer is your greatest asset.<br><b>— Harvard Business Review</b></div>
+                        <p style="color: #64748B; font-family: 'Outfit', sans-serif; margin-bottom: 40px;">Enriching profiles via Identity Graph (Est. 2-3 mins)</p>
+                        
+                        <div class="loader"></div>
+                        
+                        <div style="position: relative; height: 120px; padding: 0 20px;">
+                            <div class="pitch-fact fact-1">Organizations that leverage customer behavioral insights outperform peers by 85% in sales growth and more than 25% in gross margin.<br><span style="font-style: normal; font-weight: 700; color: #1e293b;">— McKinsey & Co</span></div>
+                            <div class="pitch-fact fact-2">Data-driven organizations are 23 times more likely to acquire customers and 6 times more likely to retain them.<br><span style="font-style: normal; font-weight: 700; color: #1e293b;">— MIT Sloan</span></div>
+                            <div class="pitch-fact fact-3">Companies that use data-driven marketing are 6x more likely to be profitable year-over-year.<br><span style="font-style: normal; font-weight: 700; color: #1e293b;">— Forbes</span></div>
+                            <div class="pitch-fact fact-4">Acquiring a new customer is up to 25x more expensive than retaining one. Knowledge of your current buyer is your greatest asset.<br><span style="font-style: normal; font-weight: 700; color: #1e293b;">— Harvard Business Review</span></div>
                         </div>
                     </div>
                 """, unsafe_allow_html=True)
                 
-                with st.spinner(" "): # Hidden spinner to allow our CSS animation to shine
-                    raw_df = pd.concat([pd.read_csv(f, encoding='latin1', on_bad_lines='skip') for f in st.session_state.orders_vault], ignore_index=True)
-                    cleaned_orders = clean_orders_data(raw_df).drop_duplicates(subset=['order_id'])
-                    unique_emails = cleaned_orders['email_match'].unique().tolist()
-                    try:
-                        # 🚨 180 SECOND WAIT TIME
-                        response = requests.post(AIDAN_WEBHOOK_URL, json={"emails": unique_emails}, timeout=180)
-                        if response.status_code == 200:
-                            st.session_state.raw_api_text = response.text 
-                            raw_enriched_df = pd.read_csv(io.StringIO(response.text), on_bad_lines='skip', engine='python')
-                            st.session_state.integrity_stats = {"processed": len(raw_enriched_df), "total": len(response.text.strip().split('\n')) - 1}
-                            st.session_state.cleaned_n8n = clean_api_response(raw_enriched_df).drop_duplicates(subset=['email_match'])
-                            st.session_state.cleaned_orders = cleaned_orders
-                            st.session_state.min_date, st.session_state.max_date = cleaned_orders['order_date'].min(), cleaned_orders['order_date'].max()
-                            st.session_state.date_filter = (st.session_state.min_date, st.session_state.max_date)
-                            st.session_state.app_state = "dashboard"
-                            st.rerun()
-                        else: st.error(f"API Error: {response.status_code}")
-                    except Exception as e: st.error(f"Error: {str(e)}")
+                # Processing Logic
+                raw_df = pd.concat([pd.read_csv(f, encoding='latin1', on_bad_lines='skip') for f in st.session_state.orders_vault], ignore_index=True)
+                cleaned_orders = clean_orders_data(raw_df).drop_duplicates(subset=['order_id'])
+                unique_emails = cleaned_orders['email_match'].unique().tolist()
+                try:
+                    # 🚨 180 SECOND WAIT TIME
+                    response = requests.post(AIDAN_WEBHOOK_URL, json={"emails": unique_emails}, timeout=180)
+                    if response.status_code == 200:
+                        st.session_state.raw_api_text = response.text 
+                        raw_enriched_df = pd.read_csv(io.StringIO(response.text), on_bad_lines='skip', engine='python')
+                        st.session_state.integrity_stats = {"processed": len(raw_enriched_df), "total": len(response.text.strip().split('\n')) - 1}
+                        st.session_state.cleaned_n8n = clean_api_response(raw_enriched_df).drop_duplicates(subset=['email_match'])
+                        st.session_state.cleaned_orders = cleaned_orders
+                        st.session_state.min_date, st.session_state.max_date = cleaned_orders['order_date'].min(), cleaned_orders['order_date'].max()
+                        st.session_state.date_filter = (st.session_state.min_date, st.session_state.max_date)
+                        st.session_state.app_state = "dashboard"
+                        st.rerun()
+                    else: st.error(f"API Error: {response.status_code}")
+                except Exception as e: st.error(f"Error: {str(e)}")
 
+# ... [DASHBOARD SECTION - NO CHANGES] ...
 elif st.session_state.app_state == "dashboard":
     if "active_var" not in st.session_state: st.session_state.active_var = "Location"
     if "active_loc_level" not in st.session_state: st.session_state.active_loc_level = "Region"
     st.image("logo.png", width=180)
     st.markdown(f"""<div style="text-align: center; margin-top: -10px; margin-bottom: 30px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.5rem; margin-bottom: 0px;">Customer Insights Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 2.8rem; color: #0F172A !important; margin-top: -5px;">{st.session_state.biz_type} Profile.</h2></div>""", unsafe_allow_html=True)
-    
     if "integrity_stats" in st.session_state:
         stats = st.session_state.integrity_stats
         skipped = stats["total"] - stats["processed"]
-        if skipped > 0: st.info(f"💡 **Data Integrity:** {stats['processed']:,} matched. {skipped:,} skipped.")
-        
+        if skipped > 0: st.info(f"💡 **Data Integrity:** {stats['processed']:,} matched. {skipped:,} records omitted.")
     _, c2, _ = st.columns([1, 4, 1])
     with c2: st.slider("Filter Date", min_value=st.session_state.min_date, max_value=st.session_state.max_date, key="date_filter", format="MMM DD, YYYY")
-    
     current_dates = st.session_state.get("date_filter")
     if current_dates and st.session_state.get("last_computed_dates") != current_dates:
         st.session_state.last_computed_dates = current_dates
         st.session_state.dash_data = build_dashboard_views(st.session_state.cleaned_orders, st.session_state.cleaned_n8n, current_dates[0], current_dates[1], st.session_state.biz_type)
-    
     dash_data = st.session_state.get("dash_data")
     if dash_data:
         m1, m2 = st.columns(2)
         with m1: st.markdown(f"""<div style="background-color: #F8F5FA; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 25px 20px; text-align: center;"><h3 style="margin: 0; font-size: 1.6rem; color: #0F172A; font-weight: 700;">Resolved Customers</h3><h4 style="margin: 5px 0 15px 0; font-size: 1.6rem; color: {PITCH_BRAND_COLOR}; font-weight: 700;">{dash_data['total_buyers']:,.0f}</h4><p style="margin: 0; font-size: 0.9rem; color: #1e293b;">Matched <b>{dash_data['match_rate']:.1f}%</b> of buyers.</p></div>""", unsafe_allow_html=True)
         with m2: st.markdown(f"""<div style="background-color: #F8F5FA; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 25px 20px; text-align: center; height: 100%; display: flex; flex-direction: column; justify-content: center;"><h3 style="margin: 0; font-size: 1.75rem; color: #0F172A; font-weight: 700;">Attributed Sales</h3><h4 style="margin: 5px 0 0 0; font-size: 1.75rem; color: {PITCH_BRAND_COLOR}; font-weight: 700;">${dash_data['total_revenue']:,.2f}</h4></div>""", unsafe_allow_html=True)
-        
         st.markdown("<div style='margin-top: 4rem;'></div>", unsafe_allow_html=True)
         st.markdown("""<h2 class="modern-serif-title" style="margin-bottom: 2rem; display: flex; align-items: center; gap: 10px;"><span style="font-size: 2rem;">🏆</span> Top Performing Segments</h2>""", unsafe_allow_html=True)
         items = list(dash_data['top_performers'].items())
@@ -209,7 +223,6 @@ elif st.session_state.app_state == "dashboard":
             chunk = items[i:i+5]; cols = st.columns(5)
             for j, (label, data) in enumerate(chunk):
                 with cols[j]: st.markdown(f'''<div style="background-color: #F8F5FA; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 15px; text-align: center; min-height: 120px; display: flex; flex-direction: column; justify-content: center; align-items: center; margin-bottom: 2rem;"><p style="margin: 0; font-size: 0.9rem; color: #0F172A; font-weight: 700; text-transform: uppercase;">{label}</p><h3 style="margin: 5px 0 10px 0; font-size: 1.1rem; color: {PITCH_BRAND_COLOR}; font-weight: 600;">{data[0]}</h3><p style="margin: 0; font-size: 0.85rem; color: {PITCH_BRAND_COLOR}; background-color: #EBE4F4; border-radius: 20px; padding: 4px 10px; display: inline-block; font-weight: 600;">{data[1]:.1f}% of Rev</p></div>''', unsafe_allow_html=True)
-
         st.markdown("<div style='margin-top: 3rem;'></div>", unsafe_allow_html=True)
         st.markdown("""<h2 class="modern-serif-title" style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 10px;"><span style="font-size: 2rem;">🔍</span> Audience Deep Dive</h2>""", unsafe_allow_html=True)
         v_labels = (["Industry", "Seniority", "Company Revenue", "Company Size", "Department", "Job Title", "Location", "Income"] if st.session_state.biz_type == "B2B / Enterprise Sales" else ["Gender", "Age", "Location", "Status", "Income", "Homeowner", "Children", "Net Worth"])
@@ -231,9 +244,6 @@ elif st.session_state.app_state == "dashboard":
             st.write("Aidan's Columns:", list(st.session_state.cleaned_n8n.columns))
             st.write("Raw:", st.session_state.raw_api_text[:500] if 'raw_api_text' in st.session_state else "Empty")
     st.markdown("<br><hr style='border-top: 1px solid #E2E8F0; margin: 2rem 0;'><br>", unsafe_allow_html=True)
-    _, reset_col, _ = st.columns([2, 1, 2])
-    if reset_col.button("← Go Back", use_container_width=True, type="secondary"): 
-        st.session_state.app_state = "onboarding"; st.rerun()
     _, reset_col, _ = st.columns([2, 1, 2])
     if reset_col.button("← Go Back", use_container_width=True, type="secondary"): 
         st.session_state.app_state = "onboarding"; st.rerun()
