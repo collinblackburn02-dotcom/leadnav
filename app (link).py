@@ -99,33 +99,47 @@ def clean_api_response(df):
         df['co_state'] = df['co_state'].astype(str).str.strip().str.upper()
         df['co_region'] = df['co_state'].map(STATE_TO_REGION).fillna('Unknown')
         
-    # 🚨 STRICT 3-DIGIT B2B NAICS ROLLUP LOGIC
     if 'naics' in df.columns:
         def map_naics(code):
-            c = str(code).split('.')[0].strip() 
-            if c in ['nan', 'None', '', 'null', '0', 'UNKNOWN'] or len(c) < 2: return 'Unknown'
-            
-            # Force everything to 3 digits for perfect aggregation
-            # If it's only 2 digits, pad it with a 0 to maintain grouping
+            c = ''.join(filter(str.isdigit, str(code))) 
+            if not c or len(c) < 2: return 'Unknown'
             rollup_code = c[:3].ljust(3, '0') 
             prefix = c[:2] 
             
-            mapping = {
-                '11': 'Agriculture', '21': 'Mining', '22': 'Utilities', '23': 'Construction',
-                '31': 'Manufacturing', '32': 'Manufacturing', '33': 'Manufacturing',
-                '42': 'Wholesale', '44': 'Retail', '45': 'Retail',
-                '48': 'Transportation', '49': 'Transportation', '51': 'Information',
-                '52': 'Finance & Insurance', '53': 'Real Estate', '54': 'Professional Services',
-                '55': 'Management', '56': 'Administrative', '61': 'Education',
-                '62': 'Health Care', '71': 'Arts & Entertainment', '72': 'Accommodation & Food',
-                '81': 'Other Services', '92': 'Public Admin'
+            naics_3_map = {
+                '111': 'Crop Production', '112': 'Animal Production', '113': 'Forestry', '114': 'Fishing & Hunting', '115': 'Agriculture Support',
+                '211': 'Oil & Gas Extraction', '212': 'Mining', '213': 'Mining Support', '221': 'Utilities',
+                '236': 'Building Construction', '237': 'Heavy & Civil Engineering', '238': 'Specialty Trade Contractors',
+                '311': 'Food Mfg', '312': 'Beverage & Tobacco Mfg', '313': 'Textile Mills', '314': 'Textile Product Mills', '315': 'Apparel Mfg', '316': 'Leather Mfg',
+                '321': 'Wood Product Mfg', '322': 'Paper Mfg', '323': 'Printing', '324': 'Petroleum & Coal Mfg', '325': 'Chemical Mfg', '326': 'Plastics & Rubber Mfg', '327': 'Nonmetallic Mineral Mfg',
+                '331': 'Primary Metal Mfg', '332': 'Fabricated Metal Mfg', '333': 'Machinery Mfg', '334': 'Computer & Electronic Mfg', '335': 'Electrical Equipment Mfg', '336': 'Transportation Equip Mfg', '337': 'Furniture Mfg', '339': 'Miscellaneous Mfg',
+                '423': 'Merchant Wholesalers (Durable)', '424': 'Merchant Wholesalers (Nondurable)', '425': 'Wholesale Electronic Markets',
+                '441': 'Motor Vehicle Dealers', '442': 'Furniture Stores', '443': 'Electronics Stores', '444': 'Building Material Dealers', '445': 'Food & Beverage Stores', '446': 'Health & Personal Care Stores', '447': 'Gasoline Stations', '448': 'Clothing Stores',
+                '451': 'Sporting Goods & Book Stores', '452': 'General Merchandise Stores', '453': 'Misc Store Retailers', '454': 'Nonstore Retailers',
+                '481': 'Air Transportation', '482': 'Rail Transportation', '483': 'Water Transportation', '484': 'Truck Transportation', '485': 'Transit & Ground Passenger Transport', '486': 'Pipeline Transportation', '488': 'Transportation Support',
+                '491': 'Postal Service', '492': 'Couriers & Messengers', '493': 'Warehousing & Storage',
+                '511': 'Publishing Industries', '512': 'Motion Picture & Sound Recording', '515': 'Broadcasting', '517': 'Telecommunications', '518': 'Data Processing & Hosting', '519': 'Other Information Services',
+                '521': 'Monetary Authorities', '522': 'Credit Intermediation', '523': 'Securities & Commodity Contracts', '524': 'Insurance Carriers', '525': 'Funds & Trusts',
+                '531': 'Real Estate', '532': 'Rental & Leasing Services', '533': 'Lessors of Intangible Assets',
+                '541': 'Professional, Scientific, & Tech Services', '551': 'Management of Companies',
+                '561': 'Administrative & Support Services', '562': 'Waste Management',
+                '611': 'Educational Services',
+                '621': 'Ambulatory Health Care', '622': 'Hospitals', '623': 'Nursing & Residential Care', '624': 'Social Assistance',
+                '711': 'Performing Arts & Sports', '712': 'Museums & Historical Sites', '713': 'Amusement & Recreation',
+                '721': 'Accommodation', '722': 'Food Services & Drinking Places',
+                '811': 'Repair & Maintenance', '812': 'Personal & Laundry Services', '813': 'Religious & Civic Orgs', '814': 'Private Households',
+                '921': 'Exec & Legislative Govt', '922': 'Justice & Public Order', '923': 'Human Resource Programs', '924': 'Environmental Quality', '925': 'Housing & Urban Development', '926': 'Economic Programs', '928': 'National Security'
             }
-            desc = mapping.get(prefix, 'Other/Unknown')
+            naics_2_map = {
+                '11': 'Agriculture', '21': 'Mining', '22': 'Utilities', '23': 'Construction', '31': 'Manufacturing', '32': 'Manufacturing', '33': 'Manufacturing',
+                '42': 'Wholesale', '44': 'Retail', '45': 'Retail', '48': 'Transportation', '49': 'Transportation', '51': 'Information',
+                '52': 'Finance & Insurance', '53': 'Real Estate', '54': 'Professional Services', '55': 'Management', '56': 'Administrative', '61': 'Education',
+                '62': 'Health Care', '71': 'Arts & Entertainment', '72': 'Accommodation & Food', '81': 'Other Services', '92': 'Public Admin'
+            }
+            desc = naics_3_map.get(rollup_code)
+            if not desc: desc = naics_2_map.get(prefix, 'Other/Unknown')
             if desc == 'Other/Unknown': return 'Unknown'
-            
-            # Returns strictly e.g. "541 - Professional Services"
             return f"{rollup_code} - {desc}" 
-            
         df['naics'] = df['naics'].apply(map_naics)
         
     df['email_match'] = df['email_match'].astype(str).str.lower().str.replace(r'[^a-z0-9@._,-]', '', regex=True).str.split(',')
@@ -134,16 +148,30 @@ def clean_api_response(df):
 
 @st.cache_data(show_spinner=False)
 def clean_orders_data(df):
-    e_col = next((c for c in df.columns if 'email' in c.lower()), 'Email')
-    o_col = next((c for c in df.columns if 'name' in c.lower() or 'order' in c.lower()), 'Order ID')
-    t_col = next((c for c in df.columns if 'total' in c.lower() or 'price' in c.lower()), 'Total')
-    d_col = next((c for c in df.columns if 'created' in c.lower() or 'date' in c.lower()), 'Date')
+    # 🚨 BULLETPROOF COLUMN FINDER: Forces exact Shopify matches first to prevent grabbing random data
+    cols_lower = [str(c).strip().lower() for c in df.columns]
+    
+    e_col = df.columns[cols_lower.index('email')] if 'email' in cols_lower else next((c for c in df.columns if 'email' in str(c).lower()), 'Email')
+    o_col = df.columns[cols_lower.index('name')] if 'name' in cols_lower else next((c for c in df.columns if 'order' in str(c).lower()), 'Order ID')
+    
+    # 🚨 UPDATED: Now aggressively targets "Total" instead of "Subtotal"
+    t_col = df.columns[cols_lower.index('total')] if 'total' in cols_lower else next((c for c in df.columns if 'total' in str(c).lower()), 'Total')
+    
+    d_col = df.columns[cols_lower.index('created at')] if 'created at' in cols_lower else next((c for c in df.columns if 'date' in str(c).lower()), 'Date')
+
     df = df.rename(columns={e_col: 'email_match', o_col: 'order_id', t_col: 'revenue_raw', d_col: 'order_date'})
+    
+    # 🚨 KILL GHOST PURCHASERS: Only keep rows with a valid email format
     df['email_match'] = df['email_match'].astype(str).str.lower().str.strip()
+    df = df[df['email_match'].str.contains('@', na=False)] 
+    
     df['revenue_raw'] = pd.to_numeric(df['revenue_raw'].astype(str).str.replace(r'[^\d.-]', '', regex=True), errors='coerce').fillna(0)
     df = df[df['revenue_raw'] > 0]
     df['order_date'] = pd.to_datetime(df['order_date'], errors='coerce', utc=True).dt.date
-    return df.dropna(subset=['order_date']).reset_index(drop=True)
+    
+    # 🚨 STRICT DEDUPLICATION: Ensures multi-item orders are never double counted
+    df['order_id'] = df['order_id'].astype(str).str.strip()
+    return df.dropna(subset=['order_date']).drop_duplicates(subset=['order_id']).reset_index(drop=True)
 
 def build_dashboard_views(orders_df, enriched_df, start_date, end_date, biz_type):
     mask = (orders_df['order_date'] >= start_date) & (orders_df['order_date'] <= end_date)
@@ -217,7 +245,7 @@ if st.session_state.app_state == "onboarding":
                 """, unsafe_allow_html=True)
                 
                 raw_df = pd.concat([pd.read_csv(f, encoding='latin1', on_bad_lines='skip') for f in st.session_state.orders_vault], ignore_index=True)
-                cleaned_orders = clean_orders_data(raw_df).drop_duplicates(subset=['order_id'])
+                cleaned_orders = clean_orders_data(raw_df)
                 unique_emails = cleaned_orders['email_match'].unique().tolist()
                 try:
                     response = requests.post(AIDAN_WEBHOOK_URL, json={"emails": unique_emails}, timeout=180)
