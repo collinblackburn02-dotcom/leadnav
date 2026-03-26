@@ -5,12 +5,11 @@ import numpy as np
 import requests
 import json
 import time
-import io  # 🚨 Necessary for reading Aidan's CSV response
+import io
 
 # ================ 1. CONFIGURATION & THEME =================
 PITCH_COMPANY_NAME = "LeadNavigator" 
 PITCH_BRAND_COLOR = "#4D148C" # LeadNavigator Deep Purple
-# 🚨 UPDATED WEBHOOK URL
 AIDAN_WEBHOOK_URL = "https://n8n.srv1144572.hstgr.cloud/webhook/669d6ef0-1393-479e-81c5-5b0bea4262b7"
 
 N8N_COLUMN_MAPPER = {
@@ -72,15 +71,12 @@ brand_gradient = mcolors.LinearSegmentedColormap.from_list("brand_purple", ["#FF
 # ================ 2. DATA ENGINE =================
 @st.cache_data(show_spinner=False)
 def clean_api_response(df):
-    """Processes DataFrame from Aidan's CSV response"""
-    # Force headers to match mapper keys (uppercase and stripped)
     df.columns = [str(c).strip().upper() for c in df.columns]
     df = df.rename(columns=N8N_COLUMN_MAPPER)
     df.columns = [c.lower() for c in df.columns]
     
     if 'state_raw' in df.columns: 
         df['region'] = df['state_raw'].str.strip().str.upper().map(STATE_TO_REGION).fillna('Unknown')
-    
     if 'gender' in df.columns:
         df['gender'] = df['gender'].astype(str).str.strip().map({'M': 'Male', 'F': 'Female', 'Male': 'Male', 'Female': 'Female'}).fillna('Unknown')
     
@@ -91,7 +87,6 @@ def clean_api_response(df):
     if 'zip_code' in df.columns: 
         df['zip_code'] = df['zip_code'].astype(str).str.replace(r'\.0$', '', regex=True).str.zfill(5)
     
-    # Matching Logic
     email_col = 'personal_emails' if 'personal_emails' in df.columns else ('business_email' if 'business_email' in df.columns else 'email_match')
     if email_col in df.columns:
         df['email_match'] = df[email_col].astype(str).str.lower().str.replace(r'[^a-z0-9@._,-]', '', regex=True).str.split(',')
@@ -182,34 +177,32 @@ if st.session_state.app_state == "onboarding":
         else:
             status_placeholder = st.empty()
             with status_placeholder.container():
-                st.markdown(f"""
-                    <div style="text-align: center; padding: 40px; background: #F8F6FA; border-radius: 12px; border: 1px solid {PITCH_BRAND_COLOR};">
-                        <h3 class="modern-serif-title" style="color: {PITCH_BRAND_COLOR};">LeadNavigator Intelligence is active...</h3>
-                        <p style="color: #64748B; font-family: 'Outfit', sans-serif;">Enriching unique audience profiles via Identity Graph</p>
-                    </div>
-                """, unsafe_allow_html=True)
+                st.markdown(f"""<div style="text-align: center; padding: 40px; background: #F8F6FA; border-radius: 12px; border: 1px solid {PITCH_BRAND_COLOR};"><h3 class="modern-serif-title" style="color: {PITCH_BRAND_COLOR};">LeadNavigator Intelligence is active...</h3><p style="color: #64748B; font-family: 'Outfit', sans-serif;">Enriching unique audience profiles via Identity Graph</p></div>""", unsafe_allow_html=True)
                 
-                intel_messages = ["🔍 Extracting unique customer identifiers...", "🌐 Querying LeadNavigator Identity Graph...", "🛡️ Scrubbing for data accuracy...", "📊 Finalizing your Insights Dashboard..."]
+                intel_messages = ["🔍 Identifying customers...", "🌐 Querying Identity Graph...", "🛡️ Cleaning attributes...", "📊 Building Dashboard..."]
                 progress_bar = st.progress(0)
                 
-                # Logic Start
                 raw_df = pd.concat([pd.read_csv(f, encoding='latin1', on_bad_lines='skip') for f in st.session_state.orders_vault], ignore_index=True)
                 cleaned_orders = clean_orders_data(raw_df).drop_duplicates(subset=['order_id'])
                 unique_emails = cleaned_orders['email_match'].unique().tolist()
                 
                 for i, msg in enumerate(intel_messages):
-                    st.toast(msg)
-                    progress_bar.progress((i + 1) / (len(intel_messages) + 1))
-                    time.sleep(0.5)
+                    st.toast(msg); progress_bar.progress((i + 1) / (len(intel_messages) + 1)); time.sleep(0.4)
 
-                # 🚨 API Call UPDATED FOR CSV
                 payload = {"emails": unique_emails}
                 try:
                     response = requests.post(AIDAN_WEBHOOK_URL, json=payload, timeout=120)
                     if response.status_code == 200:
-                        # Convert CSV text response to DataFrame
-                        csv_stream = io.StringIO(response.text)
-                        raw_enriched_df = pd.read_csv(csv_stream)
+                        csv_text = response.text
+                        total_lines = len(csv_text.strip().split('\n')) - 1
+                        csv_stream = io.StringIO(csv_text)
+                        # 🚨 Self-Healing CSV Reader
+                        raw_enriched_df = pd.read_csv(csv_stream, on_bad_lines='skip', engine='python')
+                        
+                        # Calculate Integrity Stats
+                        processed_rows = len(raw_enriched_df)
+                        skipped_rows = max(0, total_lines - processed_rows)
+                        st.session_state.integrity_stats = {"processed": processed_rows, "skipped": skipped_rows}
                         
                         st.session_state.cleaned_n8n = clean_api_response(raw_enriched_df).drop_duplicates(subset=['email_match'])
                         st.session_state.cleaned_orders = cleaned_orders
@@ -218,18 +211,23 @@ if st.session_state.app_state == "onboarding":
                         st.session_state.app_state = "dashboard"
                         st.rerun()
                     else:
-                        st.error(f"API Error: Server returned {response.status_code}. Aidan needs to add a 'Respond to Webhook' node to his n8n flow.")
+                        st.error(f"API Error: Server returned {response.status_code}.")
                 except Exception as e:
                     st.error(f"Connection Failed: {str(e)}")
 
 elif st.session_state.app_state == "dashboard":
-    # (Rest of dashboard code remains identical to your working version)
     if "active_var" not in st.session_state: st.session_state.active_var = "Location"
     if "active_loc_level" not in st.session_state: st.session_state.active_loc_level = "Region"
 
     st.image("logo.png", width=180)
     st.markdown(f"""<div style="text-align: center; margin-top: -10px; margin-bottom: 30px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.5rem; margin-bottom: 0px;">Customer Insights Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 2.8rem; color: #0F172A !important; margin-top: -5px;">{st.session_state.biz_type} Profile.</h2></div>""", unsafe_allow_html=True)
     
+    # 🚨 INTEGRITY NOTICE
+    if "integrity_stats" in st.session_state:
+        stats = st.session_state.integrity_stats
+        if stats["skipped"] > 0:
+            st.info(f"💡 **Data Integrity Note:** Successfully enriched {stats['processed']:,} profiles. {stats['skipped']:,} records were omitted due to source formatting inconsistencies.")
+
     _, c2, _ = st.columns([1, 4, 1])
     with c2: st.slider("Filter by Date", min_value=st.session_state.min_date, max_value=st.session_state.max_date, key="date_filter", format="MMM DD, YYYY")
     
@@ -245,7 +243,7 @@ elif st.session_state.app_state == "dashboard":
         with m1: st.markdown(f"""<div style="background-color: #F8F5FA; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 25px 20px; text-align: center;"><h3 style="margin: 0; font-size: 1.6rem; color: #0F172A; font-weight: 700;">Resolved Customers</h3><h4 style="margin: 5px 0 15px 0; font-size: 1.6rem; color: {PITCH_BRAND_COLOR}; font-weight: 700;">{dash_data['total_buyers']:,.0f}</h4><p style="margin: 0; font-size: 0.9rem; color: #1e293b;">Matched <b>{dash_data['total_buyers']:,.0f} ({dash_data['match_rate']:.1f}%)</b> customers.</p></div>""", unsafe_allow_html=True)
         with m2: st.markdown(f"""<div style="background-color: #F8F5FA; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 25px 20px; text-align: center; height: 100%; display: flex; flex-direction: column; justify-content: center;"><h3 style="margin: 0; font-size: 1.75rem; color: #0F172A; font-weight: 700;">Attributed Sales</h3><h4 style="margin: 5px 0 0 0; font-size: 1.75rem; color: {PITCH_BRAND_COLOR}; font-weight: 700;">${dash_data['total_revenue']:,.2f}</h4></div>""", unsafe_allow_html=True)
         
-        st.markdown("<div style='margin-top: 6rem;'></div>")
+        st.markdown("<div style='margin-top: 4rem;'></div>")
         st.markdown("""<h2 class="modern-serif-title" style="margin-bottom: 2rem; display: flex; align-items: center; gap: 10px;"><span style="font-size: 2rem;">🏆</span> Top Performing Segments</h2>""", unsafe_allow_html=True)
         items = list(dash_data['top_performers'].items())
         for i in range(0, len(items), 5):
