@@ -46,7 +46,7 @@ def apply_custom_theme(primary_color):
             [data-testid="stSidebar"], [data-testid="collapsedControl"] {{ display: none !important; }}
             .stMarkdown a svg {{ display: none !important; }}
             div[data-testid="stSlider"] label p {{ font-size: 1.2rem !important; font-weight: 700 !important; color: #0F172A !important; }}
-            div[data-testid="stButton"] button {{ border-radius: 8px; font-weight: 600; }}
+            div[data-testid="stButton"] button {{ border-radius: 8px; font-weight: 600; margin-bottom: 5px; }}
             div[data-testid="stButton"] button[kind="primary"] {{ background-color: {primary_color} !important; color: #FFFFFF !important; border: none !important; }}
             
             .premium-table-container {{ width: 100% !important; border-radius: 12px; border: 1px solid {primary_color}; background: #FFFFFF; overflow: hidden; margin-top: 1rem; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }}
@@ -96,10 +96,16 @@ def clean_api_response(df):
         c_col = next((c for c in df.columns if 'credit' in c), None)
         if c_col: df = df.rename(columns={c_col: 'credit_rating'})
     
-    for col in ['gender', 'homeowner', 'children', 'marital_status']:
+    # 🚨 FIX: Standard Yes/No for Gender, Homeowner, Children
+    for col in ['gender', 'homeowner', 'children']:
         if col in df.columns:
             df[col] = df[col].astype(str).str.strip().str.title()
             df[col] = df[col].replace({'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female'})
+            
+    # 🚨 FIX: Married / Single custom mapping
+    if 'marital_status' in df.columns:
+        df['marital_status'] = df['marital_status'].astype(str).str.strip().str.title()
+        df['marital_status'] = df['marital_status'].replace({'Y': 'Married', 'N': 'Single', 'Yes': 'Married', 'No': 'Single'})
             
     if 'state_raw' in df.columns: 
         df['state_raw'] = df['state_raw'].astype(str).str.strip().str.upper()
@@ -177,7 +183,6 @@ def clean_orders_data(df):
     df['order_id'] = df['order_id'].astype(str).str.strip()
     return df.dropna(subset=['order_date']).drop_duplicates(subset=['order_id']).reset_index(drop=True)
 
-# 🚨 UPDATED REPORT EXPORT WITH EMBEDDED LOGO
 def generate_html_report(dash_data, biz_type):
     logo_b64 = get_base64_image("logo.png")
     img_tag = f'<img src="data:image/png;base64,{logo_b64}" style="position: absolute; top: 40px; right: 40px; width: 180px;">' if logo_b64 else ""
@@ -233,7 +238,6 @@ def build_dashboard_views(orders_df, enriched_df, start_date, end_date, biz_type
     unique_shopify = f_orders['email_match'].nunique()
     match_rate = (matched_count / unique_shopify * 100) if unique_shopify > 0 else 0
     
-    # 🚨 FIX: Removed all Zip Code references from the output arrays
     if biz_type == "B2B / Enterprise Sales":
         vars = [("Industry", "industry"), ("Seniority", "seniority"), ("Company Revenue", "co_revenue"), ("Company Size", "co_size"), ("Department", "department"), ("Job Title", "job_title"), ("NAICS Code", "naics"), ("Company Region", "co_region"), ("Company State", "co_state")]
     else:
@@ -264,7 +268,6 @@ if "app_state" not in st.session_state:
 
 if st.session_state.app_state == "onboarding":
     st.image("logo.png", width=180)
-    # 🚨 UPDATED TEXT: Reveal your customer profile
     st.markdown("""<div style="text-align: center; margin-top: 0px; margin-bottom: 25px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.6rem; margin-bottom: 2px;">Customer Insights Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 1.8rem; color: #0F172A !important; margin-top: 5px;">Upload order data to reveal your customer profile.</h2></div>""", unsafe_allow_html=True)
     _, type_col, _ = st.columns([2, 1, 2])
     st.session_state.biz_type = type_col.selectbox("Business Type Profile", ["DTC Ecommerce", "B2B / Enterprise Sales"])
@@ -272,7 +275,6 @@ if st.session_state.app_state == "onboarding":
     _, col1, _ = st.columns([1, 2, 1])
     with col1:
         st.subheader("👥 Customer Data")
-        # 🚨 UPDATED TEXT: Strict column requirements string
         st.session_state.orders_vault = st.file_uploader("Upload Shopify Order Export (CSV) or Order Data that includes the headers: Name, Order ID, Email, Total (Other columns are fine and will be ignored).", type=["csv"], accept_multiple_files=True, key="order_up")
     st.markdown("<br>", unsafe_allow_html=True)
     _, center_col, _ = st.columns([2, 1.5, 2])
@@ -323,19 +325,7 @@ if st.session_state.app_state == "onboarding":
 
 elif st.session_state.app_state == "dashboard":
     st.image("logo.png", width=180)
-    # 🚨 UPDATED TEXT: Get to know your customers
     st.markdown(f"""<div style="text-align: center; margin-top: -10px; margin-bottom: 30px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.5rem; margin-bottom: 0px;">Customer Insights Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 2.8rem; color: #0F172A !important; margin-top: -5px;">Get to know your customers.</h2></div>""", unsafe_allow_html=True)
-    
-    _, btn_col, _ = st.columns([4, 2, 4])
-    if "dash_data" in st.session_state and st.session_state.dash_data:
-        export_html = generate_html_report(st.session_state.dash_data, st.session_state.biz_type)
-        btn_col.download_button(
-            label="📥 Export Executive Report",
-            data=export_html,
-            file_name="LeadNavigator_Audience_Report.html",
-            mime="text/html",
-            use_container_width=True
-        )
     
     if "integrity_stats" in st.session_state:
         stats = st.session_state.integrity_stats
@@ -379,7 +369,6 @@ elif st.session_state.app_state == "dashboard":
         lk = st.session_state.active_var
         if lk == "Location" or lk == "Company Location":
             st.markdown("<div style='margin-top: 1rem;'></div>", unsafe_allow_html=True)
-            # 🚨 UI FIX: Removed zip code columns here
             l1, l2, _ = st.columns([1, 1, 6])
             
             if st.session_state.biz_type == "B2B / Enterprise Sales":
@@ -401,7 +390,19 @@ elif st.session_state.app_state == "dashboard":
                 </div>
             """, unsafe_allow_html=True)
     
+    # 🚨 EXPORT AND GO BACK BUTTONS AT THE BOTTOM
     st.markdown("<br><hr style='border-top: 1px solid #E2E8F0; margin: 2rem 0;'><br>", unsafe_allow_html=True)
-    _, reset_col, _ = st.columns([2, 1, 2])
-    if reset_col.button("← Go Back", use_container_width=True, type="secondary"): 
+    _, action_col, _ = st.columns([2, 1.5, 2])
+    
+    if "dash_data" in st.session_state and st.session_state.dash_data:
+        export_html = generate_html_report(st.session_state.dash_data, st.session_state.biz_type)
+        action_col.download_button(
+            label="📥 Export Executive Report",
+            data=export_html,
+            file_name="LeadNavigator_Audience_Report.html",
+            mime="text/html",
+            use_container_width=True
+        )
+        
+    if action_col.button("← Go Back", use_container_width=True, type="secondary"): 
         st.session_state.app_state = "onboarding"; st.rerun()
