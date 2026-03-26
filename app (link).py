@@ -258,12 +258,26 @@ elif st.session_state.app_state == "dashboard":
             st.session_state.last_computed_dates = current_dates
             st.session_state.dash_data = build_dashboard_views(st.session_state.cleaned_orders, st.session_state.cleaned_n8n, current_dates[0], current_dates[1], st.session_state.biz_type)
     
-    dash_data = st.session_state.get("dash_data")
+dash_data = st.session_state.get("dash_data")
+    
     if dash_data:
+        # --- EXISTING DASHBOARD CODE ---
         m1, m2 = st.columns(2)
-        with m1: st.markdown(f"""<div style="background-color: #F8F5FA; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 25px 20px; text-align: center;"><h3 style="margin: 0; font-size: 1.6rem; color: #0F172A; font-weight: 700;">Resolved Customers</h3><h4 style="margin: 5px 0 15px 0; font-size: 1.6rem; color: {PITCH_BRAND_COLOR}; font-weight: 700;">{dash_data['total_buyers']:,.0f}</h4><p style="margin: 0; font-size: 0.9rem; color: #1e293b;">Matched <b>{dash_data['total_buyers']:,.0f} ({dash_data['match_rate']:.1f}%)</b> customers.</p></div>""", unsafe_allow_html=True)
-        with m2: st.markdown(f"""<div style="background-color: #F8F5FA; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 12px; padding: 25px 20px; text-align: center; height: 100%; display: flex; flex-direction: column; justify-content: center;"><h3 style="margin: 0; font-size: 1.75rem; color: #0F172A; font-weight: 700;">Attributed Sales</h3><h4 style="margin: 5px 0 0 0; font-size: 1.75rem; color: {PITCH_BRAND_COLOR}; font-weight: 700;">${dash_data['total_revenue']:,.2f}</h4></div>""", unsafe_allow_html=True)
+        # ... (all your existing metric and chart code) ...
+    
+    else:
+        # 🚨 THE DIAGNOSTIC BOX (Shows if 0 matches were found)
+        st.warning("⚠️ **No Matches Found:** The analysis ran, but 0% of the customers in your Shopify file matched the data Aidan sent back.")
         
+        with st.expander("🔍 Debug: What data did Aidan send?"):
+            st.write("Aidan's API returned the following columns:")
+            st.write(list(st.session_state.cleaned_n8n.columns))
+            
+            st.write("Sample Emails from Aidan's data (First 5):")
+            st.write(st.session_state.cleaned_n8n['email_match'].head(5).tolist())
+            
+            st.write("Sample Emails from your Shopify file (First 5):")
+            st.write(st.session_state.cleaned_orders['email_match'].head(5).tolist())
         st.markdown("<div style='margin-top: 4rem;'></div>")
         st.markdown("""<h2 class="modern-serif-title" style="margin-bottom: 2rem; display: flex; align-items: center; gap: 10px;"><span style="font-size: 2rem;">🏆</span> Top Performing Segments</h2>""", unsafe_allow_html=True)
         items = list(dash_data['top_performers'].items())
