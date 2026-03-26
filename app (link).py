@@ -13,7 +13,6 @@ PITCH_COMPANY_NAME = "LeadNavigator"
 PITCH_BRAND_COLOR = "#4D148C" 
 AIDAN_WEBHOOK_URL = "https://n8n.srv1144572.hstgr.cloud/webhook/669d6ef0-1393-479e-81c5-5b0bea4262b7"
 
-# 🚨 UPDATED: Swapped PERSONAL_ZIP for SKIPTRACE_ZIP
 N8N_COLUMN_MAPPER = {
     "GENDER": "gender", "MARRIED": "marital_status", "AGE_RANGE": "age",
     "INCOME_RANGE": "income", "PERSONAL_STATE": "state_raw", "SKIPTRACE_ZIP": "zip_code",
@@ -72,6 +71,14 @@ apply_custom_theme(PITCH_BRAND_COLOR)
 brand_gradient = mcolors.LinearSegmentedColormap.from_list("brand_purple", ["#FFFFFF", "#FBF9FC", "#EBE4F4"])
 
 # ================ 2. DATA ENGINE =================
+
+def get_base64_image(image_path):
+    try:
+        with open(image_path, "rb") as img_file:
+            return base64.b64encode(img_file.read()).decode('utf-8')
+    except Exception as e:
+        return ""
+
 @st.cache_data(show_spinner=False)
 def clean_api_response(df):
     df.columns = [str(c).strip().upper() for c in df.columns]
@@ -101,12 +108,6 @@ def clean_api_response(df):
     if 'co_state' in df.columns:
         df['co_state'] = df['co_state'].astype(str).str.strip().str.upper()
         df['co_region'] = df['co_state'].map(STATE_TO_REGION).fillna('Unknown')
-        
-    if 'zip_code' in df.columns:
-        df['zip_code'] = df['zip_code'].astype(str).str.split('-').str[0].str.split('.').str[0]
-        
-    if 'co_zip_code' in df.columns:
-        df['co_zip_code'] = df['co_zip_code'].astype(str).str.split('-').str[0].str.split('.').str[0]
         
     if 'naics' in df.columns:
         def map_naics(code):
@@ -176,16 +177,18 @@ def clean_orders_data(df):
     df['order_id'] = df['order_id'].astype(str).str.strip()
     return df.dropna(subset=['order_date']).drop_duplicates(subset=['order_id']).reset_index(drop=True)
 
-# 🚨 THE REPORT EXPORT GENERATOR
+# 🚨 UPDATED REPORT EXPORT WITH EMBEDDED LOGO
 def generate_html_report(dash_data, biz_type):
-    # Builds a clean, printable HTML document out of all our tables
+    logo_b64 = get_base64_image("logo.png")
+    img_tag = f'<img src="data:image/png;base64,{logo_b64}" style="position: absolute; top: 40px; right: 40px; width: 180px;">' if logo_b64 else ""
+
     html_content = f"""
     <html>
     <head>
         <title>{PITCH_COMPANY_NAME} Executive Report</title>
         <style>
-            body {{ font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #0F172A; padding: 40px; background: #FFFFFF; }}
-            h1 {{ color: {PITCH_BRAND_COLOR}; font-size: 28px; border-bottom: 2px solid {PITCH_BRAND_COLOR}; padding-bottom: 10px; }}
+            body {{ font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #0F172A; padding: 40px; background: #FFFFFF; position: relative; }}
+            h1 {{ color: {PITCH_BRAND_COLOR}; font-size: 28px; border-bottom: 2px solid {PITCH_BRAND_COLOR}; padding-bottom: 10px; width: 70%; }}
             h2 {{ color: #1e293b; font-size: 22px; margin-top: 40px; }}
             .summary-box {{ background-color: #F8F5FA; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 8px; padding: 20px; text-align: center; margin-bottom: 30px; }}
             .summary-box h3 {{ margin: 0; font-size: 18px; color: #64748B; text-transform: uppercase; }}
@@ -197,6 +200,7 @@ def generate_html_report(dash_data, biz_type):
         </style>
     </head>
     <body>
+        {img_tag}
         <h1>{PITCH_COMPANY_NAME} | Audience Insights Report</h1>
         <div style="display: flex; gap: 20px;">
             <div class="summary-box" style="flex: 1;">
@@ -210,10 +214,7 @@ def generate_html_report(dash_data, biz_type):
             </div>
         </div>
     """
-    
-    # Iterate through all the HTML tables we generated and append them
     for label, table_html in dash_data['html_views'].items():
-        # Strip out the inline streamlit styles so our clean print styles take over
         clean_table = table_html.replace('class="dataframe"', '').replace('id="T_', 'class="')
         html_content += f"<h2>{label} Breakdown</h2>"
         html_content += clean_table
@@ -232,10 +233,11 @@ def build_dashboard_views(orders_df, enriched_df, start_date, end_date, biz_type
     unique_shopify = f_orders['email_match'].nunique()
     match_rate = (matched_count / unique_shopify * 100) if unique_shopify > 0 else 0
     
+    # 🚨 FIX: Removed all Zip Code references from the output arrays
     if biz_type == "B2B / Enterprise Sales":
-        vars = [("Industry", "industry"), ("Seniority", "seniority"), ("Company Revenue", "co_revenue"), ("Company Size", "co_size"), ("Department", "department"), ("Job Title", "job_title"), ("NAICS Code", "naics"), ("Company Region", "co_region"), ("Company State", "co_state"), ("Company Zip Code", "co_zip_code")]
+        vars = [("Industry", "industry"), ("Seniority", "seniority"), ("Company Revenue", "co_revenue"), ("Company Size", "co_size"), ("Department", "department"), ("Job Title", "job_title"), ("NAICS Code", "naics"), ("Company Region", "co_region"), ("Company State", "co_state")]
     else:
-        vars = [("Gender", "gender"), ("Age", "age"), ("Marital Status", "marital_status"), ("Region", "region"), ("State", "state_raw"), ("Zip Code", "zip_code"), ("Income", "income"), ("Homeowner", "homeowner"), ("Children", "children"), ("Net Worth", "net_worth"), ("Credit Rating", "credit_rating")]
+        vars = [("Gender", "gender"), ("Age", "age"), ("Marital Status", "marital_status"), ("Region", "region"), ("State", "state_raw"), ("Income", "income"), ("Homeowner", "homeowner"), ("Children", "children"), ("Net Worth", "net_worth"), ("Credit Rating", "credit_rating")]
         
     top_perf, all_html = {}, {}
 
@@ -262,14 +264,16 @@ if "app_state" not in st.session_state:
 
 if st.session_state.app_state == "onboarding":
     st.image("logo.png", width=180)
-    st.markdown("""<div style="text-align: center; margin-top: 0px; margin-bottom: 25px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.6rem; margin-bottom: 2px;">Customer Insights Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 1.8rem; color: #0F172A !important; margin-top: 5px;">Upload Shopify orders to reveal your audience profile.</h2></div>""", unsafe_allow_html=True)
+    # 🚨 UPDATED TEXT: Reveal your customer profile
+    st.markdown("""<div style="text-align: center; margin-top: 0px; margin-bottom: 25px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.6rem; margin-bottom: 2px;">Customer Insights Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 1.8rem; color: #0F172A !important; margin-top: 5px;">Upload order data to reveal your customer profile.</h2></div>""", unsafe_allow_html=True)
     _, type_col, _ = st.columns([2, 1, 2])
     st.session_state.biz_type = type_col.selectbox("Business Type Profile", ["DTC Ecommerce", "B2B / Enterprise Sales"])
     st.markdown("<br>", unsafe_allow_html=True)
     _, col1, _ = st.columns([1, 2, 1])
     with col1:
         st.subheader("👥 Customer Data")
-        st.session_state.orders_vault = st.file_uploader("Upload Shopify Order Export (CSV).", type=["csv"], accept_multiple_files=True, key="order_up")
+        # 🚨 UPDATED TEXT: Strict column requirements string
+        st.session_state.orders_vault = st.file_uploader("Upload Shopify Order Export (CSV) or Order Data that includes the headers: Name, Order ID, Email, Total (Other columns are fine and will be ignored).", type=["csv"], accept_multiple_files=True, key="order_up")
     st.markdown("<br>", unsafe_allow_html=True)
     _, center_col, _ = st.columns([2, 1.5, 2])
     
@@ -319,9 +323,9 @@ if st.session_state.app_state == "onboarding":
 
 elif st.session_state.app_state == "dashboard":
     st.image("logo.png", width=180)
-    st.markdown(f"""<div style="text-align: center; margin-top: -10px; margin-bottom: 30px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.5rem; margin-bottom: 0px;">Customer Insights Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 2.8rem; color: #0F172A !important; margin-top: -5px;">{st.session_state.biz_type} Profile.</h2></div>""", unsafe_allow_html=True)
+    # 🚨 UPDATED TEXT: Get to know your customers
+    st.markdown(f"""<div style="text-align: center; margin-top: -10px; margin-bottom: 30px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.5rem; margin-bottom: 0px;">Customer Insights Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 2.8rem; color: #0F172A !important; margin-top: -5px;">Get to know your customers.</h2></div>""", unsafe_allow_html=True)
     
-    # 🚨 EXPORT BUTTON PLACEMENT
     _, btn_col, _ = st.columns([4, 2, 4])
     if "dash_data" in st.session_state and st.session_state.dash_data:
         export_html = generate_html_report(st.session_state.dash_data, st.session_state.biz_type)
@@ -375,17 +379,16 @@ elif st.session_state.app_state == "dashboard":
         lk = st.session_state.active_var
         if lk == "Location" or lk == "Company Location":
             st.markdown("<div style='margin-top: 1rem;'></div>", unsafe_allow_html=True)
-            l1, l2, l3, _ = st.columns([1, 1, 1, 5])
+            # 🚨 UI FIX: Removed zip code columns here
+            l1, l2, _ = st.columns([1, 1, 6])
             
             if st.session_state.biz_type == "B2B / Enterprise Sales":
                 if l1.button("Company Region", key="co_reg_btn", type="primary" if st.session_state.active_loc_level == "Company Region" else "secondary"): st.session_state.active_loc_level = "Company Region"; st.rerun()
                 if l2.button("Company State", key="co_state_btn", type="primary" if st.session_state.active_loc_level == "Company State" else "secondary"): st.session_state.active_loc_level = "Company State"; st.rerun()
-                if l3.button("Company Zip Code", key="co_zip_btn", type="primary" if st.session_state.active_loc_level == "Company Zip Code" else "secondary"): st.session_state.active_loc_level = "Company Zip Code"; st.rerun()
                 lk = st.session_state.active_loc_level
             else:
                 if l1.button("Region", key="reg_btn", type="primary" if st.session_state.active_loc_level == "Region" else "secondary"): st.session_state.active_loc_level = "Region"; st.rerun()
                 if l2.button("State", key="state_btn", type="primary" if st.session_state.active_loc_level == "State" else "secondary"): st.session_state.active_loc_level = "State"; st.rerun()
-                if l3.button("Zip Code", key="zip_btn", type="primary" if st.session_state.active_loc_level == "Zip Code" else "secondary"): st.session_state.active_loc_level = "Zip Code"; st.rerun()
                 lk = st.session_state.active_loc_level
         
         if lk in dash_data['html_views']: 
