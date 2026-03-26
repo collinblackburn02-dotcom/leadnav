@@ -45,9 +45,13 @@ def apply_custom_theme(primary_color):
             div[data-testid="stButton"] button {{ border-radius: 8px; font-weight: 600; }}
             div[data-testid="stButton"] button[kind="primary"] {{ background-color: {primary_color} !important; color: #FFFFFF !important; border: none !important; }}
             
-            /* 🚨 TABLE FIX: Force Full Width */
+            /* 🚨 RESTORED TABLE CSS */
             .premium-table-container {{ width: 100% !important; border-radius: 12px; border: 1px solid {primary_color}; background: #FFFFFF; overflow: hidden; margin-top: 1rem; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }}
             .premium-table-container table {{ width: 100% !important; border-collapse: collapse !important; }}
+            .premium-table-container th {{ font-family: 'Outfit', sans-serif !important; background-color: #F8F6FA !important; color: {primary_color} !important; font-weight: 700 !important; text-align: center !important; padding: 15px 12px !important; border-bottom: 2px solid {primary_color} !important; border-right: 1px solid #EBE4F4 !important; font-size: 0.95rem !important; }}
+            .premium-table-container td {{ font-family: 'Outfit', sans-serif !important; text-align: center !important; padding: 12px !important; border-bottom: 1px solid #EBE4F4 !important; border-right: 1px solid #EBE4F4 !important; font-size: 0.85rem !important; color: #1e293b !important; }}
+            /* Make the first column bold */
+            .premium-table-container td:first-child {{ font-weight: 700 !important; color: #0F172A !important; text-align: left !important; padding-left: 20px !important; }}
             
             .serif-gradient-centerpiece {{ font-family: 'Playfair Display', serif !important; background: linear-gradient(90deg, #4D148C 0%, #20B2AA 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block; font-weight: 700 !important; letter-spacing: -0.5px; }}
             .modern-serif-title {{ font-family: 'Playfair Display', serif !important; color: #0F172A !important; font-weight: 700 !important; }}
@@ -56,13 +60,17 @@ def apply_custom_theme(primary_color):
             .custom-loader {{ border: 3px solid #f3f3f3; border-top: 3px solid {primary_color}; border-radius: 50%; width: 32px; height: 32px; animation: spin 1s linear infinite; margin: 0 auto 30px auto; }}
             @keyframes spin {{ 0% {{ transform: rotate(0deg); }} 100% {{ transform: rotate(360deg); }} }}
 
-            /* 🚀 THE PITCH ROTATOR (Italicized) */
-            @keyframes fadeLoop {{ 0%, 20% {{ opacity: 0; transform: translateY(10px); }} 25%, 45% {{ opacity: 1; transform: translateY(0); }} 50%, 100% {{ opacity: 0; transform: translateY(-10px); }} }}
-            .pitch-fact {{ font-family: 'Outfit', sans-serif; font-size: 1.15rem; color: #475569; font-weight: 400; font-style: italic; position: absolute; width: 100%; opacity: 0; animation: fadeLoop 20s infinite; line-height: 1.5; text-align: center; }}
+            /* 🚀 THE PITCH ROTATOR (40 seconds total, quick initial fade) */
+            @keyframes fadeLoop {{ 
+                0% {{ opacity: 0; transform: translateY(5px); }} 
+                2%, 22% {{ opacity: 1; transform: translateY(0); }} 
+                25%, 100% {{ opacity: 0; transform: translateY(-5px); }} 
+            }}
+            .pitch-fact {{ font-family: 'Outfit', sans-serif; font-size: 1.15rem; color: #475569; font-weight: 400; font-style: italic; position: absolute; width: 100%; opacity: 0; animation: fadeLoop 40s infinite; line-height: 1.5; text-align: center; }}
             .fact-1 {{ animation-delay: 0s; }}
-            .fact-2 {{ animation-delay: 5s; }}
-            .fact-3 {{ animation-delay: 10s; }}
-            .fact-4 {{ animation-delay: 15s; }}
+            .fact-2 {{ animation-delay: 10s; }}
+            .fact-3 {{ animation-delay: 20s; }}
+            .fact-4 {{ animation-delay: 30s; }}
         </style>
     """, unsafe_allow_html=True)
 
@@ -120,7 +128,9 @@ def build_dashboard_views(orders_df, enriched_df, start_date, end_date, biz_type
                 top_perf[label] = (rs.idxmax(), (rs.max() / v_total * 100))
                 grp = valid.groupby(col_key).agg(Purchasers=('email_match', 'nunique'), Revenue=('revenue', 'sum')).reset_index()
                 grp['% of Buyers'], grp['Rev / Purchaser'] = (grp['Revenue'] / v_total) * 100, (grp['Revenue'] / grp['Purchasers'])
-                f_v = grp.rename(columns={col_key: label.upper()}).sort_values('Revenue', ascending=False).head(50)
+                
+                # 🚨 FIX: Removed .upper() to keep Title Case (e.g. "Homeowner")
+                f_v = grp.rename(columns={col_key: label}).sort_values('Revenue', ascending=False).head(50)
                 all_html[label] = f_v.style.format({'Purchasers': '{:,.0f}', 'Revenue': '${:,.2f}', '% of Buyers': '{:.1f}%', 'Rev / Purchaser': '${:,.2f}'}).background_gradient(subset=['Revenue', '% of Buyers'], cmap=brand_gradient).hide(axis="index").to_html()
     return {"total_revenue": total_rev, "total_buyers": matched_count, "unique_shopify": unique_shopify, "match_rate": match_rate, "top_performers": top_perf, "html_views": all_html}
 
@@ -209,7 +219,6 @@ elif st.session_state.app_state == "dashboard":
         st.markdown("<div style='margin-top: 3rem;'></div>", unsafe_allow_html=True)
         st.markdown("""<h2 class="modern-serif-title" style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 10px;"><span style="font-size: 2rem;">🔍</span> Audience Deep Dive</h2>""", unsafe_allow_html=True)
         
-        # 🚨 BUTTONS FIX: Marital Status restored
         v_labels = (["Industry", "Seniority", "Company Revenue", "Company Size", "Department", "Job Title", "Location", "Income"] if st.session_state.biz_type == "B2B / Enterprise Sales" else ["Gender", "Age", "Location", "Marital Status", "Income", "Homeowner", "Children", "Net Worth"])
         var_cols = st.columns(len(v_labels))
         for i, label in enumerate(v_labels):
@@ -223,7 +232,6 @@ elif st.session_state.app_state == "dashboard":
             if l3.button("Zip Code", key="zip_btn", type="primary" if st.session_state.active_loc_level == "Zip Code" else "secondary"): st.session_state.active_loc_level = "Zip Code"; st.rerun()
             lk = st.session_state.active_loc_level
         
-        # 🚨 TABLE WRAPPER FIX: Wrapped in the wide container class
         if lk in dash_data['html_views']: 
             st.markdown(f'<div class="premium-table-container">{dash_data["html_views"][lk]}</div>', unsafe_allow_html=True)
     
