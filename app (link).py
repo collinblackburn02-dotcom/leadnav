@@ -6,15 +6,17 @@ import requests
 import json
 import time
 import io
+import base64
 
 # ================ 1. CONFIGURATION & THEME =================
 PITCH_COMPANY_NAME = "LeadNavigator" 
 PITCH_BRAND_COLOR = "#4D148C" 
 AIDAN_WEBHOOK_URL = "https://n8n.srv1144572.hstgr.cloud/webhook/669d6ef0-1393-479e-81c5-5b0bea4262b7"
 
+# 🚨 UPDATED: Swapped PERSONAL_ZIP for SKIPTRACE_ZIP
 N8N_COLUMN_MAPPER = {
     "GENDER": "gender", "MARRIED": "marital_status", "AGE_RANGE": "age",
-    "INCOME_RANGE": "income", "PERSONAL_STATE": "state_raw", "PERSONAL_ZIP": "zip_code",
+    "INCOME_RANGE": "income", "PERSONAL_STATE": "state_raw", "SKIPTRACE_ZIP": "zip_code",
     "HOMEOWNER": "homeowner", "CHILDREN": "children", "NET_WORTH": "net_worth",
     "SENIORITY_LEVEL": "seniority", "COMPANY_REVENUE": "co_revenue",
     "COMPANY_EMPLOYEE_COUNT": "co_size", "COMPANY_INDUSTRY": "industry",
@@ -100,7 +102,6 @@ def clean_api_response(df):
         df['co_state'] = df['co_state'].astype(str).str.strip().str.upper()
         df['co_region'] = df['co_state'].map(STATE_TO_REGION).fillna('Unknown')
         
-    # 🚨 ZIP CODE SCRUBBER: Cleans up formatting so it doesn't show as a float (e.g. 90210.0)
     if 'zip_code' in df.columns:
         df['zip_code'] = df['zip_code'].astype(str).str.split('-').str[0].str.split('.').str[0]
         
@@ -175,6 +176,51 @@ def clean_orders_data(df):
     df['order_id'] = df['order_id'].astype(str).str.strip()
     return df.dropna(subset=['order_date']).drop_duplicates(subset=['order_id']).reset_index(drop=True)
 
+# 🚨 THE REPORT EXPORT GENERATOR
+def generate_html_report(dash_data, biz_type):
+    # Builds a clean, printable HTML document out of all our tables
+    html_content = f"""
+    <html>
+    <head>
+        <title>{PITCH_COMPANY_NAME} Executive Report</title>
+        <style>
+            body {{ font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #0F172A; padding: 40px; background: #FFFFFF; }}
+            h1 {{ color: {PITCH_BRAND_COLOR}; font-size: 28px; border-bottom: 2px solid {PITCH_BRAND_COLOR}; padding-bottom: 10px; }}
+            h2 {{ color: #1e293b; font-size: 22px; margin-top: 40px; }}
+            .summary-box {{ background-color: #F8F5FA; border: 1px solid {PITCH_BRAND_COLOR}; border-radius: 8px; padding: 20px; text-align: center; margin-bottom: 30px; }}
+            .summary-box h3 {{ margin: 0; font-size: 18px; color: #64748B; text-transform: uppercase; }}
+            .summary-box h2 {{ margin: 10px 0 0 0; font-size: 32px; color: {PITCH_BRAND_COLOR}; }}
+            table {{ width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; }}
+            th {{ background-color: {PITCH_BRAND_COLOR}; color: #FFFFFF; padding: 12px; text-align: center; border: 1px solid #ddd; }}
+            td {{ padding: 10px; border: 1px solid #ddd; text-align: center; }}
+            td:first-child {{ text-align: left; font-weight: bold; background-color: #F8F5FA; }}
+        </style>
+    </head>
+    <body>
+        <h1>{PITCH_COMPANY_NAME} | Audience Insights Report</h1>
+        <div style="display: flex; gap: 20px;">
+            <div class="summary-box" style="flex: 1;">
+                <h3>Resolved Customers</h3>
+                <h2>{dash_data['total_buyers']:,.0f}</h2>
+                <p>Match Rate: {dash_data['match_rate']:.1f}%</p>
+            </div>
+            <div class="summary-box" style="flex: 1;">
+                <h3>Attributed Sales</h3>
+                <h2>${dash_data['total_revenue']:,.2f}</h2>
+            </div>
+        </div>
+    """
+    
+    # Iterate through all the HTML tables we generated and append them
+    for label, table_html in dash_data['html_views'].items():
+        # Strip out the inline streamlit styles so our clean print styles take over
+        clean_table = table_html.replace('class="dataframe"', '').replace('id="T_', 'class="')
+        html_content += f"<h2>{label} Breakdown</h2>"
+        html_content += clean_table
+        
+    html_content += "</body></html>"
+    return html_content
+
 def build_dashboard_views(orders_df, enriched_df, start_date, end_date, biz_type):
     mask = (orders_df['order_date'] >= start_date) & (orders_df['order_date'] <= end_date)
     f_orders = orders_df.loc[mask]
@@ -186,7 +232,6 @@ def build_dashboard_views(orders_df, enriched_df, start_date, end_date, biz_type
     unique_shopify = f_orders['email_match'].nunique()
     match_rate = (matched_count / unique_shopify * 100) if unique_shopify > 0 else 0
     
-    # 🚨 FIX: "Zip Code" added back to both DTC and B2B processing arrays
     if biz_type == "B2B / Enterprise Sales":
         vars = [("Industry", "industry"), ("Seniority", "seniority"), ("Company Revenue", "co_revenue"), ("Company Size", "co_size"), ("Department", "department"), ("Job Title", "job_title"), ("NAICS Code", "naics"), ("Company Region", "co_region"), ("Company State", "co_state"), ("Company Zip Code", "co_zip_code")]
     else:
@@ -275,6 +320,19 @@ if st.session_state.app_state == "onboarding":
 elif st.session_state.app_state == "dashboard":
     st.image("logo.png", width=180)
     st.markdown(f"""<div style="text-align: center; margin-top: -10px; margin-bottom: 30px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.5rem; margin-bottom: 0px;">Customer Insights Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 2.8rem; color: #0F172A !important; margin-top: -5px;">{st.session_state.biz_type} Profile.</h2></div>""", unsafe_allow_html=True)
+    
+    # 🚨 EXPORT BUTTON PLACEMENT
+    _, btn_col, _ = st.columns([4, 2, 4])
+    if "dash_data" in st.session_state and st.session_state.dash_data:
+        export_html = generate_html_report(st.session_state.dash_data, st.session_state.biz_type)
+        btn_col.download_button(
+            label="📥 Export Executive Report",
+            data=export_html,
+            file_name="LeadNavigator_Audience_Report.html",
+            mime="text/html",
+            use_container_width=True
+        )
+    
     if "integrity_stats" in st.session_state:
         stats = st.session_state.integrity_stats
         skipped = stats["total"] - stats["processed"]
