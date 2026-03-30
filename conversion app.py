@@ -12,9 +12,9 @@ PITCH_COMPANY_NAME = "LeadNavigator"
 PITCH_BRAND_COLOR = "#4D148C" 
 AIDAN_WEBHOOK_URL = "https://n8n.srv1144572.hstgr.cloud/webhook/669d6ef0-1393-479e-81c5-5b0bea4262b7"
 
-# 🚨 MATCHING N8N COLUMNS TO THE BQ CUBE
+# 🚨 MATCHING N8N COLUMNS TO THE BQ CUBE (Fixed AGE_RANGE mapping)
 N8N_COLUMN_MAPPER = {
-    "GENDER": "gender", "MARRIED": "marital_status", "AGE_RANGE": "age_range", # <--- Fixed this line!
+    "GENDER": "gender", "MARRIED": "marital_status", "AGE_RANGE": "age_range",
     "INCOME_RANGE": "income_raw", "PERSONAL_STATE": "state", 
     "HOMEOWNER": "homeowner_raw", "CHILDREN": "children", "NET_WORTH": "net_worth_raw"
 }
@@ -65,6 +65,12 @@ def render_premium_table(styler_obj):
     st.markdown(f'<div class="premium-table-container">{html}</div>', unsafe_allow_html=True)
 
 # ================ 2. DATA ENGINE =================
+DEMO_COLS = ['gender', 'age_range', 'marital_status', 'children', 'homeowner_status', 'income_bracket', 'net_worth_bracket']
+configs = [("Gender", "gender"), ("Age", "age_range"), ("Income", "income_bracket"), ("State", "state"), ("Net Worth", "net_worth_bracket"), ("Children", "children"), ("Marital Status", "marital_status"), ("Homeowner", "homeowner_status")]
+
+INCOME_MAP = {'Under $50k': 1, '$50k-$100k': 2, '$100k-$150k': 3, '$150k+': 4}
+NET_WORTH_MAP = {'Under $100k': 1, '$100k-$249k': 2, '$250k-$499k': 3, '$500k+': 4}
+
 @st.cache_resource
 def get_bq_client():
     creds_dict = dict(st.secrets["gcp_service_account"])
@@ -170,31 +176,34 @@ def load_visitor_base():
             'homeowner': 'homeowner_status'
         })
 
-        # 🚨 TEXT CLEANUP: Match BigQuery text to n8n Purchaser text
-        df_demo['gender'] = df_demo['gender'].replace({'M': 'Male', 'F': 'Female'})
-        df_demo['children'] = df_demo['children'].replace({'Y': 'Yes', 'N': 'No'})
-        df_demo['marital_status'] = df_demo['marital_status'].replace({'Y': 'Married', 'N': 'Single'})
+        # 🚨 TEXT CLEANUP FOR DUPLICATES
+        if 'gender' in df_demo.columns:
+            df_demo['gender'] = df_demo['gender'].replace({'M': 'Male', 'F': 'Female'})
+        if 'children' in df_demo.columns:
+            df_demo['children'] = df_demo['children'].replace({'Y': 'Yes', 'N': 'No'})
+        if 'marital_status' in df_demo.columns:
+            df_demo['marital_status'] = df_demo['marital_status'].replace({'Y': 'Married', 'N': 'Single'})
         
-        # 🚨 TYPE CASTING FIX: Force all demographic columns to be Strings so they can accept 'ALL'
+        # Force all demographic columns to be Strings so they can accept 'ALL'
         for col in df_demo.columns:
             if col != 'total_visitors':
                 df_demo[col] = df_demo[col].astype(str)
-        
-
+                
+        for col in df_state.columns:
+            if col != 'total_visitors':
+                df_state[col] = df_state[col].astype(str)
         
         # Clean up any weird pandas string-nulls and fill actual nulls
         df_demo = df_demo.replace(['nan', 'NaN', '<NA>', 'None', 'null', ''], 'ALL').fillna('ALL')
         df_state = df_state.replace(['nan', 'NaN', '<NA>', 'None', 'null', ''], 'ALL').fillna('ALL')
+
+        # 🚨 SMOOSH DUPLICATES: Group the CUBE together after cleaning the text!
+        df_demo = df_demo.groupby(DEMO_COLS, as_index=False)['total_visitors'].sum()
+        df_state = df_state.groupby('state', as_index=False)['total_visitors'].sum()
         
         return df_demo, df_state, None # None means no errors!
     except Exception as e:
         return pd.DataFrame(), pd.DataFrame(), str(e) # Returns the exact API error
-
-DEMO_COLS = ['gender', 'age_range', 'marital_status', 'children', 'homeowner_status', 'income_bracket', 'net_worth_bracket']
-configs = [("Gender", "gender"), ("Age", "age_range"), ("Income", "income_bracket"), ("State", "state"), ("Net Worth", "net_worth_bracket"), ("Children", "children"), ("Marital Status", "marital_status"), ("Homeowner", "homeowner_status")]
-
-INCOME_MAP = {'Under $50k': 1, '$50k-$100k': 2, '$100k-$150k': 3, '$150k+': 4}
-NET_WORTH_MAP = {'Under $100k': 1, '$100k-$249k': 2, '$250k-$499k': 3, '$500k+': 4}
 
 # ================ 3. APP FLOW =================
 if "app_state" not in st.session_state: st.session_state.app_state = "onboarding"
@@ -294,7 +303,12 @@ elif st.session_state.app_state == "dashboard":
     df_p_filtered = st.session_state.df_icp[
         (st.session_state.df_icp['order_date'] >= current_dates[0]) & 
         (st.session_state.df_icp['order_date'] <= current_dates[1])
-    ]
+    ].copy()
+
+    # 🚨 MISSING COLUMN SAFETY NET
+    for _, col_name in configs:
+        if col_name not in df_p_filtered.columns:
+            df_p_filtered[col_name] = 'Unknown'
 
     st.markdown('<p style="font-size: 2rem; font-weight: 700; margin-bottom: 0px;">Audience Insights Engine</p>', unsafe_allow_html=True)
     st.markdown('<p style="color: #64748B; margin-top: -5px; margin-bottom: 30px;">Traffic and Conversion Optimization</p>', unsafe_allow_html=True)
