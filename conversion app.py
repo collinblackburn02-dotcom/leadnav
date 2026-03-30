@@ -170,9 +170,18 @@ def load_visitor_base():
             'homeowner': 'homeowner_status'
         })
         
-        # Fill NULL values
-        df_demo = df_demo.fillna('ALL')
-        df_state = df_state.fillna('ALL')
+        # 🚨 TYPE CASTING FIX: Force all demographic columns to be Strings so they can accept 'ALL'
+        for col in df_demo.columns:
+            if col != 'total_visitors':
+                df_demo[col] = df_demo[col].astype(str)
+                
+        for col in df_state.columns:
+            if col != 'total_visitors':
+                df_state[col] = df_state[col].astype(str)
+        
+        # Clean up any weird pandas string-nulls and fill actual nulls
+        df_demo = df_demo.replace(['nan', 'NaN', '<NA>', 'None', 'null', ''], 'ALL').fillna('ALL')
+        df_state = df_state.replace(['nan', 'NaN', '<NA>', 'None', 'null', ''], 'ALL').fillna('ALL')
         
         return df_demo, df_state, None # None means no errors!
     except Exception as e:
