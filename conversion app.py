@@ -14,7 +14,7 @@ AIDAN_WEBHOOK_URL = "https://n8n.srv1144572.hstgr.cloud/webhook/669d6ef0-1393-47
 
 # 🚨 MATCHING N8N COLUMNS TO THE BQ CUBE
 N8N_COLUMN_MAPPER = {
-    "GENDER": "gender", "MARRIED": "marital_status", "AGE_RANGE": "age",
+    "GENDER": "gender", "MARRIED": "marital_status", "AGE_RANGE": "age_range", # <--- Fixed this line!
     "INCOME_RANGE": "income_raw", "PERSONAL_STATE": "state", 
     "HOMEOWNER": "homeowner_raw", "CHILDREN": "children", "NET_WORTH": "net_worth_raw"
 }
@@ -169,15 +169,18 @@ def load_visitor_base():
             'net_worth': 'net_worth_bracket',
             'homeowner': 'homeowner_status'
         })
+
+        # 🚨 TEXT CLEANUP: Match BigQuery text to n8n Purchaser text
+        df_demo['gender'] = df_demo['gender'].replace({'M': 'Male', 'F': 'Female'})
+        df_demo['children'] = df_demo['children'].replace({'Y': 'Yes', 'N': 'No'})
+        df_demo['marital_status'] = df_demo['marital_status'].replace({'Y': 'Married', 'N': 'Single'})
         
         # 🚨 TYPE CASTING FIX: Force all demographic columns to be Strings so they can accept 'ALL'
         for col in df_demo.columns:
             if col != 'total_visitors':
                 df_demo[col] = df_demo[col].astype(str)
-                
-        for col in df_state.columns:
-            if col != 'total_visitors':
-                df_state[col] = df_state[col].astype(str)
+        
+
         
         # Clean up any weird pandas string-nulls and fill actual nulls
         df_demo = df_demo.replace(['nan', 'NaN', '<NA>', 'None', 'null', ''], 'ALL').fillna('ALL')
