@@ -71,7 +71,6 @@ def get_bq_client():
     if "private_key" in creds_dict: creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
     return bigquery.Client(credentials=service_account.Credentials.from_service_account_info(creds_dict), project=creds_dict["project_id"])
 
-# 🚨 MIRRORS THE BIGQUERY SQL LOGIC EXACTLY
 def bucket_income_bq(val):
     val_str = str(val).lower()
     if any(x in val_str for x in ['under $10', 'less than $20', '$10,000 - $14', '$20,000 - $24', '$30,000 - $34', '$40,000 - $44', '$20,000 to $44']): return 'Under $50k'
@@ -150,7 +149,7 @@ def clean_api_purchasers(df):
     df = df.explode('email_match').reset_index(drop=True)
     return df
 
-# 🚨 BIGQUERY SUMMARY TABLE IMPORTER
+# 🚨 BIGQUERY SUMMARY TABLE IMPORTER WITH ERROR HANDLING
 @st.cache_data(show_spinner=False, ttl=3600)
 def load_visitor_base():
     client = get_bq_client()
@@ -159,20 +158,25 @@ def load_visitor_base():
         df_state = client.query("SELECT * FROM `leadnav-hhs.HHSpixeltest.weekly_state_summary`").to_dataframe()
         
         # Standardize matching to Python script
-        df_demo.columns = [c.lower() for c in df_demo.columns]
-        df_state.columns = [c.lower() for c in df_state.columns]
+        df_demo.columns = [c.lower().strip() for c in df_demo.columns]
+        df_state.columns = [c.lower().strip() for c in df_state.columns]
         
-        # 🚨 THE FIX: Rename 'married' to 'marital_status' to match our config!
-        df_demo = df_demo.rename(columns={'married': 'marital_status'})
+        # 🚨 THE BULLETPROOF RENAME
+        df_demo = df_demo.rename(columns={
+            'married': 'marital_status',
+            'age': 'age_range',
+            'income': 'income_bracket',
+            'net_worth': 'net_worth_bracket',
+            'homeowner': 'homeowner_status'
+        })
         
-        # In a CUBE table, NULL represents "All Values". We fill with 'ALL' so pandas can filter it.
+        # Fill NULL values
         df_demo = df_demo.fillna('ALL')
         df_state = df_state.fillna('ALL')
         
-        return df_demo, df_state
+        return df_demo, df_state, None # None means no errors!
     except Exception as e:
-        st.error(f"Failed to fetch BigQuery Visitors: {e}")
-        return pd.DataFrame(), pd.DataFrame()
+        return pd.DataFrame(), pd.DataFrame(), str(e) # Returns the exact API error
 
 DEMO_COLS = ['gender', 'age_range', 'marital_status', 'children', 'homeowner_status', 'income_bracket', 'net_worth_bracket']
 configs = [("Gender", "gender"), ("Age", "age_range"), ("Income", "income_bracket"), ("State", "state"), ("Net Worth", "net_worth_bracket"), ("Children", "children"), ("Marital Status", "marital_status"), ("Homeowner", "homeowner_status")]
@@ -232,8 +236,16 @@ if st.session_state.app_state == "onboarding":
                         st.session_state.max_date = cleaned_orders['order_date'].max()
                         st.session_state.date_filter = (st.session_state.min_date, st.session_state.max_date)
                         
-                        # Load BigQuery Baseline
-                        st.session_state.df_demo_cube, st.session_state.df_state_map = load_visitor_base()
+                        # 🚨 Load BigQuery Baseline and Handle Errors Safely!
+                        st.session_state.df_demo_cube, st.session_state.df_state_map, bq_error = load_visitor_base()
+                        
+                        if bq_error:
+                            st.error(f"🚨 BIGQUERY CONNECTION ERROR: {bq_error}")
+                            st.stop()
+                            
+                        if 'gender' not in st.session_state.df_demo_cube.columns:
+                            st.error(f"🚨 SQL ERROR: Connected to BQ, but columns don't match. Found: {st.session_state.df_demo_cube.columns.tolist()}")
+                            st.stop()
                         
                         st.session_state.app_state = "dashboard"
                         st.rerun()
@@ -293,7 +305,6 @@ elif st.session_state.app_state == "dashboard":
     if selected_col == 'state':
         df_v_grp = st.session_state.df_state_map[st.session_state.df_state_map['state'] != 'ALL'].copy().rename(columns={'total_visitors': 'Visitors'})
     else:
-        # Ask the CUBE for just this single column where everything else is 'ALL'
         mask = (st.session_state.df_demo_cube[selected_col] != 'ALL')
         for c in DEMO_COLS:
             if c != selected_col: mask &= (st.session_state.df_demo_cube[c] == 'ALL')
@@ -382,20 +393,17 @@ elif st.session_state.app_state == "dashboard":
             for subset in itertools.combinations(included_types, r):
                 sub_cols = list(subset)
                 
-                # Fetch exact CUBE baseline
                 mask = pd.Series(True, index=st.session_state.df_demo_cube.index)
                 for col in DEMO_COLS:
                     if col in sub_cols: mask &= (st.session_state.df_demo_cube[col] != 'ALL')
                     else: mask &= (st.session_state.df_demo_cube[col] == 'ALL')
                 
-                # Apply UI Filters
                 for col, vals in selected_filters.items(): 
                     if col in sub_cols: mask &= st.session_state.df_demo_cube[col].isin(vals)
                         
                 temp_v = st.session_state.df_demo_cube[mask].copy()
                 if temp_v.empty: continue
                 
-                # Filter Purchasers
                 temp_p = df_p_filtered.copy()
                 for col in sub_cols:
                     temp_p = temp_p[~temp_p[col].isin(EXCLUDE_LIST)]
