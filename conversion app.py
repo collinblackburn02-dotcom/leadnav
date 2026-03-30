@@ -12,26 +12,14 @@ PITCH_COMPANY_NAME = "LeadNavigator"
 PITCH_BRAND_COLOR = "#4D148C" 
 AIDAN_WEBHOOK_URL = "https://n8n.srv1144572.hstgr.cloud/webhook/669d6ef0-1393-479e-81c5-5b0bea4262b7"
 
+# 🚨 MATCHING N8N COLUMNS TO THE BQ CUBE
 N8N_COLUMN_MAPPER = {
     "GENDER": "gender", "MARRIED": "marital_status", "AGE_RANGE": "age",
-    "INCOME_RANGE": "income", "PERSONAL_STATE": "state_raw", "SKIPTRACE_ZIP": "zip_code",
-    "HOMEOWNER": "homeowner", "CHILDREN": "children", "NET_WORTH": "net_worth",
-    "SENIORITY_LEVEL": "seniority", "COMPANY_REVENUE": "co_revenue",
-    "COMPANY_EMPLOYEE_COUNT": "co_size", "COMPANY_INDUSTRY": "industry",
-    "DEPARTMENT": "department", "JOB_TITLE": "job_title", 
-    "SKIPTRACE_CREDIT_RATING": "credit_rating",
-    "COMPANY_STATE": "co_state", "COMPANY_NAICS": "naics",
-    "COMPANY_ZIP": "co_zip_code"
+    "INCOME_RANGE": "income_raw", "PERSONAL_STATE": "state", 
+    "HOMEOWNER": "homeowner_raw", "CHILDREN": "children", "NET_WORTH": "net_worth_raw"
 }
 
-STATE_TO_REGION = {
-    'CT':'Northeast','MA':'Northeast','ME':'Northeast','NH':'Northeast','NJ':'Northeast','NY':'Northeast','PA':'Northeast','RI':'Northeast','VT':'Northeast',
-    'IA':'Midwest','IL':'Midwest','IN':'Midwest','KS':'Midwest','MI':'Midwest','MN':'Midwest','MO':'Midwest','ND':'Midwest','NE':'Midwest','OH':'Midwest','SD':'Midwest','WI':'Midwest',
-    'AL':'South','AR':'South','DC':'South','DE':'South','FL':'South','GA':'South','KY':'South','LA':'South','MD':'South','MS':'South','NC':'South','OK':'South','SC':'South','TN':'South','TX':'South','VA':'South','WV':'South',
-    'AK':'West','AZ':'West','CA':'West','CO':'West','HI':'West','ID':'West','MT':'West','NM':'West','NV':'West','OR':'West','UT':'West','WA':'West','WY':'West'
-}
-
-EXCLUDE_LIST = ['Unknown', 'U', '', 'None', 'nan', 'NaN', 'null', 'NULL', '<NA>']
+EXCLUDE_LIST = ['Unknown', 'U', '', 'None', 'nan', 'NaN', 'null', 'NULL', '<NA>', 'ALL']
 
 st.set_page_config(page_title=f"{PITCH_COMPANY_NAME} | Conversion Engine", page_icon="🧭", layout="wide", initial_sidebar_state="collapsed")
 
@@ -83,29 +71,31 @@ def get_bq_client():
     if "private_key" in creds_dict: creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
     return bigquery.Client(credentials=service_account.Credentials.from_service_account_info(creds_dict), project=creds_dict["project_id"])
 
-def bucket_income(val):
+# 🚨 MIRRORS THE BIGQUERY SQL LOGIC EXACTLY
+def bucket_income_bq(val):
     val_str = str(val).lower()
-    if val in EXCLUDE_LIST or val_str in ['unknown', 'u', 'none', 'nan']: return 'Unknown'
-    if any(x in val_str for x in ['less than', 'under', '$20,000 to $44', '$45,000 to $59']): return '$0-$59,999'
-    if any(x in val_str for x in ['$60,000 to $74', '$75,000 to $99']): return '$60,000-$99,999'
-    if any(x in val_str for x in ['$100,000 to $149', '$150,000 to $199']): return '$100,000-$199,999'
-    if any(x in val_str for x in ['$200,000', '$250,000']): return '$200,000+'
-    return val
+    if any(x in val_str for x in ['under $10', 'less than $20', '$10,000 - $14', '$20,000 - $24', '$30,000 - $34', '$40,000 - $44', '$20,000 to $44']): return 'Under $50k'
+    if any(x in val_str for x in ['$50,000 - $54', '$55,000 - $59', '$60,000 - $64', '$65,000 - $74', '$75,000 - $99']): return '$50k-$100k'
+    if any(x in val_str for x in ['$100,000 - $149']): return '$100k-$150k'
+    if any(x in val_str for x in ['$150,000 - $174', '$175,000 - $199', '$200,000 - $249', '$250,000 +', '$499,999 or more']): return '$150k+'
+    return 'Unknown'
 
-def bucket_net_worth(val):
+def bucket_net_worth_bq(val):
     val_str = str(val).lower()
-    if val in EXCLUDE_LIST or val_str in ['unknown', 'u', 'none', 'nan']: return 'Unknown'
-    if any(x in val_str for x in ['-$', 'less than', '$2,500 to $24', '$25,000 to $49', 'under']): return '$49,999 and below'
-    if any(x in val_str for x in ['$50,000 to $74', '$75,000 to $99']): return '$50,000-$99,999'
-    if any(x in val_str for x in ['$100,000 to $149', '$150,000 to $249']): return '$100,000-$249,999'
-    if any(x in val_str for x in ['$250,000 to $374', '$375,000 to $499']): return '$250,000-$499,999'
-    if any(x in val_str for x in ['$500,000 to $74', '$750,000 to $999']): return '$500,000-$999,999'
-    if '1,000,000' in val_str or 'million' in val_str: return '$1,000,000+'
-    return val
+    if any(x in val_str for x in ['less than $1', '$1 - $4', '$5,000 - $9', '$10,000 - $24', '$25,000 - $49', '$50,000 - $99']): return 'Under $100k'
+    if any(x in val_str for x in ['$100,000 - $249']): return '$100k-$249k'
+    if any(x in val_str for x in ['$250,000 - $499', '$250,000 to $374', '$375,000 to $499']): return '$250k-$499k'
+    if any(x in val_str for x in ['$499,999 or more', '$500,000']): return '$500k+'
+    return 'Unknown'
+
+def clean_homeowner_bq(val):
+    val_str = str(val).lower()
+    if 'homeowner' in val_str: return 'Homeowner'
+    if 'renter' in val_str: return 'Renter'
+    return 'Unknown'
 
 def normalize_demographics(df):
-    """Ensures BigQuery (Visitors) and n8n (Purchasers) use the EXACT same categories"""
-    for col in ['gender', 'homeowner', 'children']:
+    for col in ['gender', 'children']:
         if col in df.columns:
             df[col] = df[col].astype(str).str.strip().str.title()
             df[col] = df[col].replace({'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female', 'True': 'Yes', 'False': 'No'})
@@ -114,15 +104,11 @@ def normalize_demographics(df):
         df['marital_status'] = df['marital_status'].astype(str).str.strip().str.title()
         df['marital_status'] = df['marital_status'].replace({'Y': 'Married', 'N': 'Single', 'Yes': 'Married', 'No': 'Single', 'True': 'Married', 'False': 'Single'})
 
-    if 'credit_rating' in df.columns:
-        df['credit_rating'] = df['credit_rating'].replace({
-            'A': 'High (A, B, C)', 'B': 'High (A, B, C)', 'C': 'High (A, B, C)',
-            'D': 'Medium (D, E)', 'E': 'Medium (D, E)',
-            'F': 'Low (F, G)', 'G': 'Low (F, G)'
-        })
-
-    if 'income' in df.columns: df['income'] = df['income'].apply(bucket_income)
-    if 'net_worth' in df.columns: df['net_worth'] = df['net_worth'].apply(bucket_net_worth)
+    if 'income_raw' in df.columns: df['income_bracket'] = df['income_raw'].apply(bucket_income_bq)
+    if 'net_worth_raw' in df.columns: df['net_worth_bracket'] = df['net_worth_raw'].apply(bucket_net_worth_bq)
+    if 'homeowner_raw' in df.columns: df['homeowner_status'] = df['homeowner_raw'].apply(clean_homeowner_bq)
+    
+    if 'state' in df.columns: df['state'] = df['state'].astype(str).str.strip().str.upper()
 
     for col in df.columns:
         df[col] = df[col].replace(["", "nan", "NaN", "None", "null", "NULL", "<NA>"], "Unknown")
@@ -148,7 +134,6 @@ def clean_orders_data(df):
 
 @st.cache_data(show_spinner=False)
 def clean_api_purchasers(df):
-    """Takes the n8n webhook response for purchasers and formats it"""
     df.columns = [str(c).strip().upper() for c in df.columns]
     standard_emails = ['PERSONAL_EMAILS', 'BUSINESS_EMAIL', 'EMAIL_MATCH', 'DEEP_VERIFIED_EMAILS']
     found_email_col = next((col for col in standard_emails if col in df.columns), None)
@@ -158,10 +143,6 @@ def clean_api_purchasers(df):
     df = df.rename(columns={found_email_col: 'email_match'})
     df = df.rename(columns=N8N_COLUMN_MAPPER)
     df.columns = [c.lower() for c in df.columns]
-    
-    if 'state_raw' in df.columns: 
-        df['state_raw'] = df['state_raw'].astype(str).str.strip().str.upper()
-        df['region'] = df['state_raw'].map(STATE_TO_REGION).fillna('Unknown')
         
     df = normalize_demographics(df)
         
@@ -169,42 +150,33 @@ def clean_api_purchasers(df):
     df = df.explode('email_match').reset_index(drop=True)
     return df
 
-@st.cache_data(show_spinner=False)
-def load_visitor_base(start_date, end_date):
-    """Queries BigQuery for Visitors dynamically based on the Date Slider"""
+# 🚨 BIGQUERY SUMMARY TABLE IMPORTER
+@st.cache_data(show_spinner=False, ttl=3600)
+def load_visitor_base():
     client = get_bq_client()
-    # 🚨 FIX: We are now using event_timestamp to filter and pixel_id to count unique visits
-    query = f"""
-        SELECT 
-            GENDER as gender, AGE_RANGE as age, INCOME_RANGE as income, 
-            CASE 
-                WHEN PERSONAL_STATE IN ('CT', 'ME', 'MA', 'NH', 'RI', 'VT', 'NJ', 'NY', 'PA') THEN 'Northeast'
-                WHEN PERSONAL_STATE IN ('IL', 'IN', 'IA', 'KS', 'MI', 'MN', 'MO', 'NE', 'ND', 'OH', 'SD', 'WI') THEN 'Midwest'
-                WHEN PERSONAL_STATE IN ('AL', 'AR', 'DE', 'FL', 'GA', 'KY', 'LA', 'MD', 'MS', 'NC', 'OK', 'SC', 'TN', 'TX', 'VA', 'WV', 'DC') THEN 'South'
-                WHEN PERSONAL_STATE IN ('AK', 'AZ', 'CA', 'CO', 'HI', 'ID', 'MT', 'NV', 'NM', 'OR', 'UT', 'WA', 'WY') THEN 'West'
-                ELSE 'Unknown'
-            END as region,
-            PERSONAL_STATE as state_raw,
-            NET_WORTH as net_worth, CHILDREN as children, MARRIED as marital_status, 
-            HOMEOWNER as homeowner, SKIPTRACE_CREDIT_RATING as credit_rating,
-            COUNT(DISTINCT pixel_id) as total_visitors
-        FROM `xenon-mantis-430216-n4.visitors_raw.all_visitors_combined`
-        WHERE DATE(event_timestamp) >= '{start_date}' AND DATE(event_timestamp) <= '{end_date}'
-        GROUP BY 1,2,3,4,5,6,7,8,9,10
-    """
     try:
-        df = client.query(query).to_dataframe()
-        df = normalize_demographics(df)
-        df['total_visitors'] = pd.to_numeric(df['total_visitors'], errors='coerce').fillna(0)
-        return df
+        df_demo = client.query("SELECT * FROM `leadnav-hhs.HHSpixeltest.weekly_demographic_summary`").to_dataframe()
+        df_state = client.query("SELECT * FROM `leadnav-hhs.HHSpixeltest.weekly_state_summary`").to_dataframe()
+        
+        # Standardize matching to Python script
+        df_demo.columns = [c.lower() for c in df_demo.columns]
+        df_state.columns = [c.lower() for c in df_state.columns]
+        
+        # In a CUBE table, NULL represents "All Values". We fill with 'ALL' so pandas can filter it.
+        df_demo = df_demo.fillna('ALL')
+        df_state = df_state.fillna('ALL')
+        
+        return df_demo, df_state
     except Exception as e:
         st.error(f"Failed to fetch BigQuery Visitors: {e}")
-        return pd.DataFrame()
+        return pd.DataFrame(), pd.DataFrame()
 
-configs = [("Gender", "gender"), ("Age", "age"), ("Income", "income"), ("Region", "region"), ("State", "state_raw"), ("Net Worth", "net_worth"), ("Children", "children"), ("Marital Status", "marital_status"), ("Homeowner", "homeowner"), ("Credit Rating", "credit_rating")]
-INCOME_MAP = {'$0-$59,999': 1, '$60,000-$99,999': 2, '$100,000-$199,999': 3, '$200,000+': 4}
-NET_WORTH_MAP = {'$49,999 and below': 1, '$50,000-$99,999': 2, '$100,000-$249,999': 3, '$250,000-$499,999': 4, '$500,000-$999,999': 5, '$1,000,000+': 6}
-CREDIT_MAP = {'High (A, B, C)': 1, 'Medium (D, E)': 2, 'Low (F, G)': 3}
+
+DEMO_COLS = ['gender', 'age_range', 'marital_status', 'children', 'homeowner_status', 'income_bracket', 'net_worth_bracket']
+configs = [("Gender", "gender"), ("Age", "age_range"), ("Income", "income_bracket"), ("State", "state"), ("Net Worth", "net_worth_bracket"), ("Children", "children"), ("Marital Status", "marital_status"), ("Homeowner", "homeowner_status")]
+
+INCOME_MAP = {'Under $50k': 1, '$50k-$100k': 2, '$100k-$150k': 3, '$150k+': 4}
+NET_WORTH_MAP = {'Under $100k': 1, '$100k-$249k': 2, '$250k-$499k': 3, '$500k+': 4}
 
 # ================ 3. APP FLOW =================
 if "app_state" not in st.session_state: st.session_state.app_state = "onboarding"
@@ -245,19 +217,21 @@ if st.session_state.app_state == "onboarding":
                 unique_emails = cleaned_orders['email_match'].unique().tolist()
                 
                 try:
-                    # 🚨 TRACK 1: GET PURCHASER ENRICHMENT FROM N8N WEBHOOK
+                    # Enrich Purchasers via N8N
                     response = requests.post(AIDAN_WEBHOOK_URL, json={"emails": unique_emails}, timeout=180)
                     if response.status_code == 200:
                         raw_enriched_df = pd.read_csv(io.StringIO(response.text), on_bad_lines='skip', engine='python')
                         df_n8n_clean = clean_api_purchasers(raw_enriched_df).drop_duplicates(subset=['email_match'])
                         
-                        # Merge Purchasers with their Shopify Order Totals & Dates
                         purchasers_totals = cleaned_orders.groupby('email_match').agg(Total=('revenue_raw', 'sum'), Order_ID=('order_id', 'first'), order_date=('order_date', 'min')).reset_index()
                         st.session_state.df_icp = pd.merge(purchasers_totals, df_n8n_clean, on='email_match', how='inner').reset_index(drop=True)
                         
                         st.session_state.min_date = cleaned_orders['order_date'].min()
                         st.session_state.max_date = cleaned_orders['order_date'].max()
                         st.session_state.date_filter = (st.session_state.min_date, st.session_state.max_date)
+                        
+                        # Load BigQuery Baseline
+                        st.session_state.df_demo_cube, st.session_state.df_state_map = load_visitor_base()
                         
                         st.session_state.app_state = "dashboard"
                         st.rerun()
@@ -268,16 +242,11 @@ elif st.session_state.app_state == "dashboard":
     st.image("logo.png", width=180)
     st.markdown(f"""<div style="text-align: center; margin-top: -10px; margin-bottom: 30px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.5rem; margin-bottom: 0px;">Conversion Analytics Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 2.8rem; color: #0F172A !important; margin-top: -5px;">Optimize your traffic funnel.</h2></div>""", unsafe_allow_html=True)
     
+    st.info("💡 **Note:** Visitor baselines reflect your historical BigQuery snapshot. The Date Slider filters your uploaded Purchaser order data.")
     _, c2, _ = st.columns([1, 4, 1])
-    with c2: st.slider("Filter Date", min_value=st.session_state.min_date, max_value=st.session_state.max_date, key="date_filter", format="MMM DD, YYYY")
+    with c2: st.slider("Filter Purchaser Date", min_value=st.session_state.min_date, max_value=st.session_state.max_date, key="date_filter", format="MMM DD, YYYY")
     
     current_dates = st.session_state.get("date_filter")
-    
-    # 🚨 TRACK 2: GET VISITORS FROM BIGQUERY (Re-runs when date slider changes)
-    if "last_computed_dates" not in st.session_state or st.session_state.last_computed_dates != current_dates:
-        with st.spinner("Fetching Visitor Traffic from BigQuery..."):
-            st.session_state.df_visitors = load_visitor_base(current_dates[0], current_dates[1])
-            st.session_state.last_computed_dates = current_dates
     
     with st.sidebar:
         st.markdown(f"<h2 style='color: {PITCH_BRAND_COLOR}; text-align: center; margin-bottom: 0;'>🎯 LeadNavigator</h2>", unsafe_allow_html=True)
@@ -295,7 +264,7 @@ elif st.session_state.app_state == "dashboard":
 
     metric_map = {"Conv %": "Conv %", "Purchases": "Purchases", "Revenue": "Revenue", "Visitors": "Visitors", "Rev/Visitor": "Rev/Visitor"}
 
-    # Filter Purchasers locally by the date slider
+    # Filter Purchasers by Date Slider
     df_p_filtered = st.session_state.df_icp[
         (st.session_state.df_icp['order_date'] >= current_dates[0]) & 
         (st.session_state.df_icp['order_date'] <= current_dates[1])
@@ -304,10 +273,12 @@ elif st.session_state.app_state == "dashboard":
     st.markdown('<p style="font-size: 2rem; font-weight: 700; margin-bottom: 0px;">Audience Insights Engine</p>', unsafe_allow_html=True)
     st.markdown('<p style="color: #64748B; margin-top: -5px; margin-bottom: 30px;">Traffic and Conversion Optimization</p>', unsafe_allow_html=True)
     
+    # ========================================================
+    # 🔍 SINGLE VARIABLE DEEP DIVE (POWERED BY CUBE)
+    # ========================================================
     st.subheader("🔍 Single Variable Deep Dive")
     if "active_single_var" not in st.session_state: st.session_state.active_single_var = "Gender"
     
-    # 🚨 DYNAMIC BUTTONS FOR THE LEADNAV UI
     for i in range(0, len(configs), 5):
         var_cols = st.columns(5)
         for j, (label, col_name) in enumerate(configs[i:i+5]):
@@ -317,9 +288,14 @@ elif st.session_state.app_state == "dashboard":
                 
     selected_col = dict(configs)[st.session_state.active_single_var]
     
-    # 🚨 COMBINATION MATH (BigQuery Visitors vs n8n Purchasers)
-    df_v = st.session_state.df_visitors[~st.session_state.df_visitors[selected_col].isin(EXCLUDE_LIST)]
-    df_v_grp = df_v.groupby(selected_col)['total_visitors'].sum().reset_index().rename(columns={'total_visitors': 'Visitors'})
+    if selected_col == 'state':
+        df_v_grp = st.session_state.df_state_map[st.session_state.df_state_map['state'] != 'ALL'].copy().rename(columns={'total_visitors': 'Visitors'})
+    else:
+        # Ask the CUBE for just this single column where everything else is 'ALL'
+        mask = (st.session_state.df_demo_cube[selected_col] != 'ALL')
+        for c in DEMO_COLS:
+            if c != selected_col: mask &= (st.session_state.df_demo_cube[c] == 'ALL')
+        df_v_grp = st.session_state.df_demo_cube[mask][[selected_col, 'total_visitors']].rename(columns={'total_visitors': 'Visitors'})
     
     df_p = df_p_filtered[~df_p_filtered[selected_col].isin(EXCLUDE_LIST)]
     df_p_grp = df_p.groupby(selected_col).agg(Purchases=('Order_ID', 'nunique'), Revenue=('Total', 'sum')).reset_index()
@@ -337,11 +313,19 @@ elif st.session_state.app_state == "dashboard":
 
     st.markdown("<hr>", unsafe_allow_html=True)
     
+    # ========================================================
+    # 🏆 TOP CONVERSION DRIVERS
+    # ========================================================
     st.subheader("🏆 Top Conversion Drivers")
     predictive_data = []
     for label, col_name in configs:
-        df_v_sub = st.session_state.df_visitors[~st.session_state.df_visitors[col_name].isin(EXCLUDE_LIST)]
-        grp_v = df_v_sub.groupby(col_name)['total_visitors'].sum().reset_index()
+        if col_name == 'state':
+            grp_v = st.session_state.df_state_map[st.session_state.df_state_map['state'] != 'ALL'].copy()
+        else:
+            mask = (st.session_state.df_demo_cube[col_name] != 'ALL')
+            for c in DEMO_COLS:
+                if c != col_name: mask &= (st.session_state.df_demo_cube[c] == 'ALL')
+            grp_v = st.session_state.df_demo_cube[mask][[col_name, 'total_visitors']]
         
         df_p_sub = df_p_filtered[~df_p_filtered[col_name].isin(EXCLUDE_LIST)]
         grp_p = df_p_sub.groupby(col_name).agg(Purchases=('Order_ID', 'nunique')).reset_index()
@@ -360,70 +344,62 @@ elif st.session_state.app_state == "dashboard":
         render_premium_table(styler)
 
     st.markdown("<hr>", unsafe_allow_html=True)
+    
+    # ========================================================
+    # 📊 MULTI-VARIABLE COMBINATION MATRIX (CUBE FILTER)
+    # ========================================================
     st.subheader("📊 Multi-Variable Combination Matrix")
+    
+    demo_only_configs = [c for c in configs if c[1] != 'state']
 
     with st.expander("🎛️ Combination Filters", expanded=True):
         selected_filters, included_types = {}, []
         filter_cols = st.columns(3)
 
-        for i, (label, col_name) in enumerate(configs):
+        for i, (label, col_name) in enumerate(demo_only_configs):
             with filter_cols[i % 3]:
                 c_title, c_inc = st.columns([3, 1])
                 c_title.markdown(f'<p style="font-weight: 600; color: {PITCH_BRAND_COLOR}; margin-bottom: 0;">{label}</p>', unsafe_allow_html=True)
                 is_inc = c_inc.checkbox("Inc", key=f"inc_{col_name}", help=f"Include {label}")
                 
-                opts = [x for x in st.session_state.df_visitors[col_name].unique() if x not in EXCLUDE_LIST]
-                if col_name == 'income': opts = sorted(opts, key=lambda x: INCOME_MAP.get(x, 99))
-                elif col_name == 'net_worth': opts = sorted(opts, key=lambda x: NET_WORTH_MAP.get(x, 99))
-                elif col_name == 'credit_rating': opts = sorted(opts, key=lambda x: CREDIT_MAP.get(x, 99))
+                opts = [x for x in st.session_state.df_demo_cube[col_name].unique() if x not in EXCLUDE_LIST]
+                if col_name == 'income_bracket': opts = sorted(opts, key=lambda x: INCOME_MAP.get(x, 99))
+                elif col_name == 'net_worth_bracket': opts = sorted(opts, key=lambda x: NET_WORTH_MAP.get(x, 99))
                 else: opts = sorted(opts)
 
                 val = st.multiselect(f"Filter {label}", opts, key=f"f_{col_name}", label_visibility="collapsed", placeholder="All")
                 if is_inc: included_types.append(col_name)
                 if val: selected_filters[col_name] = val
 
-    dff_v = st.session_state.df_visitors.copy()
-    dff_p = df_p_filtered.copy()
-    
-    for col, vals in selected_filters.items(): 
-        dff_v = dff_v[dff_v[col].isin(vals)]
-        dff_p = dff_p[dff_p[col].isin(vals)]
-
-    for col in included_types:
-        dff_v = dff_v[~dff_v[col].isin(EXCLUDE_LIST)]
-        dff_p = dff_p[~dff_p[col].isin(EXCLUDE_LIST)]
-
     st.markdown("<br>", unsafe_allow_html=True)
-    if not dff_v.empty and (selected_filters or included_types):
-        total_vis = dff_v['total_visitors'].sum()
-        total_purch = dff_p['Order_ID'].nunique()
-        total_rev = dff_p['Total'].sum()
-        avg_conv = (total_purch / total_vis * 100) if total_vis > 0 else 0
-        avg_rev_vis = (total_rev / total_vis) if total_vis > 0 else 0
-
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Filtered Segment Visitors", f"{total_vis:,.0f}")
-        m2.metric("Segment Purchases", f"{total_purch:,.0f}")
-        m3.metric("Segment Conv Rate", f"{avg_conv:.2f}%")
-        m4.metric("Segment Rev / Visitor", f"${avg_rev_vis:,.2f}")
-        st.markdown("<br>", unsafe_allow_html=True)
-
-    if included_types and not dff_v.empty:
+    if included_types:
         combos = []
         max_combo_size = min(3, len(included_types))
         
         for r in range(1, max_combo_size + 1):
             for subset in itertools.combinations(included_types, r):
                 sub_cols = list(subset)
-                temp_v, temp_p = dff_v.copy(), dff_p.copy()
                 
-                for col in sub_cols:
-                    temp_v = temp_v[~temp_v[col].isin(EXCLUDE_LIST)]
-                    temp_p = temp_p[~temp_p[col].isin(EXCLUDE_LIST)]
-                    
+                # Fetch exact CUBE baseline
+                mask = pd.Series(True, index=st.session_state.df_demo_cube.index)
+                for col in DEMO_COLS:
+                    if col in sub_cols: mask &= (st.session_state.df_demo_cube[col] != 'ALL')
+                    else: mask &= (st.session_state.df_demo_cube[col] == 'ALL')
+                
+                # Apply UI Filters
+                for col, vals in selected_filters.items(): 
+                    if col in sub_cols: mask &= st.session_state.df_demo_cube[col].isin(vals)
+                        
+                temp_v = st.session_state.df_demo_cube[mask].copy()
                 if temp_v.empty: continue
+                
+                # Filter Purchasers
+                temp_p = df_p_filtered.copy()
+                for col in sub_cols:
+                    temp_p = temp_p[~temp_p[col].isin(EXCLUDE_LIST)]
+                    if col in selected_filters: temp_p = temp_p[temp_p[col].isin(selected_filters[col])]
                     
-                grp_v = temp_v.groupby(sub_cols)['total_visitors'].sum().reset_index()
+                grp_v = temp_v[sub_cols + ['total_visitors']]
                 grp_p = temp_p.groupby(sub_cols).agg(Purchases=('Order_ID', 'nunique'), Revenue=('Total', 'sum')).reset_index()
                 grp = pd.merge(grp_v, grp_p, on=sub_cols, how='left').fillna(0).rename(columns={'total_visitors': 'Visitors'})
                 
@@ -444,5 +420,6 @@ elif st.session_state.app_state == "dashboard":
             if final_res.empty:
                 st.warning(f"No combinations met the Traffic Floor minimum.")
             else:
+                st.metric("Total Segments Found", f"{len(final_res):,}")
                 styler = final_res.head(50)[ordered_cols].rename(columns=rename_dict).style.format({'Visitors': '{:,.0f}', 'Purchases': '{:,.0f}', 'Revenue': '${:,.2f}', 'Conv %': '{:.2f}%', 'Rev/Visitor': '${:,.2f}'}).background_gradient(subset=['Rev/Visitor', 'Conv %'], cmap=brand_gradient)
                 render_premium_table(styler)
