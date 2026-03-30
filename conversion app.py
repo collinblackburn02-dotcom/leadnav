@@ -162,6 +162,9 @@ def load_visitor_base():
         df_demo.columns = [c.lower() for c in df_demo.columns]
         df_state.columns = [c.lower() for c in df_state.columns]
         
+        # 🚨 THE FIX: Rename 'married' to 'marital_status' to match our config!
+        df_demo = df_demo.rename(columns={'married': 'marital_status'})
+        
         # In a CUBE table, NULL represents "All Values". We fill with 'ALL' so pandas can filter it.
         df_demo = df_demo.fillna('ALL')
         df_state = df_state.fillna('ALL')
@@ -170,7 +173,6 @@ def load_visitor_base():
     except Exception as e:
         st.error(f"Failed to fetch BigQuery Visitors: {e}")
         return pd.DataFrame(), pd.DataFrame()
-
 
 DEMO_COLS = ['gender', 'age_range', 'marital_status', 'children', 'homeowner_status', 'income_bracket', 'net_worth_bracket']
 configs = [("Gender", "gender"), ("Age", "age_range"), ("Income", "income_bracket"), ("State", "state"), ("Net Worth", "net_worth_bracket"), ("Children", "children"), ("Marital Status", "marital_status"), ("Homeowner", "homeowner_status")]
