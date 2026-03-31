@@ -42,6 +42,7 @@ def apply_custom_theme(primary_color):
             .premium-table-container table {{ width: 100% !important; border-collapse: collapse !important; border: none !important; }}
             .premium-table-container th {{ font-family: 'Outfit', sans-serif !important; background-color: #F8F6FA !important; color: {primary_color} !important; font-weight: 700 !important; text-align: center !important; padding: 15px 12px !important; border-bottom: 2px solid {primary_color} !important; font-size: 0.95rem !important; text-transform: none !important; }}
             .premium-table-container td {{ font-family: 'Outfit', sans-serif !important; text-align: center !important; padding: 12px !important; border-bottom: 1px solid #EBE4F4 !important; font-size: 0.9rem !important; color: #1e293b !important; }}
+            /* 🚨 Fix: Centers the Rank column and makes it bold */
             .premium-table-container td:first-child {{ font-weight: 700 !important; color: #0F172A !important; text-align: center !important; }}
             
             .serif-gradient-centerpiece {{ font-family: 'Playfair Display', serif !important; background: linear-gradient(90deg, #4D148C 0%, #20B2AA 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block; font-weight: 700 !important; letter-spacing: -0.5px; }}
@@ -57,7 +58,7 @@ def apply_custom_theme(primary_color):
 
 apply_custom_theme(PITCH_BRAND_COLOR)
 
-# 🚨 THE FIX: Only using the light readable gradient for EVERYTHING
+# 🚨 THE COLOR FIX: Only using the light readable gradient for EVERYTHING
 brand_gradient = mcolors.LinearSegmentedColormap.from_list("brand_purple", ["#FFFFFF", "#FBF9FC", "#EBE4F4"])
 
 def render_premium_table(styler_obj):
@@ -66,7 +67,7 @@ def render_premium_table(styler_obj):
     html = styler_obj.to_html()
     st.markdown(f'<div class="premium-table-container">{html}</div>', unsafe_allow_html=True)
 
-# ================ 2. BIGQUERY DATA ENGINE =================
+# ================ 2. THE VERIFIED DATA ENGINE (FROM TURN 9) =================
 DEMO_COLS = ['gender', 'age_range', 'marital_status', 'children', 'homeowner_status', 'income_bracket', 'net_worth_bracket']
 configs = [("Gender", "gender"), ("Age", "age_range"), ("Income", "income_bracket"), ("State", "state"), ("Net Worth", "net_worth_bracket"), ("Children", "children"), ("Marital Status", "marital_status"), ("Homeowner", "homeowner_status")]
 
@@ -79,35 +80,40 @@ def get_bq_client():
     if "private_key" in creds_dict: creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
     return bigquery.Client(credentials=service_account.Credentials.from_service_account_info(creds_dict), project=creds_dict["project_id"])
 
-# Mappers strictly for N8N Purchaser Data
+# 🚨 Restored the exact, verified data cleaners that successfully protect CUBE "ALL" rows
 def clean_gender(val):
     v = str(val).strip().lower()
-    if v in ['male', 'm', '1', '1.0', 'true']: return 'Male'
-    if v in ['female', 'f', '0', '0.0', 'false']: return 'Female'
+    if v in ['all', 'none', 'nan', '<na>', 'null', '']: return 'ALL'
+    if v in ['m', 'male']: return 'Male'
+    if v in ['f', 'female']: return 'Female'
     return 'Unknown'
 
 def clean_yes_no(val):
     v = str(val).strip().lower()
+    if v in ['all', 'none', 'nan', '<na>', 'null', '']: return 'ALL'
     if v in ['y', 'yes', 'true', 't', '1', '1.0']: return 'Yes'
     if v in ['n', 'no', 'false', 'f', '0', '0.0']: return 'No'
     return 'Unknown'
 
 def clean_marital(val):
     v = str(val).strip().lower()
-    if v in ['married', 'm', '1', '1.0', 'true']: return 'Married'
-    if v in ['single', 's', '0', '0.0', 'false']: return 'Single'
+    if v in ['all', 'none', 'nan', '<na>', 'null', '']: return 'ALL'
+    if v in ['y', 'yes', 'true', 't', 'married', 'm']: return 'Married'
+    if v in ['n', 'no', 'false', 'f', 'single', 's']: return 'Single'
     return 'Unknown'
 
 def clean_homeowner_bq(val):
     v = str(val).strip().lower()
-    if v in ['homeowner', 'h', 'y', 'yes', '1', '1.0', 'true']: return 'Homeowner'
-    if v in ['renter', 'r', 'n', 'no', '0', '0.0', 'false']: return 'Renter'
+    if v in ['all', 'none', 'nan', '<na>', 'null', '']: return 'ALL'
+    if v in ['y', 'yes', 'true', 't', 'homeowner']: return 'Homeowner'
+    if v in ['n', 'no', 'false', 'f', 'renter']: return 'Renter'
     if 'homeowner' in v: return 'Homeowner'
     if 'renter' in v: return 'Renter'
     return 'Unknown'
 
 def clean_age(val):
     v = str(val).strip().lower()
+    if v in ['all', 'none', 'nan', '<na>', 'null', '']: return 'ALL'
     if '65' in v: return '65+'
     if '18' in v and '24' in v: return '18-24'
     if '25' in v and '34' in v: return '25-34'
@@ -118,6 +124,7 @@ def clean_age(val):
 
 def bucket_income_bq(val):
     v = str(val).strip().lower()
+    if v in ['all', 'none', 'nan', '<na>', 'null', '']: return 'ALL'
     nums = [int(n) for n in re.findall(r'\d+', v.replace(',', ''))]
     if not nums: return 'Unknown'
     lower = nums[0]
@@ -129,6 +136,7 @@ def bucket_income_bq(val):
 
 def bucket_net_worth_bq(val):
     v = str(val).strip().lower()
+    if v in ['all', 'none', 'nan', '<na>', 'null', '']: return 'ALL'
     nums = [int(n) for n in re.findall(r'\d+', v.replace(',', ''))]
     if not nums: return 'Unknown'
     lower = nums[0]
@@ -146,10 +154,12 @@ def normalize_demographics(df):
     if 'homeowner_raw' in df.columns: df['homeowner_status'] = df['homeowner_raw'].apply(clean_homeowner_bq)
     if 'income_raw' in df.columns: df['income_bracket'] = df['income_raw'].apply(bucket_income_bq)
     if 'net_worth_raw' in df.columns: df['net_worth_bracket'] = df['net_worth_raw'].apply(bucket_net_worth_bq)
-    if 'state' in df.columns: df['state'] = df['state'].astype(str).str.strip().str.upper()
     
+    if 'state' in df.columns: df['state'] = df['state'].astype(str).str.strip().str.upper()
+
     for col in df.columns:
         df[col] = df[col].replace(["", "nan", "NaN", "None", "null", "NULL", "<NA>", "unknown", "Unknown"], "Unknown")
+        
     return df
 
 @st.cache_data(show_spinner=False)
@@ -180,7 +190,9 @@ def clean_api_purchasers(df):
     df = df.rename(columns={found_email_col: 'email_match'})
     df = df.rename(columns=N8N_COLUMN_MAPPER)
     df.columns = [c.lower() for c in df.columns]
+        
     df = normalize_demographics(df)
+        
     df['email_match'] = df['email_match'].astype(str).str.lower().str.replace(r'[^a-z0-9@._,-]', '', regex=True).str.split(',')
     df = df.explode('email_match').reset_index(drop=True)
     return df
@@ -203,14 +215,13 @@ def load_visitor_base():
             'homeowner': 'homeowner_status'
         })
 
-        # 🚨 THE FIX: I REMOVED THE CLEANERS THAT WERE MUTATING BIGQUERY CUBE ROWS!
-        # Only applying basic safe standardization for BigQuery abbreviations
-        if 'gender' in df_demo.columns:
-            df_demo['gender'] = df_demo['gender'].astype(str).str.strip().str.title().replace({'M': 'Male', 'F': 'Female'})
-        if 'children' in df_demo.columns:
-            df_demo['children'] = df_demo['children'].astype(str).str.strip().str.title().replace({'Y': 'Yes', 'N': 'No', 'True': 'Yes', 'False': 'No'})
-        if 'marital_status' in df_demo.columns:
-            df_demo['marital_status'] = df_demo['marital_status'].astype(str).str.strip().str.title().replace({'Y': 'Married', 'N': 'Single', 'True': 'Married', 'False': 'Single'})
+        if 'gender' in df_demo.columns: df_demo['gender'] = df_demo['gender'].apply(clean_gender)
+        if 'children' in df_demo.columns: df_demo['children'] = df_demo['children'].apply(clean_yes_no)
+        if 'marital_status' in df_demo.columns: df_demo['marital_status'] = df_demo['marital_status'].apply(clean_marital)
+        if 'age_range' in df_demo.columns: df_demo['age_range'] = df_demo['age_range'].apply(clean_age)
+        if 'homeowner_status' in df_demo.columns: df_demo['homeowner_status'] = df_demo['homeowner_status'].apply(clean_homeowner_bq)
+        if 'income_bracket' in df_demo.columns: df_demo['income_bracket'] = df_demo['income_bracket'].apply(bucket_income_bq)
+        if 'net_worth_bracket' in df_demo.columns: df_demo['net_worth_bracket'] = df_demo['net_worth_bracket'].apply(bucket_net_worth_bq)
         
         for col in df_demo.columns:
             if col != 'total_visitors': df_demo[col] = df_demo[col].astype(str).str.strip()
@@ -232,7 +243,8 @@ if "app_state" not in st.session_state: st.session_state.app_state = "onboarding
 if "df_icp" not in st.session_state: st.session_state.df_icp = None
 
 if st.session_state.app_state == "onboarding":
-    st.image("logo.png", width=180)
+    # Removed explicit width so Streamlit renders it natively and sharply
+    st.image("logo.png")
     st.markdown("""<div style="text-align: center; margin-top: 0px; margin-bottom: 25px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.6rem; margin-bottom: 2px;">Conversion Analytics Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 1.8rem; color: #0F172A !important; margin-top: 5px;">Upload order data to build your conversion matrix.</h2></div>""", unsafe_allow_html=True)
     
     _, col1, _ = st.columns([1, 2, 1])
@@ -312,7 +324,7 @@ if st.session_state.app_state == "onboarding":
                 st.error(f"Error: {str(e)}")
 
 elif st.session_state.app_state == "dashboard":
-    st.image("logo.png", width=180)
+    st.image("logo.png")
     st.markdown(f"""<div style="text-align: center; margin-top: -10px; margin-bottom: 30px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.5rem; margin-bottom: 0px;">Conversion Analytics Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 2.8rem; color: #0F172A !important; margin-top: -5px;">Optimize your traffic funnel.</h2></div>""", unsafe_allow_html=True)
     
     st.info("💡 **Note:** Visitor baselines reflect your historical BigQuery snapshot. The Date Slider filters your uploaded Purchaser order data.")
@@ -428,8 +440,8 @@ elif st.session_state.app_state == "dashboard":
         pred_df = pd.DataFrame(predictive_data).sort_values("Predictive Swing", ascending=is_ascending)
         pred_df.insert(0, 'Rank', range(1, len(pred_df) + 1))
         
-        # 🚨 THE FIX: I REMOVED THE DARK PURPLE MCOLOR ENTIRELY! ALL GRADIENTS NOW USE THE LIGHT `brand_gradient`
-        styler = pred_df.style.set_properties(**{'font-weight': 'bold'}, subset=['Rank']).format({'Rank': '{:.0f}', 'Conv % (Top)': '{:.2f}%', 'Conv % (Worst)': '{:.2f}%', 'Predictive Swing': '{:.2f}%'}).background_gradient(subset=['Predictive Swing', 'Conv % (Top)'], cmap=brand_gradient).background_gradient(subset=['Conv % (Worst)'], cmap=brand_gradient)
+        # 🚨 THE FIX: Using the light `brand_gradient` for ALL highlight columns
+        styler = pred_df.style.set_properties(**{'font-weight': 'bold'}, subset=['Rank']).format({'Rank': '{:.0f}', 'Conv % (Top)': '{:.2f}%', 'Conv % (Worst)': '{:.2f}%', 'Predictive Swing': '{:.2f}%'}).background_gradient(subset=['Predictive Swing', 'Conv % (Top)', 'Conv % (Worst)'], cmap=brand_gradient)
         render_premium_table(styler)
 
     st.markdown("<hr>", unsafe_allow_html=True)
