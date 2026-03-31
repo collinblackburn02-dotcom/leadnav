@@ -77,7 +77,6 @@ def get_bq_client():
     if "private_key" in creds_dict: creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
     return bigquery.Client(credentials=service_account.Credentials.from_service_account_info(creds_dict), project=creds_dict["project_id"])
 
-# 🚨 THE FIX: All functions now respect "ALL" so BigQuery CUBEs aren't accidentally destroyed
 def clean_gender(val):
     v = str(val).strip().lower()
     if v in ['all', 'none', 'nan', '<na>', 'null', '']: return 'ALL'
@@ -149,6 +148,8 @@ def normalize_demographics(df):
     if 'marital_status' in df.columns: df['marital_status'] = df['marital_status'].apply(clean_marital)
     if 'age_range' in df.columns: df['age_range'] = df['age_range'].apply(clean_age)
     if 'homeowner_raw' in df.columns: df['homeowner_status'] = df['homeowner_raw'].apply(clean_homeowner_bq)
+    
+    # We apply the numerical bucketing ONLY to the Purchaser data!
     if 'income_raw' in df.columns: df['income_bracket'] = df['income_raw'].apply(bucket_income_bq)
     if 'net_worth_raw' in df.columns: df['net_worth_bracket'] = df['net_worth_raw'].apply(bucket_net_worth_bq)
     
@@ -212,18 +213,20 @@ def load_visitor_base():
             'homeowner': 'homeowner_status'
         })
 
+        # ONLY text standardization for BQ. We removed the double-bucketing!
         if 'gender' in df_demo.columns: df_demo['gender'] = df_demo['gender'].apply(clean_gender)
         if 'children' in df_demo.columns: df_demo['children'] = df_demo['children'].apply(clean_yes_no)
         if 'marital_status' in df_demo.columns: df_demo['marital_status'] = df_demo['marital_status'].apply(clean_marital)
         if 'age_range' in df_demo.columns: df_demo['age_range'] = df_demo['age_range'].apply(clean_age)
         if 'homeowner_status' in df_demo.columns: df_demo['homeowner_status'] = df_demo['homeowner_status'].apply(clean_homeowner_bq)
-        if 'income_bracket' in df_demo.columns: df_demo['income_bracket'] = df_demo['income_bracket'].apply(bucket_income_bq)
-        if 'net_worth_bracket' in df_demo.columns: df_demo['net_worth_bracket'] = df_demo['net_worth_bracket'].apply(bucket_net_worth_bq)
         
         for col in df_demo.columns:
             if col != 'total_visitors': df_demo[col] = df_demo[col].astype(str).str.strip()
         for col in df_state.columns:
             if col != 'total_visitors': df_state[col] = df_state[col].astype(str).str.strip()
+
+        df_demo = df_demo.replace(['nan', 'NaN', '<NA>', 'None', 'null', ''], 'ALL').fillna('ALL')
+        df_state = df_state.replace(['nan', 'NaN', '<NA>', 'None', 'null', ''], 'ALL').fillna('ALL')
 
         df_demo = df_demo.groupby(DEMO_COLS, as_index=False)['total_visitors'].sum()
         df_state = df_state.groupby('state', as_index=False)['total_visitors'].sum()
@@ -450,36 +453,6 @@ elif st.session_state.app_state == "dashboard":
                         
                 temp_v = st.session_state.df_demo_cube[mask].copy()
                 if temp_v.empty: continue
-                
-                temp_p = df_p_filtered.copy()
-                for col in sub_cols:
-                    temp_p = temp_p[~temp_p[col].isin(EXCLUDE_LIST)]
-                    if col in selected_filters: temp_p = temp_p[temp_p[col].isin(selected_filters[col])]
-                    
-                grp_v = temp_v[sub_cols + ['total_visitors']]
-                grp_p = temp_p.groupby(sub_cols).agg(Purchases=('Order_ID', 'nunique'), Revenue=('Total', 'sum')).reset_index()
-                grp = pd.merge(grp_v, grp_p, on=sub_cols, how='left').fillna(0).rename(columns={'total_visitors': 'Visitors'})
-                
-                for col in included_types:
-                    if col not in sub_cols:
-                        grp[col] = ", ".join(selected_filters[col]) if col in selected_filters and selected_filters[col] else ""
-                combos.append(grp)
-                
-        if combos:
-            res = pd.concat(combos, ignore_index=True).drop_duplicates(subset=included_types)
-            res['Conv %'] = (res['Purchases'] / res['Visitors'] * 100).round(2)
-            res['Rev/Visitor'] = (res['Revenue'] / res['Visitors']).round(2)
-            
-            final_res = res[res['Visitors'] >= min_visitors].sort_values(metric_map[metric_choice], ascending=is_ascending)
-            ordered_cols = included_types + ["Visitors", "Purchases", "Revenue", "Conv %", "Rev/Visitor"]
-            rename_dict = {c[1]: c[0] for c in configs}
-            
-            if final_res.empty:
-                st.warning(f"No combinations met the Traffic Floor minimum.")
-            else:
-                st.metric("Total Segments Found", f"{len(final_res):,}")
-                styler = final_res.head(50)[ordered_cols].rename(columns=rename_dict).style.format({'Visitors': '{:,.0f}', 'Purchases': '{:,.0f}', 'Revenue': '${:,.2f}', 'Conv %': '{:.2f}%', 'Rev/Visitor': '${:,.2f}'}).background_gradient(subset=['Rev/Visitor', 'Conv %'], cmap=brand_gradient)
-                render_premium_table(styler)
                 
                 temp_p = df_p_filtered.copy()
                 for col in sub_cols:
