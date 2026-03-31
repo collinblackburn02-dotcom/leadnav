@@ -32,7 +32,6 @@ def apply_custom_theme(primary_color):
             [data-testid="stHeader"] {{ display: none !important; }}
             #MainMenu {{ visibility: hidden; }}
             footer {{ visibility: hidden; }}
-            /* KEEPING THE SIDEBAR HIDDEN FOR A PREMIUM LOOK */
             [data-testid="stSidebar"], [data-testid="collapsedControl"] {{ display: none !important; }}
             .stMarkdown a svg {{ display: none !important; }}
             div[data-testid="stSlider"] label p {{ font-size: 1.2rem !important; font-weight: 700 !important; color: #0F172A !important; }}
@@ -83,27 +82,31 @@ def get_bq_client():
     if "private_key" in creds_dict: creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
     return bigquery.Client(credentials=service_account.Credentials.from_service_account_info(creds_dict), project=creds_dict["project_id"])
 
+# 🚨 THE SAFETY NET HAS BEEN RESTORED: "ALL" Rows will no longer be destroyed!
 def clean_gender(val):
     v = str(val).strip().lower()
+    if v in ['all', 'none', 'nan', '<na>', 'null', '']: return 'ALL'
     if v in ['male', 'm', '1', '1.0', 'true']: return 'Male'
     if v in ['female', 'f', '0', '0.0', 'false']: return 'Female'
-    return 'ALL' if v == 'all' else 'Unknown'
+    return 'Unknown'
 
 def clean_yes_no(val):
     v = str(val).strip().lower()
+    if v in ['all', 'none', 'nan', '<na>', 'null', '']: return 'ALL'
     if v in ['y', 'yes', 'true', 't', '1', '1.0']: return 'Yes'
     if v in ['n', 'no', 'false', 'f', '0', '0.0']: return 'No'
-    return 'ALL' if v == 'all' else 'Unknown'
+    return 'Unknown'
 
 def clean_marital(val):
     v = str(val).strip().lower()
-    if v in ['married', 'm', '1', '1.0', 'true']: return 'Married'
-    if v in ['single', 's', '0', '0.0', 'false']: return 'Single'
-    return 'ALL' if v == 'all' else 'Unknown'
+    if v in ['all', 'none', 'nan', '<na>', 'null', '']: return 'ALL'
+    if v in ['y', 'yes', 'true', 't', 'married', 'm']: return 'Married'
+    if v in ['n', 'no', 'false', 'f', 'single', 's']: return 'Single'
+    return 'Unknown'
 
 def clean_homeowner_bq(val):
     v = str(val).strip().lower()
-    if v == 'all': return 'ALL'
+    if v in ['all', 'none', 'nan', '<na>', 'null', '']: return 'ALL'
     if v in ['homeowner', 'h', 'y', 'yes', '1', '1.0', 'true']: return 'Homeowner'
     if v in ['renter', 'r', 'n', 'no', '0', '0.0', 'false']: return 'Renter'
     if 'homeowner' in v: return 'Homeowner'
@@ -112,7 +115,7 @@ def clean_homeowner_bq(val):
 
 def clean_age(val):
     v = str(val).strip().lower()
-    if v == 'all': return 'ALL'
+    if v in ['all', 'none', 'nan', '<na>', 'null', '']: return 'ALL'
     if '65' in v: return '65+'
     if '18' in v and '24' in v: return '18-24'
     if '25' in v and '34' in v: return '25-34'
@@ -123,7 +126,7 @@ def clean_age(val):
 
 def bucket_income_bq(val):
     v = str(val).strip().lower()
-    if v == 'all': return 'ALL'
+    if v in ['all', 'none', 'nan', '<na>', 'null', '']: return 'ALL'
     nums = [int(n) for n in re.findall(r'\d+', v.replace(',', ''))]
     if not nums: return 'Unknown'
     lower = nums[0]
@@ -135,7 +138,7 @@ def bucket_income_bq(val):
 
 def bucket_net_worth_bq(val):
     v = str(val).strip().lower()
-    if v == 'all': return 'ALL'
+    if v in ['all', 'none', 'nan', '<na>', 'null', '']: return 'ALL'
     nums = [int(n) for n in re.findall(r'\d+', v.replace(',', ''))]
     if not nums: return 'Unknown'
     lower = nums[0]
@@ -153,9 +156,12 @@ def normalize_demographics(df):
     if 'homeowner_raw' in df.columns: df['homeowner_status'] = df['homeowner_raw'].apply(clean_homeowner_bq)
     if 'income_raw' in df.columns: df['income_bracket'] = df['income_raw'].apply(bucket_income_bq)
     if 'net_worth_raw' in df.columns: df['net_worth_bracket'] = df['net_worth_raw'].apply(bucket_net_worth_bq)
+    
     if 'state' in df.columns: df['state'] = df['state'].astype(str).str.strip().str.upper()
+
     for col in df.columns:
         df[col] = df[col].replace(["", "nan", "NaN", "None", "null", "NULL", "<NA>", "unknown", "Unknown"], "Unknown")
+        
     return df
 
 @st.cache_data(show_spinner=False)
@@ -186,7 +192,9 @@ def clean_api_purchasers(df):
     df = df.rename(columns={found_email_col: 'email_match'})
     df = df.rename(columns=N8N_COLUMN_MAPPER)
     df.columns = [c.lower() for c in df.columns]
+        
     df = normalize_demographics(df)
+        
     df['email_match'] = df['email_match'].astype(str).str.lower().str.replace(r'[^a-z0-9@._,-]', '', regex=True).str.split(',')
     df = df.explode('email_match').reset_index(drop=True)
     return df
@@ -255,48 +263,67 @@ if st.session_state.app_state == "onboarding":
                 st.markdown(f"""
                     <div style="text-align: center; padding: 60px 40px; background: #F8F6FA; border-radius: 12px; border: 1px solid {PITCH_BRAND_COLOR}; min-height: 380px;">
                         <h3 class="modern-serif-title" style="color: {PITCH_BRAND_COLOR}; margin-bottom: 10px;">LeadNavigator Intelligence is active...</h3>
-                        <p style="color: #64748B; font-family: 'Outfit', sans-serif; margin-bottom: 40px;">Processing multi-touch attribution metrics. Please don't refresh the page.</p>
+                        <p style="color: #64748B; font-family: 'Outfit', sans-serif; margin-bottom: 40px;">Processing multi-touch attribution metrics (Est. 2-3 mins)</p>
                         <div class="custom-loader"></div>
-                        <div style="position: relative; height: 100px;">
-                            <p class="pitch-fact fact-1">💡 LeadNavigator automatically connects Shopify orders to thousands of household data points.</p>
-                            <p class="pitch-fact fact-2">🚀 We analyze conversion *patterns*, not just totals, to build your target Ideal Customer Profile.</p>
-                            <p class="pitch-fact fact-3">🧭 Combining your traffic baseline with actual conversion data gives you a map to higher ROI.</p>
-                            <p class="pitch-fact fact-4">🎯 Identifying high-converting *combinations* unlocks advanced audience segmentation.</p>
-                        </div>
                     </div>
                 """, unsafe_allow_html=True)
                 
-                raw_df = pd.concat([pd.read_csv(f, encoding='latin1', on_bad_lines='skip') for f in st.session_state.orders_vault], ignore_index=True)
-                cleaned_orders = clean_orders_data(raw_df)
-                unique_emails = cleaned_orders['email_match'].unique().tolist()
+            raw_df = pd.concat([pd.read_csv(f, encoding='latin1', on_bad_lines='skip') for f in st.session_state.orders_vault], ignore_index=True)
+            cleaned_orders = clean_orders_data(raw_df)
+            unique_emails = cleaned_orders['email_match'].unique().tolist()
+            
+            # 🚨 10-MINUTE MEGA BATCH RESTORED
+            chunk_size = 2000 
+            all_enriched_dfs = []
+            
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            
+            try:
+                for i in range(0, len(unique_emails), chunk_size):
+                    chunk = unique_emails[i:i + chunk_size]
+                    batch_num = (i // chunk_size) + 1
+                    total_batches = (len(unique_emails) // chunk_size) + 1
+                    
+                    status_text.markdown(f"<p style='text-align:center; color:{PITCH_BRAND_COLOR}; font-weight:600;'>Enriching payload {batch_num} of {total_batches}...</p>", unsafe_allow_html=True)
+                    
+                    try:
+                        response = requests.post(AIDAN_WEBHOOK_URL, json={"emails": chunk}, timeout=600)
+                        if response.status_code == 200:
+                            chunk_df = pd.read_csv(io.StringIO(response.text), on_bad_lines='skip', engine='python')
+                            all_enriched_dfs.append(chunk_df)
+                    except requests.exceptions.RequestException as e:
+                        st.warning(f"Payload {batch_num} timed out. Skipping.")
+                        
+                    progress_bar.progress(min((i + chunk_size) / len(unique_emails), 1.0))
                 
-                try:
-                    response = requests.post(AIDAN_WEBHOOK_URL, json={"emails": unique_emails}, timeout=600)
-                    if response.status_code == 200:
-                        raw_enriched_df = pd.read_csv(io.StringIO(response.text), on_bad_lines='skip', engine='python')
-                        df_n8n_clean = clean_api_purchasers(raw_enriched_df).drop_duplicates(subset=['email_match'])
-                        
-                        purchasers_totals = cleaned_orders.groupby('email_match').agg(Total=('revenue_raw', 'sum'), Order_ID=('order_id', 'first'), order_date=('order_date', 'min')).reset_index()
-                        st.session_state.df_icp = pd.merge(purchasers_totals, df_n8n_clean, on='email_match', how='inner').reset_index(drop=True)
-                        
-                        st.session_state.min_date = cleaned_orders['order_date'].min()
-                        st.session_state.max_date = cleaned_orders['order_date'].max()
-                        st.session_state.date_filter = (st.session_state.min_date, st.session_state.max_date)
-                        
-                        st.session_state.df_demo_cube, st.session_state.df_state_map, bq_error = load_visitor_base()
-                        
-                        if bq_error:
-                            st.error(f"🚨 BIGQUERY CONNECTION ERROR: {bq_error}")
-                            st.stop()
-                        if 'gender' not in st.session_state.df_demo_cube.columns:
-                            st.error(f"🚨 SQL ERROR: Columns mismatch. Found: {st.session_state.df_demo_cube.columns.tolist()}")
-                            st.stop()
-                        
-                        st.session_state.app_state = "dashboard"
-                        st.rerun()
-                    else: st.error(f"n8n logic error: Received {response.status_code} from webhook. Please check Aidan's server.")
-                except requests.exceptions.Timeout: st.error("n8n logic error: Aiden's enrichment server timed out. Try uploading a smaller email list.")
-                except Exception as e: st.error(f"n8n enrichment failed: {str(e)}. Please contact app support.")
+                status_text.empty()
+                progress_bar.empty()
+                status_placeholder.empty()
+
+                if all_enriched_dfs:
+                    raw_enriched_df = pd.concat(all_enriched_dfs, ignore_index=True)
+                    df_n8n_clean = clean_api_purchasers(raw_enriched_df).drop_duplicates(subset=['email_match'])
+                    
+                    purchasers_totals = cleaned_orders.groupby('email_match').agg(Total=('revenue_raw', 'sum'), Order_ID=('order_id', 'first'), order_date=('order_date', 'min')).reset_index()
+                    st.session_state.df_icp = pd.merge(purchasers_totals, df_n8n_clean, on='email_match', how='inner').reset_index(drop=True)
+                    
+                    st.session_state.min_date = cleaned_orders['order_date'].min()
+                    st.session_state.max_date = cleaned_orders['order_date'].max()
+                    st.session_state.date_filter = (st.session_state.min_date, st.session_state.max_date)
+                    
+                    st.session_state.df_demo_cube, st.session_state.df_state_map, bq_error = load_visitor_base()
+                    
+                    if bq_error:
+                        st.error(f"🚨 BIGQUERY CONNECTION ERROR: {bq_error}")
+                        st.stop()
+                    
+                    st.session_state.app_state = "dashboard"
+                    st.rerun()
+                else:
+                    st.error("Failed to enrich payload. Please check if your n8n server is online.")
+            except Exception as e: 
+                st.error(f"Error: {str(e)}")
 
 elif st.session_state.app_state == "dashboard":
     st.image("logo.png", width=180)
@@ -308,7 +335,6 @@ elif st.session_state.app_state == "dashboard":
     
     current_dates = st.session_state.get("date_filter")
     
-    # 🚨 MOVED CONTROLS TO THE MAIN PAGE 🚨
     st.markdown("<hr style='margin-top: 10px; margin-bottom: 30px;'>", unsafe_allow_html=True)
     st.markdown('### 🎛️ Global Dashboard Controls')
     
@@ -319,7 +345,7 @@ elif st.session_state.app_state == "dashboard":
         sort_order = st.radio("Ranking Order", ["High to Low", "Low to High"])
         is_ascending = (sort_order == "Low to High")
     with ctrl3:
-        min_visitors = st.number_input("Minimum Traffic Floor", value=10) # Default lowered to 10
+        min_visitors = st.number_input("Minimum Traffic Floor", value=10)
     with ctrl4:
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("🔄 Upload New Orders", use_container_width=True): 
@@ -381,9 +407,9 @@ elif st.session_state.app_state == "dashboard":
             styler = display_df.style.set_properties(**{'font-weight': 'bold'}, subset=['Rank']).format({'Rank': '{:.0f}', 'Visitors': '{:,.0f}', 'Purchases': '{:,.0f}', 'Revenue': '${:,.2f}', 'Conv %': '{:.2f}%', 'Rev/Visitor': '${:,.2f}'}).background_gradient(subset=['Rev/Visitor', 'Conv %'], cmap=brand_gradient)
             render_premium_table(styler)
         else:
-            st.warning("No segments met the Minimum Traffic Floor criteria. You can lower the floor on the left sidebar.")
+            st.warning("No segments met the Minimum Traffic Floor criteria. You can lower the floor in the Global Controls above.")
     else:
-        st.warning("No segments met the Minimum Traffic Floor criteria. You can lower the floor on the left sidebar.")
+        st.warning("No segments met the Minimum Traffic Floor criteria. You can lower the floor in the Global Controls above.")
 
     st.markdown("<hr>", unsafe_allow_html=True)
     
