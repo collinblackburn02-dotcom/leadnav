@@ -6,13 +6,13 @@ import matplotlib.colors as mcolors
 import itertools
 import requests
 import io
+import re
 
 # ================ 1. CONFIGURATION & THEME =================
 PITCH_COMPANY_NAME = "LeadNavigator" 
 PITCH_BRAND_COLOR = "#4D148C" 
 AIDAN_WEBHOOK_URL = "https://n8n.srv1144572.hstgr.cloud/webhook/669d6ef0-1393-479e-81c5-5b0bea4262b7"
 
-# 🚨 MATCHING N8N COLUMNS TO THE BQ CUBE (Fixed AGE_RANGE mapping)
 N8N_COLUMN_MAPPER = {
     "GENDER": "gender", "MARRIED": "marital_status", "AGE_RANGE": "age_range",
     "INCOME_RANGE": "income_raw", "PERSONAL_STATE": "state", 
@@ -64,7 +64,7 @@ def render_premium_table(styler_obj):
     html = styler_obj.to_html()
     st.markdown(f'<div class="premium-table-container">{html}</div>', unsafe_allow_html=True)
 
-# ================ 2. DATA ENGINE =================
+# ================ 2. HYPER-RESILIENT DATA ENGINE =================
 DEMO_COLS = ['gender', 'age_range', 'marital_status', 'children', 'homeowner_status', 'income_bracket', 'net_worth_bracket']
 configs = [("Gender", "gender"), ("Age", "age_range"), ("Income", "income_bracket"), ("State", "state"), ("Net Worth", "net_worth_bracket"), ("Children", "children"), ("Marital Status", "marital_status"), ("Homeowner", "homeowner_status")]
 
@@ -77,46 +77,83 @@ def get_bq_client():
     if "private_key" in creds_dict: creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
     return bigquery.Client(credentials=service_account.Credentials.from_service_account_info(creds_dict), project=creds_dict["project_id"])
 
+def clean_gender(val):
+    v = str(val).strip().lower()
+    if v in ['m', 'male']: return 'Male'
+    if v in ['f', 'female']: return 'Female'
+    return 'ALL' if v == 'all' else 'Unknown'
+
+def clean_yes_no(val):
+    v = str(val).strip().lower()
+    if v in ['y', 'yes', 'true', 't', '1', '1.0']: return 'Yes'
+    if v in ['n', 'no', 'false', 'f', '0', '0.0']: return 'No'
+    return 'ALL' if v == 'all' else 'Unknown'
+
+def clean_marital(val):
+    v = str(val).strip().lower()
+    if v in ['y', 'yes', 'true', 't', 'married', 'm']: return 'Married'
+    if v in ['n', 'no', 'false', 'f', 'single', 's']: return 'Single'
+    return 'ALL' if v == 'all' else 'Unknown'
+
+def clean_homeowner_bq(val):
+    v = str(val).strip().lower()
+    if v == 'all': return 'ALL'
+    if v in ['y', 'yes', 'true', 't', 'homeowner']: return 'Homeowner'
+    if v in ['n', 'no', 'false', 'f', 'renter']: return 'Renter'
+    if 'homeowner' in v: return 'Homeowner'
+    if 'renter' in v: return 'Renter'
+    return 'Unknown'
+
+def clean_age(val):
+    v = str(val).strip().lower()
+    if v == 'all': return 'ALL'
+    if '65' in v: return '65+'
+    if '18' in v and '24' in v: return '18-24'
+    if '25' in v and '34' in v: return '25-34'
+    if '35' in v and '44' in v: return '35-44'
+    if '45' in v and '54' in v: return '45-54'
+    if '55' in v and '64' in v: return '55-64'
+    return 'Unknown'
+
 def bucket_income_bq(val):
-    val_str = str(val).lower()
-    if any(x in val_str for x in ['under $10', 'less than $20', '$10,000 - $14', '$20,000 - $24', '$30,000 - $34', '$40,000 - $44', '$20,000 to $44']): return 'Under $50k'
-    if any(x in val_str for x in ['$50,000 - $54', '$55,000 - $59', '$60,000 - $64', '$65,000 - $74', '$75,000 - $99']): return '$50k-$100k'
-    if any(x in val_str for x in ['$100,000 - $149']): return '$100k-$150k'
-    if any(x in val_str for x in ['$150,000 - $174', '$175,000 - $199', '$200,000 - $249', '$250,000 +', '$499,999 or more']): return '$150k+'
+    v = str(val).strip().lower()
+    if v == 'all': return 'ALL'
+    nums = [int(n) for n in re.findall(r'\d+', v.replace(',', ''))]
+    if not nums: return 'Unknown'
+    lower = nums[0]
+    if lower < 50000: return 'Under $50k'
+    if 50000 <= lower < 100000: return '$50k-$100k'
+    if 100000 <= lower < 150000: return '$100k-$150k'
+    if lower >= 150000: return '$150k+'
     return 'Unknown'
 
 def bucket_net_worth_bq(val):
-    val_str = str(val).lower()
-    if any(x in val_str for x in ['less than $1', '$1 - $4', '$5,000 - $9', '$10,000 - $24', '$25,000 - $49', '$50,000 - $99']): return 'Under $100k'
-    if any(x in val_str for x in ['$100,000 - $249']): return '$100k-$249k'
-    if any(x in val_str for x in ['$250,000 - $499', '$250,000 to $374', '$375,000 to $499']): return '$250k-$499k'
-    if any(x in val_str for x in ['$499,999 or more', '$500,000']): return '$500k+'
-    return 'Unknown'
-
-def clean_homeowner_bq(val):
-    val_str = str(val).lower()
-    if 'homeowner' in val_str: return 'Homeowner'
-    if 'renter' in val_str: return 'Renter'
+    v = str(val).strip().lower()
+    if v == 'all': return 'ALL'
+    nums = [int(n) for n in re.findall(r'\d+', v.replace(',', ''))]
+    if not nums: return 'Unknown'
+    lower = nums[0]
+    if lower < 100000: return 'Under $100k'
+    if 100000 <= lower < 250000: return '$100k-$249k'
+    if 250000 <= lower < 500000: return '$250k-$499k'
+    if lower >= 500000: return '$500k+'
     return 'Unknown'
 
 def normalize_demographics(df):
-    for col in ['gender', 'children']:
-        if col in df.columns:
-            df[col] = df[col].astype(str).str.strip().str.title()
-            df[col] = df[col].replace({'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female', 'True': 'Yes', 'False': 'No'})
-            
-    if 'marital_status' in df.columns:
-        df['marital_status'] = df['marital_status'].astype(str).str.strip().str.title()
-        df['marital_status'] = df['marital_status'].replace({'Y': 'Married', 'N': 'Single', 'Yes': 'Married', 'No': 'Single', 'True': 'Married', 'False': 'Single'})
-
+    """Applies hyper-resilient logic to n8n Purchaser API Data"""
+    if 'gender' in df.columns: df['gender'] = df['gender'].apply(clean_gender)
+    if 'children' in df.columns: df['children'] = df['children'].apply(clean_yes_no)
+    if 'marital_status' in df.columns: df['marital_status'] = df['marital_status'].apply(clean_marital)
+    if 'age_range' in df.columns: df['age_range'] = df['age_range'].apply(clean_age)
+    if 'homeowner_raw' in df.columns: df['homeowner_status'] = df['homeowner_raw'].apply(clean_homeowner_bq)
     if 'income_raw' in df.columns: df['income_bracket'] = df['income_raw'].apply(bucket_income_bq)
     if 'net_worth_raw' in df.columns: df['net_worth_bracket'] = df['net_worth_raw'].apply(bucket_net_worth_bq)
-    if 'homeowner_raw' in df.columns: df['homeowner_status'] = df['homeowner_raw'].apply(clean_homeowner_bq)
     
     if 'state' in df.columns: df['state'] = df['state'].astype(str).str.strip().str.upper()
 
+    # Null Sweeper
     for col in df.columns:
-        df[col] = df[col].replace(["", "nan", "NaN", "None", "null", "NULL", "<NA>"], "Unknown")
+        df[col] = df[col].replace(["", "nan", "NaN", "None", "null", "NULL", "<NA>", "unknown", "Unknown"], "Unknown")
         
     return df
 
@@ -155,7 +192,6 @@ def clean_api_purchasers(df):
     df = df.explode('email_match').reset_index(drop=True)
     return df
 
-# 🚨 BIGQUERY SUMMARY TABLE IMPORTER WITH ERROR HANDLING
 @st.cache_data(show_spinner=False, ttl=3600)
 def load_visitor_base():
     client = get_bq_client()
@@ -163,11 +199,9 @@ def load_visitor_base():
         df_demo = client.query("SELECT * FROM `leadnav-hhs.HHSpixeltest.weekly_demographic_summary`").to_dataframe()
         df_state = client.query("SELECT * FROM `leadnav-hhs.HHSpixeltest.weekly_state_summary`").to_dataframe()
         
-        # Standardize matching to Python script
         df_demo.columns = [c.lower().strip() for c in df_demo.columns]
         df_state.columns = [c.lower().strip() for c in df_state.columns]
         
-        # 🚨 THE BULLETPROOF RENAME
         df_demo = df_demo.rename(columns={
             'married': 'marital_status',
             'age': 'age_range',
@@ -176,34 +210,29 @@ def load_visitor_base():
             'homeowner': 'homeowner_status'
         })
 
-        # 🚨 TEXT CLEANUP FOR DUPLICATES
-        if 'gender' in df_demo.columns:
-            df_demo['gender'] = df_demo['gender'].replace({'M': 'Male', 'F': 'Female'})
-        if 'children' in df_demo.columns:
-            df_demo['children'] = df_demo['children'].replace({'Y': 'Yes', 'N': 'No'})
-        if 'marital_status' in df_demo.columns:
-            df_demo['marital_status'] = df_demo['marital_status'].replace({'Y': 'Married', 'N': 'Single'})
+        # 🚨 APPLY HYPER-RESILIENT MAPPERS TO BIGQUERY DATA
+        if 'gender' in df_demo.columns: df_demo['gender'] = df_demo['gender'].apply(clean_gender)
+        if 'children' in df_demo.columns: df_demo['children'] = df_demo['children'].apply(clean_yes_no)
+        if 'marital_status' in df_demo.columns: df_demo['marital_status'] = df_demo['marital_status'].apply(clean_marital)
+        if 'age_range' in df_demo.columns: df_demo['age_range'] = df_demo['age_range'].apply(clean_age)
+        if 'homeowner_status' in df_demo.columns: df_demo['homeowner_status'] = df_demo['homeowner_status'].apply(clean_homeowner_bq)
         
-        # Force all demographic columns to be Strings so they can accept 'ALL'
+        # Cast everything to string safely
         for col in df_demo.columns:
-            if col != 'total_visitors':
-                df_demo[col] = df_demo[col].astype(str)
-                
+            if col != 'total_visitors': df_demo[col] = df_demo[col].astype(str).str.strip()
         for col in df_state.columns:
-            if col != 'total_visitors':
-                df_state[col] = df_state[col].astype(str)
+            if col != 'total_visitors': df_state[col] = df_state[col].astype(str).str.strip()
         
-        # Clean up any weird pandas string-nulls and fill actual nulls
         df_demo = df_demo.replace(['nan', 'NaN', '<NA>', 'None', 'null', ''], 'ALL').fillna('ALL')
         df_state = df_state.replace(['nan', 'NaN', '<NA>', 'None', 'null', ''], 'ALL').fillna('ALL')
 
-        # 🚨 SMOOSH DUPLICATES: Group the CUBE together after cleaning the text!
+        # 🚨 SMOOSH DUPLICATES
         df_demo = df_demo.groupby(DEMO_COLS, as_index=False)['total_visitors'].sum()
         df_state = df_state.groupby('state', as_index=False)['total_visitors'].sum()
         
-        return df_demo, df_state, None # None means no errors!
+        return df_demo, df_state, None
     except Exception as e:
-        return pd.DataFrame(), pd.DataFrame(), str(e) # Returns the exact API error
+        return pd.DataFrame(), pd.DataFrame(), str(e)
 
 # ================ 3. APP FLOW =================
 if "app_state" not in st.session_state: st.session_state.app_state = "onboarding"
@@ -230,12 +259,6 @@ if st.session_state.app_state == "onboarding":
                         <h3 class="modern-serif-title" style="color: {PITCH_BRAND_COLOR}; margin-bottom: 10px;">LeadNavigator Intelligence is active...</h3>
                         <p style="color: #64748B; font-family: 'Outfit', sans-serif; margin-bottom: 40px;">Processing multi-touch attribution metrics (Est. 2-3 mins)</p>
                         <div class="custom-loader"></div>
-                        <div style="position: relative; height: 120px;">
-                            <div class="pitch-fact fact-1">Organizations that leverage customer behavioral insights outperform peers by 85% in sales growth and more than 25% in gross margin.</div>
-                            <div class="pitch-fact fact-2">Data-driven organizations are 23 times more likely to acquire customers and 6 times more likely to retain them.</div>
-                            <div class="pitch-fact fact-3">Companies that use data-driven marketing are 6x more likely to be profitable year-over-year.</div>
-                            <div class="pitch-fact fact-4">Understanding traffic flow eliminates wasted ad spend and instantly lowers your Customer Acquisition Cost.</div>
-                        </div>
                     </div>
                 """, unsafe_allow_html=True)
                 
@@ -244,7 +267,6 @@ if st.session_state.app_state == "onboarding":
                 unique_emails = cleaned_orders['email_match'].unique().tolist()
                 
                 try:
-                    # Enrich Purchasers via N8N
                     response = requests.post(AIDAN_WEBHOOK_URL, json={"emails": unique_emails}, timeout=180)
                     if response.status_code == 200:
                         raw_enriched_df = pd.read_csv(io.StringIO(response.text), on_bad_lines='skip', engine='python')
@@ -257,15 +279,13 @@ if st.session_state.app_state == "onboarding":
                         st.session_state.max_date = cleaned_orders['order_date'].max()
                         st.session_state.date_filter = (st.session_state.min_date, st.session_state.max_date)
                         
-                        # 🚨 Load BigQuery Baseline and Handle Errors Safely!
                         st.session_state.df_demo_cube, st.session_state.df_state_map, bq_error = load_visitor_base()
                         
                         if bq_error:
                             st.error(f"🚨 BIGQUERY CONNECTION ERROR: {bq_error}")
                             st.stop()
-                            
                         if 'gender' not in st.session_state.df_demo_cube.columns:
-                            st.error(f"🚨 SQL ERROR: Connected to BQ, but columns don't match. Found: {st.session_state.df_demo_cube.columns.tolist()}")
+                            st.error(f"🚨 SQL ERROR: Columns mismatch. Found: {st.session_state.df_demo_cube.columns.tolist()}")
                             st.stop()
                         
                         st.session_state.app_state = "dashboard"
@@ -299,13 +319,11 @@ elif st.session_state.app_state == "dashboard":
 
     metric_map = {"Conv %": "Conv %", "Purchases": "Purchases", "Revenue": "Revenue", "Visitors": "Visitors", "Rev/Visitor": "Rev/Visitor"}
 
-    # Filter Purchasers by Date Slider
     df_p_filtered = st.session_state.df_icp[
         (st.session_state.df_icp['order_date'] >= current_dates[0]) & 
         (st.session_state.df_icp['order_date'] <= current_dates[1])
     ].copy()
 
-    # 🚨 MISSING COLUMN SAFETY NET
     for _, col_name in configs:
         if col_name not in df_p_filtered.columns:
             df_p_filtered[col_name] = 'Unknown'
@@ -314,7 +332,7 @@ elif st.session_state.app_state == "dashboard":
     st.markdown('<p style="color: #64748B; margin-top: -5px; margin-bottom: 30px;">Traffic and Conversion Optimization</p>', unsafe_allow_html=True)
     
     # ========================================================
-    # 🔍 SINGLE VARIABLE DEEP DIVE (POWERED BY CUBE)
+    # 🔍 SINGLE VARIABLE DEEP DIVE
     # ========================================================
     st.subheader("🔍 Single Variable Deep Dive")
     if "active_single_var" not in st.session_state: st.session_state.active_single_var = "Gender"
@@ -329,9 +347,9 @@ elif st.session_state.app_state == "dashboard":
     selected_col = dict(configs)[st.session_state.active_single_var]
     
     if selected_col == 'state':
-        df_v_grp = st.session_state.df_state_map[st.session_state.df_state_map['state'] != 'ALL'].copy().rename(columns={'total_visitors': 'Visitors'})
+        df_v_grp = st.session_state.df_state_map[~st.session_state.df_state_map['state'].isin(EXCLUDE_LIST)].copy().rename(columns={'total_visitors': 'Visitors'})
     else:
-        mask = (st.session_state.df_demo_cube[selected_col] != 'ALL')
+        mask = (st.session_state.df_demo_cube[selected_col] != 'ALL') & (~st.session_state.df_demo_cube[selected_col].isin(EXCLUDE_LIST))
         for c in DEMO_COLS:
             if c != selected_col: mask &= (st.session_state.df_demo_cube[c] == 'ALL')
         df_v_grp = st.session_state.df_demo_cube[mask][[selected_col, 'total_visitors']].rename(columns={'total_visitors': 'Visitors'})
@@ -359,9 +377,9 @@ elif st.session_state.app_state == "dashboard":
     predictive_data = []
     for label, col_name in configs:
         if col_name == 'state':
-            grp_v = st.session_state.df_state_map[st.session_state.df_state_map['state'] != 'ALL'].copy()
+            grp_v = st.session_state.df_state_map[~st.session_state.df_state_map['state'].isin(EXCLUDE_LIST)].copy()
         else:
-            mask = (st.session_state.df_demo_cube[col_name] != 'ALL')
+            mask = (st.session_state.df_demo_cube[col_name] != 'ALL') & (~st.session_state.df_demo_cube[col_name].isin(EXCLUDE_LIST))
             for c in DEMO_COLS:
                 if c != col_name: mask &= (st.session_state.df_demo_cube[c] == 'ALL')
             grp_v = st.session_state.df_demo_cube[mask][[col_name, 'total_visitors']]
@@ -385,7 +403,7 @@ elif st.session_state.app_state == "dashboard":
     st.markdown("<hr>", unsafe_allow_html=True)
     
     # ========================================================
-    # 📊 MULTI-VARIABLE COMBINATION MATRIX (CUBE FILTER)
+    # 📊 MULTI-VARIABLE COMBINATION MATRIX
     # ========================================================
     st.subheader("📊 Multi-Variable Combination Matrix")
     
@@ -421,7 +439,7 @@ elif st.session_state.app_state == "dashboard":
                 
                 mask = pd.Series(True, index=st.session_state.df_demo_cube.index)
                 for col in DEMO_COLS:
-                    if col in sub_cols: mask &= (st.session_state.df_demo_cube[col] != 'ALL')
+                    if col in sub_cols: mask &= (st.session_state.df_demo_cube[col] != 'ALL') & (~st.session_state.df_demo_cube[col].isin(EXCLUDE_LIST))
                     else: mask &= (st.session_state.df_demo_cube[col] == 'ALL')
                 
                 for col, vals in selected_filters.items(): 
