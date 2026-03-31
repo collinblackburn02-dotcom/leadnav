@@ -148,8 +148,6 @@ def normalize_demographics(df):
     if 'marital_status' in df.columns: df['marital_status'] = df['marital_status'].apply(clean_marital)
     if 'age_range' in df.columns: df['age_range'] = df['age_range'].apply(clean_age)
     if 'homeowner_raw' in df.columns: df['homeowner_status'] = df['homeowner_raw'].apply(clean_homeowner_bq)
-    
-    # We apply the numerical bucketing ONLY to the Purchaser data!
     if 'income_raw' in df.columns: df['income_bracket'] = df['income_raw'].apply(bucket_income_bq)
     if 'net_worth_raw' in df.columns: df['net_worth_bracket'] = df['net_worth_raw'].apply(bucket_net_worth_bq)
     
@@ -213,7 +211,6 @@ def load_visitor_base():
             'homeowner': 'homeowner_status'
         })
 
-        # ONLY text standardization for BQ. We removed the double-bucketing!
         if 'gender' in df_demo.columns: df_demo['gender'] = df_demo['gender'].apply(clean_gender)
         if 'children' in df_demo.columns: df_demo['children'] = df_demo['children'].apply(clean_yes_no)
         if 'marital_status' in df_demo.columns: df_demo['marital_status'] = df_demo['marital_status'].apply(clean_marital)
@@ -258,41 +255,67 @@ if st.session_state.app_state == "onboarding":
                 st.markdown(f"""
                     <div style="text-align: center; padding: 60px 40px; background: #F8F6FA; border-radius: 12px; border: 1px solid {PITCH_BRAND_COLOR}; min-height: 380px;">
                         <h3 class="modern-serif-title" style="color: {PITCH_BRAND_COLOR}; margin-bottom: 10px;">LeadNavigator Intelligence is active...</h3>
-                        <p style="color: #64748B; font-family: 'Outfit', sans-serif; margin-bottom: 40px;">Processing multi-touch attribution metrics (Est. 2-3 mins)</p>
+                        <p style="color: #64748B; font-family: 'Outfit', sans-serif; margin-bottom: 40px;">Processing multi-touch attribution metrics. Please don't refresh the page.</p>
                         <div class="custom-loader"></div>
                     </div>
                 """, unsafe_allow_html=True)
                 
-                raw_df = pd.concat([pd.read_csv(f, encoding='latin1', on_bad_lines='skip') for f in st.session_state.orders_vault], ignore_index=True)
-                cleaned_orders = clean_orders_data(raw_df)
-                unique_emails = cleaned_orders['email_match'].unique().tolist()
+            raw_df = pd.concat([pd.read_csv(f, encoding='latin1', on_bad_lines='skip') for f in st.session_state.orders_vault], ignore_index=True)
+            cleaned_orders = clean_orders_data(raw_df)
+            unique_emails = cleaned_orders['email_match'].unique().tolist()
+            
+            # 🚨 NEW BATCH PROCESSING LOGIC
+            chunk_size = 50 # Send 50 emails at a time to prevent n8n timeouts!
+            all_enriched_dfs = []
+            
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            
+            try:
+                for i in range(0, len(unique_emails), chunk_size):
+                    chunk = unique_emails[i:i + chunk_size]
+                    batch_num = (i // chunk_size) + 1
+                    total_batches = (len(unique_emails) // chunk_size) + 1
+                    
+                    status_text.markdown(f"<p style='text-align:center; color:{PITCH_BRAND_COLOR}; font-weight:600;'>Enriching batch {batch_num} of {total_batches}...</p>", unsafe_allow_html=True)
+                    
+                    try:
+                        response = requests.post(AIDAN_WEBHOOK_URL, json={"emails": chunk}, timeout=180)
+                        if response.status_code == 200:
+                            chunk_df = pd.read_csv(io.StringIO(response.text), on_bad_lines='skip', engine='python')
+                            all_enriched_dfs.append(chunk_df)
+                    except requests.exceptions.RequestException as e:
+                        st.warning(f"Batch {batch_num} timed out. Skipping.")
+                        
+                    progress_bar.progress(min((i + chunk_size) / len(unique_emails), 1.0))
                 
-                try:
-                    response = requests.post(AIDAN_WEBHOOK_URL, json={"emails": unique_emails}, timeout=180)
-                    if response.status_code == 200:
-                        raw_enriched_df = pd.read_csv(io.StringIO(response.text), on_bad_lines='skip', engine='python')
-                        df_n8n_clean = clean_api_purchasers(raw_enriched_df).drop_duplicates(subset=['email_match'])
-                        
-                        purchasers_totals = cleaned_orders.groupby('email_match').agg(Total=('revenue_raw', 'sum'), Order_ID=('order_id', 'first'), order_date=('order_date', 'min')).reset_index()
-                        st.session_state.df_icp = pd.merge(purchasers_totals, df_n8n_clean, on='email_match', how='inner').reset_index(drop=True)
-                        
-                        st.session_state.min_date = cleaned_orders['order_date'].min()
-                        st.session_state.max_date = cleaned_orders['order_date'].max()
-                        st.session_state.date_filter = (st.session_state.min_date, st.session_state.max_date)
-                        
-                        st.session_state.df_demo_cube, st.session_state.df_state_map, bq_error = load_visitor_base()
-                        
-                        if bq_error:
-                            st.error(f"🚨 BIGQUERY CONNECTION ERROR: {bq_error}")
-                            st.stop()
-                        if 'gender' not in st.session_state.df_demo_cube.columns:
-                            st.error(f"🚨 SQL ERROR: Columns mismatch. Found: {st.session_state.df_demo_cube.columns.tolist()}")
-                            st.stop()
-                        
-                        st.session_state.app_state = "dashboard"
-                        st.rerun()
-                    else: st.error(f"Error {response.status_code}")
-                except Exception as e: st.error(f"Error: {str(e)}")
+                status_text.empty()
+                progress_bar.empty()
+                status_placeholder.empty()
+
+                if all_enriched_dfs:
+                    raw_enriched_df = pd.concat(all_enriched_dfs, ignore_index=True)
+                    df_n8n_clean = clean_api_purchasers(raw_enriched_df).drop_duplicates(subset=['email_match'])
+                    
+                    purchasers_totals = cleaned_orders.groupby('email_match').agg(Total=('revenue_raw', 'sum'), Order_ID=('order_id', 'first'), order_date=('order_date', 'min')).reset_index()
+                    st.session_state.df_icp = pd.merge(purchasers_totals, df_n8n_clean, on='email_match', how='inner').reset_index(drop=True)
+                    
+                    st.session_state.min_date = cleaned_orders['order_date'].min()
+                    st.session_state.max_date = cleaned_orders['order_date'].max()
+                    st.session_state.date_filter = (st.session_state.min_date, st.session_state.max_date)
+                    
+                    st.session_state.df_demo_cube, st.session_state.df_state_map, bq_error = load_visitor_base()
+                    
+                    if bq_error:
+                        st.error(f"🚨 BIGQUERY CONNECTION ERROR: {bq_error}")
+                        st.stop()
+                    
+                    st.session_state.app_state = "dashboard"
+                    st.rerun()
+                else:
+                    st.error("Failed to enrich any batches. Please check if your n8n server is online.")
+            except Exception as e: 
+                st.error(f"Error: {str(e)}")
 
 elif st.session_state.app_state == "dashboard":
     st.image("logo.png", width=180)
