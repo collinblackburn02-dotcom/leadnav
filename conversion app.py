@@ -216,14 +216,13 @@ def load_visitor_base():
         if 'marital_status' in df_demo.columns: df_demo['marital_status'] = df_demo['marital_status'].apply(clean_marital)
         if 'age_range' in df_demo.columns: df_demo['age_range'] = df_demo['age_range'].apply(clean_age)
         if 'homeowner_status' in df_demo.columns: df_demo['homeowner_status'] = df_demo['homeowner_status'].apply(clean_homeowner_bq)
+        if 'income_bracket' in df_demo.columns: df_demo['income_bracket'] = df_demo['income_bracket'].apply(bucket_income_bq)
+        if 'net_worth_bracket' in df_demo.columns: df_demo['net_worth_bracket'] = df_demo['net_worth_bracket'].apply(bucket_net_worth_bq)
         
         for col in df_demo.columns:
             if col != 'total_visitors': df_demo[col] = df_demo[col].astype(str).str.strip()
         for col in df_state.columns:
             if col != 'total_visitors': df_state[col] = df_state[col].astype(str).str.strip()
-
-        df_demo = df_demo.replace(['nan', 'NaN', '<NA>', 'None', 'null', ''], 'ALL').fillna('ALL')
-        df_state = df_state.replace(['nan', 'NaN', '<NA>', 'None', 'null', ''], 'ALL').fillna('ALL')
 
         df_demo = df_demo.groupby(DEMO_COLS, as_index=False)['total_visitors'].sum()
         df_state = df_state.groupby('state', as_index=False)['total_visitors'].sum()
