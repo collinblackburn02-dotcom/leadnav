@@ -9,24 +9,20 @@ import io
 import re
 
 # ================ 1. CONFIGURATION & THEME =================
-PITCH_COMPANY_NAME = "LeadNavigator" # On theme for pitch
-PITCH_BRAND_COLOR = "#4D148C" # Dark pitch purple for accents
+PITCH_COMPANY_NAME = "LeadNavigator" 
+PITCH_BRAND_COLOR = "#4D148C" 
 AIDAN_WEBHOOK_URL = "https://n8n.srv1144572.hstgr.cloud/webhook/669d6ef0-1393-479e-81c5-5b0bea4262b7"
 
-# User's exact column mappings from the n8n webhook response
 N8N_COLUMN_MAPPER = {
     "GENDER": "gender", "MARRIED": "marital_status", "AGE_RANGE": "age_range",
     "INCOME_RANGE": "income_raw", "PERSONAL_STATE": "state", 
     "HOMEOWNER": "homeowner_raw", "CHILDREN": "children", "NET_WORTH": "net_worth_raw"
 }
 
-# Data cleaning constants
 EXCLUDE_LIST = ['Unknown', 'U', '', 'None', 'nan', 'NaN', 'null', 'NULL', '<NA>', 'ALL']
 
-# Page config
 st.set_page_config(page_title=f"{PITCH_COMPANY_NAME} | Conversion Engine", page_icon="🧭", layout="wide", initial_sidebar_state="collapsed")
 
-# Custom styling
 def apply_custom_theme(primary_color):
     st.markdown(f"""
         <style>
@@ -36,6 +32,7 @@ def apply_custom_theme(primary_color):
             [data-testid="stHeader"] {{ display: none !important; }}
             #MainMenu {{ visibility: hidden; }}
             footer {{ visibility: hidden; }}
+            /* KEEPING THE SIDEBAR HIDDEN FOR A PREMIUM LOOK */
             [data-testid="stSidebar"], [data-testid="collapsedControl"] {{ display: none !important; }}
             .stMarkdown a svg {{ display: none !important; }}
             div[data-testid="stSlider"] label p {{ font-size: 1.2rem !important; font-weight: 700 !important; color: #0F172A !important; }}
@@ -46,7 +43,6 @@ def apply_custom_theme(primary_color):
             .premium-table-container table {{ width: 100% !important; border-collapse: collapse !important; border: none !important; }}
             .premium-table-container th {{ font-family: 'Outfit', sans-serif !important; background-color: #F8F6FA !important; color: {primary_color} !important; font-weight: 700 !important; text-align: center !important; padding: 15px 12px !important; border-bottom: 2px solid {primary_color} !important; font-size: 0.95rem !important; text-transform: none !important; }}
             .premium-table-container td {{ font-family: 'Outfit', sans-serif !important; text-align: center !important; padding: 12px !important; border-bottom: 1px solid #EBE4F4 !important; font-size: 0.9rem !important; color: #1e293b !important; }}
-            /* Centering the left-most data column and rank column */
             .premium-table-container td:first-child {{ font-weight: 700 !important; color: #0F172A !important; text-align: center !important; }}
             
             .serif-gradient-centerpiece {{ font-family: 'Playfair Display', serif !important; background: linear-gradient(90deg, #4D148C 0%, #20B2AA 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block; font-weight: 700 !important; letter-spacing: -0.5px; }}
@@ -61,18 +57,15 @@ def apply_custom_theme(primary_color):
     """, unsafe_allow_html=True)
 
 apply_custom_theme(PITCH_BRAND_COLOR)
-# Lighter gradient range for readability on un-highlighted cells
 brand_gradient = mcolors.LinearSegmentedColormap.from_list("brand_purple", ["#FFFFFF", "#FBF9FC", "#EBE4F4"])
 
-# Utility function to hide index for table display
 def render_premium_table(styler_obj):
     try: styler_obj = styler_obj.hide(axis="index")
-    except AttributeError: styler_obj = styler_obj.hide_index() # For compatibility
+    except AttributeError: styler_obj = styler_obj.hide_index() 
     html = styler_obj.to_html()
     st.markdown(f'<div class="premium-table-container">{html}</div>', unsafe_allow_html=True)
 
 # ================ 2. BIGQUERY DATA ENGINE =================
-# Define demographic variables to analyze
 DEMO_COLS = ['gender', 'age_range', 'marital_status', 'children', 'homeowner_status', 'income_bracket', 'net_worth_bracket']
 
 configs = [
@@ -84,14 +77,12 @@ configs = [
 INCOME_MAP = {'Under $50k': 1, '$50k-$100k': 2, '$100k-$150k': 3, '$150k+': 4}
 NET_WORTH_MAP = {'Under $100k': 1, '$100k-$249k': 2, '$250k-$499k': 3, '$500k+': 4}
 
-# GCP Credentials (secrets required in app.secrets)
 @st.cache_resource
 def get_bq_client():
     creds_dict = dict(st.secrets["gcp_service_account"])
     if "private_key" in creds_dict: creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
     return bigquery.Client(credentials=service_account.Credentials.from_service_account_info(creds_dict), project=creds_dict["project_id"])
 
-# Standardization functions
 def clean_gender(val):
     v = str(val).strip().lower()
     if v in ['male', 'm', '1', '1.0', 'true']: return 'Male'
@@ -130,75 +121,43 @@ def clean_age(val):
     if '55' in v and '64' in v: return '55-64'
     return 'Unknown'
 
-# 🚨 DATA BUG FIX: We need a regex, not exact text matching.
-# The BQ data uses literal names like "$100,000 - $149,999".
-# The Purchaser data might use exact dashboard names. We must normalize to the standard range names.
 def bucket_income_bq(val):
     v = str(val).strip().lower()
     if v == 'all': return 'ALL'
-    
-    # Dashboard screenshot (image_14.png) shows literal dashboard bucket names.
-    # We must use regex to ensure the data bucket from PURCHASER matches the BQ form.
-    
-    # Example: PURCHASER data has literal string '$100,000 to $149,999'.
-    # We need this to match the BQ '$100k-$150k' bucket.
-    
     nums = [int(n) for n in re.findall(r'\d+', v.replace(',', ''))]
     if not nums: return 'Unknown'
-    
     lower = nums[0]
-    
-    # Standardize based on logic (matches dashboard logic)
     if lower < 50000: return 'Under $50k'
     if 50000 <= lower < 100000: return '$50k-$100k'
     if 100000 <= lower < 150000: return '$100k-$150k'
     if lower >= 150000: return '$150k+'
-    
     return 'Unknown'
 
 def bucket_net_worth_bq(val):
     v = str(val).strip().lower()
     if v == 'all': return 'ALL'
-    
-    # Match against dashboard screenshot logic (image_0.png)
-    # "$1,000,000 or more" -> "$500k+"
-    # "-$2,499 to $2,499" -> "Under $100k" (assume lower band)
-    # "$100,000 to $149,999" -> "$100k-$249k"
-    
     nums = [int(n) for n in re.findall(r'\d+', v.replace(',', ''))]
     if not nums: return 'Unknown'
-    
     lower = nums[0]
-    
     if lower < 100000: return 'Under $100k'
     if 100000 <= lower < 250000: return '$100k-$249k'
     if 250000 <= lower < 500000: return '$250k-$499k'
     if lower >= 500000: return '$500k+'
-    
     return 'Unknown'
 
-# Master cleansing function for Purchaser API data (n8n response)
 def normalize_demographics(df):
-    """Standardizes the n8n webhook response to match BQ buckets."""
     if 'gender' in df.columns: df['gender'] = df['gender'].apply(clean_gender)
     if 'children' in df.columns: df['children'] = df['children'].apply(clean_yes_no)
     if 'marital_status' in df.columns: df['marital_status'] = df['marital_status'].apply(clean_marital)
     if 'age_range' in df.columns: df['age_range'] = df['age_range'].apply(clean_age)
-    
-    # Fixes from Turn 3 matching screenshots
     if 'homeowner_raw' in df.columns: df['homeowner_status'] = df['homeowner_raw'].apply(clean_homeowner_bq)
     if 'income_raw' in df.columns: df['income_bracket'] = df['income_raw'].apply(bucket_income_bq)
     if 'net_worth_raw' in df.columns: df['net_worth_bracket'] = df['net_worth_raw'].apply(bucket_net_worth_bq)
-    
     if 'state' in df.columns: df['state'] = df['state'].astype(str).str.strip().str.upper()
-
-    # Final null sweeper
     for col in df.columns:
         df[col] = df[col].replace(["", "nan", "NaN", "None", "null", "NULL", "<NA>", "unknown", "Unknown"], "Unknown")
-        
     return df
 
-# Data loaders
 @st.cache_data(show_spinner=False)
 def clean_orders_data(df):
     cols_lower = [str(c).strip().lower() for c in df.columns]
@@ -209,7 +168,7 @@ def clean_orders_data(df):
 
     df = df.rename(columns={e_col: 'email_match', o_col: 'order_id', t_col: 'revenue_raw', d_col: 'order_date'})
     df['email_match'] = df['email_match'].astype(str).str.lower().str.strip()
-    df = df[df['email_match'].str.contains('@', na=False)] # Filter valid emails
+    df = df[df['email_match'].str.contains('@', na=False)] 
     df['revenue_raw'] = pd.to_numeric(df['revenue_raw'].astype(str).str.replace(r'[^\d.-]', '', regex=True), errors='coerce').fillna(0)
     df = df[df['revenue_raw'] > 0]
     df['order_date'] = pd.to_datetime(df['order_date'], errors='coerce', utc=True).dt.date
@@ -218,9 +177,7 @@ def clean_orders_data(df):
 
 @st.cache_data(show_spinner=False)
 def clean_api_purchasers(df):
-    # n8n response uses exact dashboard text from Turn 3 screenshot.
     df.columns = [str(c).strip().upper() for c in df.columns]
-    # Look for typical email headers
     standard_emails = ['PERSONAL_EMAILS', 'BUSINESS_EMAIL', 'EMAIL_MATCH', 'DEEP_VERIFIED_EMAILS']
     found_email_col = next((col for col in standard_emails if col in df.columns), None)
     if not found_email_col: found_email_col = next((col for col in df.columns if 'EMAIL' in col), None)
@@ -229,11 +186,7 @@ def clean_api_purchasers(df):
     df = df.rename(columns={found_email_col: 'email_match'})
     df = df.rename(columns=N8N_COLUMN_MAPPER)
     df.columns = [c.lower() for c in df.columns]
-    
-    # Standardize demographics (applying regex fix from Turn 3)
     df = normalize_demographics(df)
-    
-    # Explode emails to create master email list
     df['email_match'] = df['email_match'].astype(str).str.lower().str.replace(r'[^a-z0-9@._,-]', '', regex=True).str.split(',')
     df = df.explode('email_match').reset_index(drop=True)
     return df
@@ -245,11 +198,9 @@ def load_visitor_base():
         df_demo = client.query("SELECT * FROM `leadnav-hhs.HHSpixeltest.weekly_demographic_summary`").to_dataframe()
         df_state = client.query("SELECT * FROM `leadnav-hhs.HHSpixeltest.weekly_state_summary`").to_dataframe()
         
-        # Normalize BQ column names
         df_demo.columns = [c.lower().strip() for c in df_demo.columns]
         df_state.columns = [c.lower().strip() for c in df_state.columns]
         
-        # Map BQ columns to standard application names
         df_demo = df_demo.rename(columns={
             'married': 'marital_status',
             'age': 'age_range',
@@ -258,7 +209,6 @@ def load_visitor_base():
             'homeowner': 'homeowner_status'
         })
 
-        # Minor standardization for text values in the CUBE result
         if 'gender' in df_demo.columns: df_demo['gender'] = df_demo['gender'].apply(clean_gender)
         if 'children' in df_demo.columns: df_demo['children'] = df_demo['children'].apply(clean_yes_no)
         if 'marital_status' in df_demo.columns: df_demo['marital_status'] = df_demo['marital_status'].apply(clean_marital)
@@ -267,17 +217,14 @@ def load_visitor_base():
         if 'income_bracket' in df_demo.columns: df_demo['income_bracket'] = df_demo['income_bracket'].apply(bucket_income_bq)
         if 'net_worth_bracket' in df_demo.columns: df_demo['net_worth_bracket'] = df_demo['net_worth_bracket'].apply(bucket_net_worth_bq)
         
-        # Type cast safe columns
         for col in df_demo.columns:
             if col != 'total_visitors': df_demo[col] = df_demo[col].astype(str).str.strip()
         for col in df_state.columns:
             if col != 'total_visitors': df_state[col] = df_state[col].astype(str).str.strip()
         
-        # Final fill for missing values within the cube structure, essential for combination matrix merging
         df_demo = df_demo.replace(['nan', 'NaN', '<NA>', 'None', 'null', ''], 'ALL').fillna('ALL')
         df_state = df_state.replace(['nan', 'NaN', '<NA>', 'None', 'null', ''], 'ALL').fillna('ALL')
 
-        # Aggregate to ensure absolute numbers from cube
         df_demo = df_demo.groupby(DEMO_COLS, as_index=False)['total_visitors'].sum()
         df_state = df_state.groupby('state', as_index=False)['total_visitors'].sum()
         
@@ -290,8 +237,6 @@ if "app_state" not in st.session_state: st.session_state.app_state = "onboarding
 if "df_icp" not in st.session_state: st.session_state.df_icp = None
 
 if st.session_state.app_state == "onboarding":
-    # Header (Pitch mode, center logo, bold statement)
-    # Using specific width for perceived sharpness of potentially blurry file
     st.image("logo.png", width=180)
     st.markdown("""<div style="text-align: center; margin-top: 0px; margin-bottom: 25px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.6rem; margin-bottom: 2px;">Conversion Analytics Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 1.8rem; color: #0F172A !important; margin-top: 5px;">Upload order data to build your conversion matrix.</h2></div>""", unsafe_allow_html=True)
     
@@ -307,11 +252,10 @@ if st.session_state.app_state == "onboarding":
         else:
             status_placeholder = st.empty()
             with status_placeholder:
-                # Premium pitch-ready placeholder with rotating facts
                 st.markdown(f"""
                     <div style="text-align: center; padding: 60px 40px; background: #F8F6FA; border-radius: 12px; border: 1px solid {PITCH_BRAND_COLOR}; min-height: 380px;">
                         <h3 class="modern-serif-title" style="color: {PITCH_BRAND_COLOR}; margin-bottom: 10px;">LeadNavigator Intelligence is active...</h3>
-                        <p style="color: #64748B; font-family: 'Outfit', sans-serif; margin-bottom: 40px;">Processing multi-touch attribution metrics (Est. 2-3 mins)</p>
+                        <p style="color: #64748B; font-family: 'Outfit', sans-serif; margin-bottom: 40px;">Processing multi-touch attribution metrics. Please don't refresh the page.</p>
                         <div class="custom-loader"></div>
                         <div style="position: relative; height: 100px;">
                             <p class="pitch-fact fact-1">💡 LeadNavigator automatically connects Shopify orders to thousands of household data points.</p>
@@ -322,31 +266,23 @@ if st.session_state.app_state == "onboarding":
                     </div>
                 """, unsafe_allow_html=True)
                 
-                # 1. Process Order Data locally
                 raw_df = pd.concat([pd.read_csv(f, encoding='latin1', on_bad_lines='skip') for f in st.session_state.orders_vault], ignore_index=True)
                 cleaned_orders = clean_orders_data(raw_df)
                 unique_emails = cleaned_orders['email_match'].unique().tolist()
                 
-                # 2. Enrich emails via n8n webhook (requires external server, secrets, etc.)
-                # We send all unique emails in one chunk to n8n.
                 try:
-                    # Bump timeout for large email lists
-                    response = requests.post(AIDAN_WEBHOOK_URL, json={"emails": unique_emails}, timeout=180)
+                    response = requests.post(AIDAN_WEBHOOK_URL, json={"emails": unique_emails}, timeout=600)
                     if response.status_code == 200:
-                        # 3. Clean n8n response (CSV format expected)
                         raw_enriched_df = pd.read_csv(io.StringIO(response.text), on_bad_lines='skip', engine='python')
                         df_n8n_clean = clean_api_purchasers(raw_enriched_df).drop_duplicates(subset=['email_match'])
                         
-                        # 4. Merge: Total Revenue by Email * Inner Merge * Demographics by Email
                         purchasers_totals = cleaned_orders.groupby('email_match').agg(Total=('revenue_raw', 'sum'), Order_ID=('order_id', 'first'), order_date=('order_date', 'min')).reset_index()
                         st.session_state.df_icp = pd.merge(purchasers_totals, df_n8n_clean, on='email_match', how='inner').reset_index(drop=True)
                         
-                        # Standard date filter setup
                         st.session_state.min_date = cleaned_orders['order_date'].min()
                         st.session_state.max_date = cleaned_orders['order_date'].max()
                         st.session_state.date_filter = (st.session_state.min_date, st.session_state.max_date)
                         
-                        # 5. Load BQ Visitor Baseline data
                         st.session_state.df_demo_cube, st.session_state.df_state_map, bq_error = load_visitor_base()
                         
                         if bq_error:
@@ -363,8 +299,6 @@ if st.session_state.app_state == "onboarding":
                 except Exception as e: st.error(f"n8n enrichment failed: {str(e)}. Please contact app support.")
 
 elif st.session_state.app_state == "dashboard":
-    # Finalized Premium Header
-    # Adjusted width slightly smaller to perceive sharpness of logo file
     st.image("logo.png", width=180)
     st.markdown(f"""<div style="text-align: center; margin-top: -10px; margin-bottom: 30px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.5rem; margin-bottom: 0px;">Conversion Analytics Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 2.8rem; color: #0F172A !important; margin-top: -5px;">Optimize your traffic funnel.</h2></div>""", unsafe_allow_html=True)
     
@@ -372,38 +306,39 @@ elif st.session_state.app_state == "dashboard":
     _, c2, _ = st.columns([1, 4, 1])
     with c2: st.slider("Filter Purchaser Date", min_value=st.session_state.min_date, max_value=st.session_state.max_date, key="date_filter", format="MMM DD, YYYY")
     
-    # Get active filters
     current_dates = st.session_state.get("date_filter")
     
-    # Premium Sidebar
-    with st.sidebar:
-        st.markdown(f"<h2 style='color: {PITCH_BRAND_COLOR}; text-align: center; margin-bottom: 0;'>🎯 LeadNavigator</h2>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align: center; color: #888; font-size: 0.8rem;'>Conversion Engine</p>", unsafe_allow_html=True)
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.header("Global Controls")
-        sort_order = st.radio("Ranking Order", ["High to Low", "Low to High"], horizontal=True)
-        is_ascending = (sort_order == "Low to High")
+    # 🚨 MOVED CONTROLS TO THE MAIN PAGE 🚨
+    st.markdown("<hr style='margin-top: 10px; margin-bottom: 30px;'>", unsafe_allow_html=True)
+    st.markdown('### 🎛️ Global Dashboard Controls')
+    
+    ctrl1, ctrl2, ctrl3, ctrl4 = st.columns(4)
+    with ctrl1:
         metric_choice = st.radio("Primary Metric Leaderboard", ["Rev/Visitor", "Conv %", "Revenue", "Purchases", "Visitors"])
-        min_visitors = st.number_input("Minimum Traffic Floor", value=250)
-        st.markdown("<br><br>", unsafe_allow_html=True)
+    with ctrl2:
+        sort_order = st.radio("Ranking Order", ["High to Low", "Low to High"])
+        is_ascending = (sort_order == "Low to High")
+    with ctrl3:
+        min_visitors = st.number_input("Minimum Traffic Floor", value=10) # Default lowered to 10
+    with ctrl4:
+        st.markdown("<br>", unsafe_allow_html=True)
         if st.button("🔄 Upload New Orders", use_container_width=True): 
             st.session_state.app_state = "onboarding"
             st.rerun()
+            
+    st.markdown("<hr style='margin-top: 10px; margin-bottom: 30px;'>", unsafe_allow_html=True)
 
     metric_map = {"Conv %": "Conv %", "Purchases": "Purchases", "Revenue": "Revenue", "Visitors": "Visitors", "Rev/Visitor": "Rev/Visitor"}
 
-    # 1. Apply Master Date Filter to Purchasers
     df_p_filtered = st.session_state.df_icp[
         (st.session_state.df_icp['order_date'] >= current_dates[0]) & 
         (st.session_state.df_icp['order_date'] <= current_dates[1])
     ].copy()
 
-    # Ensure all required demo columns exist in filtered purchaser data (or default to Unknown)
     for _, col_name in configs:
         if col_name not in df_p_filtered.columns:
             df_p_filtered[col_name] = 'Unknown'
 
-    # Main Page Title
     st.markdown('<p style="font-size: 2rem; font-weight: 700; margin-bottom: 0px;">Audience Insights Engine</p>', unsafe_allow_html=True)
     st.markdown('<p style="color: #64748B; margin-top: -5px; margin-bottom: 30px;">Traffic and Conversion Optimization</p>', unsafe_allow_html=True)
     
@@ -411,10 +346,8 @@ elif st.session_state.app_state == "dashboard":
     # 🔍 SINGLE VARIABLE DEEP DIVE
     # ========================================================
     st.subheader("🔍 Single Variable Deep Dive")
-    # Initialize active variable if missing
     if "active_single_var" not in st.session_state: st.session_state.active_single_var = "Gender"
     
-    # Premium variable selector buttons
     for i in range(0, len(configs), 5):
         var_cols = st.columns(5)
         for j, (label, col_name) in enumerate(configs[i:i+5]):
@@ -424,41 +357,33 @@ elif st.session_state.app_state == "dashboard":
                 
     selected_col = dict(configs)[st.session_state.active_single_var]
     
-    # 1. Load Visitor Baseline for the selected variable (excluding the Master/ALL/Unknown rows)
     if selected_col == 'state':
         df_v_grp = st.session_state.df_state_map[~st.session_state.df_state_map['state'].isin(EXCLUDE_LIST)].copy().rename(columns={'total_visitors': 'Visitors'})
     else:
         mask = (st.session_state.df_demo_cube[selected_col] != 'ALL') & (~st.session_state.df_demo_cube[selected_col].isin(EXCLUDE_LIST))
-        # Ensure *all other* variables are 'ALL'
         for c in DEMO_COLS:
             if c != selected_col: mask &= (st.session_state.df_demo_cube[c] == 'ALL')
         df_v_grp = st.session_state.df_demo_cube[mask][[selected_col, 'total_visitors']].rename(columns={'total_visitors': 'Visitors'})
     
-    # 2. Aggregates the Purchasers ( Inner Merged Data ) for this variable
-    # Exclude unmapped dashboard values like "Unknown" or dashboard standard "Unknown"
     df_p = df_p_filtered[~df_p_filtered[selected_col].isin(EXCLUDE_LIST)]
     df_p_grp = df_p.groupby(selected_col).agg(Purchases=('Order_ID', 'nunique'), Revenue=('Total', 'sum')).reset_index()
     
-    # 3. Merge: Outer baseline onto aggregates (left merge ensure visitor count)
     df_merged = pd.merge(df_v_grp, df_p_grp, on=selected_col, how='left').fillna(0)
 
-    # 4. Standard Metric Calculations & Styling
     if not df_merged.empty:
         df_merged['Conv %'] = (df_merged['Purchases'] / df_merged['Visitors'] * 100).round(2)
         df_merged['Rev/Visitor'] = (df_merged['Revenue'] / df_merged['Visitors']).round(2)
         df_merged = df_merged[df_merged['Visitors'] >= min_visitors].sort_values(metric_map[metric_choice], ascending=is_ascending)
         
         if not df_merged.empty:
-            # Premium Renaming for display
             display_df = df_merged.rename(columns={selected_col: st.session_state.active_single_var})
-            
-            # 🏆 Add BOLD Numbered RANK column
             display_df.insert(0, 'Rank', range(1, len(display_df) + 1))
-            
             styler = display_df.style.set_properties(**{'font-weight': 'bold'}, subset=['Rank']).format({'Rank': '{:.0f}', 'Visitors': '{:,.0f}', 'Purchases': '{:,.0f}', 'Revenue': '${:,.2f}', 'Conv %': '{:.2f}%', 'Rev/Visitor': '${:,.2f}'}).background_gradient(subset=['Rev/Visitor', 'Conv %'], cmap=brand_gradient)
             render_premium_table(styler)
-        else: st.warning("No segments met the Minimum Traffic Floor criteria.")
-    else: st.warning("No segments met the Minimum Traffic Floor criteria.")
+        else:
+            st.warning("No segments met the Minimum Traffic Floor criteria. You can lower the floor on the left sidebar.")
+    else:
+        st.warning("No segments met the Minimum Traffic Floor criteria. You can lower the floor on the left sidebar.")
 
     st.markdown("<hr>", unsafe_allow_html=True)
     
@@ -466,40 +391,31 @@ elif st.session_state.app_state == "dashboard":
     # 🏆 TOP CONVERSION DRIVERS
     # ========================================================
     st.subheader("🏆 Top Conversion Drivers")
-    # Re-apply the CUBE Fix Logic from Turn 2: Always use the Master Visitor Baseline
-    # We need the master 'ALL' total to build the correct conversion rate denominator.
-    
     predictive_data = []
     for label, col_name in configs:
-        # 1. Baseline visitors for *this demographic* (e.g., all Males, all Females)
         if col_name == 'state':
             grp_v = st.session_state.df_state_map[~st.session_state.df_state_map['state'].isin(EXCLUDE_LIST)].copy()
         else:
             mask = (st.session_state.df_demo_cube[col_name] != 'ALL') & (~st.session_state.df_demo_cube[col_name].isin(EXCLUDE_LIST))
-            # Ensure all other variables are 'ALL' to get the single-demo total
             for c in DEMO_COLS:
                 if c != col_name: mask &= (st.session_state.df_demo_cube[c] == 'ALL')
             grp_v = st.session_state.df_demo_cube[mask][[col_name, 'total_visitors']]
         
-        # 2. Filter purchasers (Inner Merge result) for this variable (already inner merged, just cleanse)
         df_p_sub = df_p_filtered[~df_p_filtered[col_name].isin(EXCLUDE_LIST)]
         grp_p = df_p_sub.groupby(col_name).agg(Purchases=('Order_ID', 'nunique')).reset_index()
         
-        # 3. Merge: Apply baseline onto aggregates (left merge visitor count)
         grp = pd.merge(grp_v, grp_p, on=col_name, how='left').fillna(0).rename(columns={'total_visitors': 'Visitors'})
-        grp = grp[grp['Visitors'] >= min_visitors] # Apply minimum floor
+        grp = grp[grp['Visitors'] >= min_visitors]
         
         if len(grp) >= 2:
-            #  Deny "Master ALL" row logic from previous turn: The grp naturally denies CUBE master ALL rows
-            
             grp['Conv %'] = (grp['Purchases'] / grp['Visitors']) * 100
             top_row, bot_row = grp.loc[grp['Conv %'].idxmax()], grp.loc[grp['Conv %'].idxmin()]
             predictive_data.append({"Demographic Trait": label, "Top Segment": top_row[col_name], "Conv % (Top)": top_row['Conv %'], "Worst Segment": bot_row[col_name], "Conv % (Worst)": bot_row['Conv %'], "Predictive Swing": top_row['Conv %'] - bot_row['Conv %']})
 
-    # Final standardized predictive table display
     if predictive_data:
         pred_df = pd.DataFrame(predictive_data).sort_values("Predictive Swing", ascending=is_ascending)
-        styler = pred_df.style.format({'Conv % (Top)': '{:.2f}%', 'Conv % (Worst)': '{:.2f}%', 'Predictive Swing': '{:.2f}%'}).background_gradient(subset=['Predictive Swing', 'Conv % (Top)'], cmap=brand_gradient).background_gradient(subset=['Conv % (Worst)'], cmap=mcolors.LinearSegmentedColormap.from_list("custom_purple_r", ["#4D148C", "#FBF9FC", "#FFFFFF"]))
+        pred_df.insert(0, 'Rank', range(1, len(pred_df) + 1))
+        styler = pred_df.style.set_properties(**{'font-weight': 'bold'}, subset=['Rank']).format({'Rank': '{:.0f}', 'Conv % (Top)': '{:.2f}%', 'Conv % (Worst)': '{:.2f}%', 'Predictive Swing': '{:.2f}%'}).background_gradient(subset=['Predictive Swing', 'Conv % (Top)'], cmap=brand_gradient).background_gradient(subset=['Conv % (Worst)'], cmap=mcolors.LinearSegmentedColormap.from_list("custom_purple_r", ["#4D148C", "#FBF9FC", "#FFFFFF"]))
         render_premium_table(styler)
 
     st.markdown("<hr>", unsafe_allow_html=True)
@@ -509,10 +425,8 @@ elif st.session_state.app_state == "dashboard":
     # ========================================================
     st.subheader("📊 Multi-Variable Combination Matrix")
     
-    # State is not available in combination matrix (due to cube sparsity)
     demo_only_configs = [c for c in configs if c[1] != 'state']
 
-    # Advanced multi-select filtering for pitch mode
     with st.expander("🎛️ Combination Filters", expanded=True):
         selected_filters, included_types = {}, []
         filter_cols = st.columns(3)
@@ -521,12 +435,9 @@ elif st.session_state.app_state == "dashboard":
             with filter_cols[i % 3]:
                 c_title, c_inc = st.columns([3, 1])
                 c_title.markdown(f'<p style="font-weight: 600; color: {PITCH_BRAND_COLOR}; margin-bottom: 0;">{label}</p>', unsafe_allow_html=True)
-                # Helper checkbox to explicitly include the variable in combinations
                 is_inc = c_inc.checkbox("Inc", key=f"inc_{col_name}", help=f"Include {label} in combination matrix")
                 
-                # Get unique clean options
                 opts = [x for x in st.session_state.df_demo_cube[col_name].unique() if x not in EXCLUDE_LIST]
-                # Sorting logic
                 if col_name == 'income_bracket': opts = sorted(opts, key=lambda x: INCOME_MAP.get(x, 99))
                 elif col_name == 'net_worth_bracket': opts = sorted(opts, key=lambda x: NET_WORTH_MAP.get(x, 99))
                 else: opts = sorted(opts)
@@ -535,46 +446,36 @@ elif st.session_state.app_state == "dashboard":
                 if is_inc: included_types.append(col_name)
                 if val: selected_filters[col_name] = val
 
-    # Combo Matrix Logic
     st.markdown("<br>", unsafe_allow_html=True)
     if included_types:
         combos = []
-        # Calculate up to 3-way combinations (sparsity limit)
         max_combo_size = min(3, len(included_types))
         
         for r in range(1, max_combo_size + 1):
             for subset in itertools.combinations(included_types, r):
                 sub_cols = list(subset)
                 
-                # 1. Filter Visitor Baseline using the Master/ALL/Unknown Cube rows
                 mask = pd.Series(True, index=st.session_state.df_demo_cube.index)
                 for col in DEMO_COLS:
-                    # Deny "Master ALL" row logic from previous turn: The subset column *must* have distinct values, all other *must* be ALL
                     if col in sub_cols: mask &= (st.session_state.df_demo_cube[col] != 'ALL') & (~st.session_state.df_demo_cube[col].isin(EXCLUDE_LIST))
                     else: mask &= (st.session_state.df_demo_cube[col] == 'ALL')
                 
-                # Re-apply manual multiselect filters
                 for col, vals in selected_filters.items(): 
                     if col in sub_cols: mask &= st.session_state.df_demo_cube[col].isin(vals)
                         
                 temp_v = st.session_state.df_demo_cube[mask].copy()
                 if temp_v.empty: continue
                 
-                # 2. Process Purchasers (Inner Merge result)
                 temp_p = df_p_filtered.copy()
-                # Demographic cleanse applies standard Buckets defined on Turn 3
                 for col in sub_cols:
                     temp_p = temp_p[~temp_p[col].isin(EXCLUDE_LIST)]
                     if col in selected_filters: temp_p = temp_p[temp_p[col].isin(selected_filters[col])]
                     
-                # 3. Aggregates Inner Purchasers for this combination
                 grp_v = temp_v[sub_cols + ['total_visitors']]
                 grp_p = temp_p.groupby(sub_cols).agg(Purchases=('Order_ID', 'nunique'), Revenue=('Total', 'sum')).reset_index()
                 
-                # 4. Merge: Standard grouping merge (left merge visitor count)
                 grp = pd.merge(grp_v, grp_p, on=sub_cols, how='left').fillna(0).rename(columns={'total_visitors': 'Visitors'})
                 
-                # Add back static columns for concat later
                 for col in included_types:
                     if col not in sub_cols:
                         grp[col] = ", ".join(selected_filters[col]) if col in selected_filters and selected_filters[col] else ""
@@ -585,17 +486,14 @@ elif st.session_state.app_state == "dashboard":
             res['Conv %'] = (res['Purchases'] / res['Visitors'] * 100).round(2)
             res['Rev/Visitor'] = (res['Revenue'] / res['Visitors']).round(2)
             
-            # Standard sorting & renaming display logic
             final_res = res[res['Visitors'] >= min_visitors].sort_values(metric_map[metric_choice], ascending=is_ascending)
             ordered_cols = included_types + ["Visitors", "Purchases", "Revenue", "Conv %", "Rev/Visitor"]
             rename_dict = {c[1]: c[0] for c in configs}
             
-            # final_res table display logic
             if final_res.empty: st.warning("No combinations met the Traffic Floor minimum.")
             else:
                 st.metric("Total Segments Found", f"{len(final_res):,}")
                 
-                # 🏆 Add BOLD Numbered RANK column
                 final_res.insert(0, 'Rank', range(1, len(final_res) + 1))
                 final_ordered_cols = ['Rank'] + ordered_cols
                 
