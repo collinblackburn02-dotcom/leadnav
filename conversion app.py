@@ -264,8 +264,8 @@ if st.session_state.app_state == "onboarding":
             cleaned_orders = clean_orders_data(raw_df)
             unique_emails = cleaned_orders['email_match'].unique().tolist()
             
-            # 🚨 NEW BATCH PROCESSING LOGIC
-            chunk_size = 50 # Send 50 emails at a time to prevent n8n timeouts!
+            # 🚨 2000-ROW BATCHING (And bumped the timeout to 10 Minutes!)
+            chunk_size = 2000 
             all_enriched_dfs = []
             
             progress_bar = st.progress(0)
@@ -277,15 +277,16 @@ if st.session_state.app_state == "onboarding":
                     batch_num = (i // chunk_size) + 1
                     total_batches = (len(unique_emails) // chunk_size) + 1
                     
-                    status_text.markdown(f"<p style='text-align:center; color:{PITCH_BRAND_COLOR}; font-weight:600;'>Enriching batch {batch_num} of {total_batches}...</p>", unsafe_allow_html=True)
+                    status_text.markdown(f"<p style='text-align:center; color:{PITCH_BRAND_COLOR}; font-weight:600;'>Enriching payload {batch_num} of {total_batches}...</p>", unsafe_allow_html=True)
                     
                     try:
-                        response = requests.post(AIDAN_WEBHOOK_URL, json={"emails": chunk}, timeout=180)
+                        # Bumped timeout to 600 seconds (10 mins) so n8n has plenty of time to respond
+                        response = requests.post(AIDAN_WEBHOOK_URL, json={"emails": chunk}, timeout=600)
                         if response.status_code == 200:
                             chunk_df = pd.read_csv(io.StringIO(response.text), on_bad_lines='skip', engine='python')
                             all_enriched_dfs.append(chunk_df)
                     except requests.exceptions.RequestException as e:
-                        st.warning(f"Batch {batch_num} timed out. Skipping.")
+                        st.warning(f"Payload {batch_num} timed out. Skipping.")
                         
                     progress_bar.progress(min((i + chunk_size) / len(unique_emails), 1.0))
                 
@@ -313,7 +314,7 @@ if st.session_state.app_state == "onboarding":
                     st.session_state.app_state = "dashboard"
                     st.rerun()
                 else:
-                    st.error("Failed to enrich any batches. Please check if your n8n server is online.")
+                    st.error("Failed to enrich payload. Please check if your n8n server is online.")
             except Exception as e: 
                 st.error(f"Error: {str(e)}")
 
