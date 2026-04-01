@@ -493,7 +493,7 @@ elif st.session_state.app_state == "dashboard":
         combos = []
         max_combo_size = min(3, len(included_types))
         
-        for r in range(1, max_combo_size + 1):
+        for r in [len(included_types)]:
             for subset in itertools.combinations(included_types, r):
                 sub_cols = list(subset)
                 
