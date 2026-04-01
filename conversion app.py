@@ -69,9 +69,6 @@ def render_premium_table(styler_obj):
 DEMO_COLS = ['gender', 'age_range', 'marital_status', 'children', 'homeowner_status', 'income_bracket', 'net_worth_bracket']
 configs = [("Gender", "gender"), ("Age", "age_range"), ("Income", "income_bracket"), ("State", "state"), ("Net Worth", "net_worth_bracket"), ("Children", "children"), ("Marital Status", "marital_status"), ("Homeowner", "homeowner_status")]
 
-INCOME_MAP = {'Under $50k': 1, '$50k-$100k': 2, '$100k-$150k': 3, '$150k+': 4}
-NET_WORTH_MAP = {'Under $100k': 1, '$100k-$249k': 2, '$250k-$499k': 3, '$500k+': 4}
-
 @st.cache_resource
 def get_bq_client():
     creds_dict = dict(st.secrets["gcp_service_account"])
@@ -236,7 +233,6 @@ def load_visitor_base():
         df_demo.columns = [c.lower().strip() for c in df_demo.columns]
         df_state.columns = [c.lower().strip() for c in df_state.columns]
         
-        
         df_demo = df_demo.rename(columns={
             'married': 'marital_status',
             'age': 'age_range',
@@ -255,9 +251,12 @@ def load_visitor_base():
         
         for col in df_demo.columns:
             if col != 'total_visitors': df_demo[col] = df_demo[col].astype(str).str.strip()
+        
         for col in df_state.columns:
-            if col != 'total_visitors': df_state[col] = df_state[col].astype(str).str.strip()
-        df_state['state'] = df_state['state'].str.upper() # 🚨 THE FIX: Match casing to purchasers
+            if col != 'total_visitors': 
+                # 🚨 THE FIX: Force Visitor state to match uppercase Purchaser states
+                df_state[col] = df_state[col].astype(str).str.strip().str.upper()
+
         df_demo = df_demo.replace(['nan', 'NaN', '<NA>', 'None', 'null', ''], 'ALL').fillna('ALL')
         df_state = df_state.replace(['nan', 'NaN', '<NA>', 'None', 'null', ''], 'ALL').fillna('ALL')
 
@@ -272,7 +271,7 @@ def load_visitor_base():
 if "app_state" not in st.session_state: st.session_state.app_state = "onboarding"
 if "df_icp" not in st.session_state: st.session_state.df_icp = None
 
-# Custom HTML Logo block - white-space: nowrap ensures it never breaks to a second line
+# Custom HTML Logo block
 custom_html_logo = f"""
     <div style="font-family: 'Outfit', sans-serif; font-size: 1.6rem; font-weight: 800; color: #0F172A; letter-spacing: -0.5px; margin-top: 10px; white-space: nowrap;">
         Lead<span style="color: {PITCH_BRAND_COLOR};">Navigator</span>
@@ -546,7 +545,6 @@ elif st.session_state.app_state == "dashboard":
                 temp_p = df_p_filtered.copy()
                 for col in sub_cols:
                     temp_p = temp_p[~temp_p[col].isin(EXCLUDE_LIST)]
-                    # 🚨 THE FIX: Only filter purchasers if the column is actually in this specific permutation!
                     if col in selected_filters: 
                         temp_p = temp_p[temp_p[col].isin(selected_filters[col])]
                     
@@ -555,10 +553,10 @@ elif st.session_state.app_state == "dashboard":
                 
                 grp = pd.merge(grp_v, grp_p, on=sub_cols, how='left').fillna(0).rename(columns={'total_visitors': 'Visitors'})
                 
-                # 🚨 THE FIX: Accurately label un-used variables as "All" instead of faking it
+                # 🚨 THE FIX: Leave un-used variables completely blank for readability
                 for col in included_types:
                     if col not in sub_cols:
-                        grp[col] = "All"
+                        grp[col] = ""
                 combos.append(grp)
                 
         if combos:
