@@ -489,11 +489,12 @@ elif st.session_state.app_state == "dashboard":
                 if val: selected_filters[col_name] = val
 
     st.markdown("<br>", unsafe_allow_html=True)
-    if included_types:
+  if included_types:
         combos = []
+        # 🚨 RESTORED: Hard cap at 3 variables so BigQuery doesn't explode
         max_combo_size = min(3, len(included_types))
         
-        for r in [len(included_types)]:
+        for r in range(1, max_combo_size + 1):
             for subset in itertools.combinations(included_types, r):
                 sub_cols = list(subset)
                 
@@ -511,16 +512,19 @@ elif st.session_state.app_state == "dashboard":
                 temp_p = df_p_filtered.copy()
                 for col in sub_cols:
                     temp_p = temp_p[~temp_p[col].isin(EXCLUDE_LIST)]
-                    if col in selected_filters: temp_p = temp_p[temp_p[col].isin(selected_filters[col])]
+                    # 🚨 THE FIX: Only filter purchasers if the column is actually in this specific permutation!
+                    if col in selected_filters: 
+                        temp_p = temp_p[temp_p[col].isin(selected_filters[col])]
                     
                 grp_v = temp_v[sub_cols + ['total_visitors']]
                 grp_p = temp_p.groupby(sub_cols).agg(Purchases=('Order_ID', 'nunique'), Revenue=('Total', 'sum')).reset_index()
                 
                 grp = pd.merge(grp_v, grp_p, on=sub_cols, how='left').fillna(0).rename(columns={'total_visitors': 'Visitors'})
                 
+                # 🚨 THE FIX: Accurately label un-used variables as "All" instead of faking it
                 for col in included_types:
                     if col not in sub_cols:
-                        grp[col] = ", ".join(selected_filters[col]) if col in selected_filters and selected_filters[col] else ""
+                        grp[col] = "All"
                 combos.append(grp)
                 
         if combos:
