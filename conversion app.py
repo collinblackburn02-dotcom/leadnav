@@ -69,7 +69,7 @@ def render_premium_table(styler_obj):
 DEMO_COLS = ['gender', 'age_range', 'marital_status', 'children', 'homeowner_status', 'income_bracket', 'net_worth_bracket']
 configs = [("Gender", "gender"), ("Age", "age_range"), ("Income", "income_bracket"), ("State", "state"), ("Net Worth", "net_worth_bracket"), ("Children", "children"), ("Marital Status", "marital_status"), ("Homeowner", "homeowner_status")]
 
-INCOME_MAP = {'Under $50k': 1, '$50k-$100k': 2, '$100k-$150k': 3, '$150k+': 4}
+INCOME_MAP = {'Under $50k': 1, '$50k-$100k': 2, '$100k-$150k': 3, '$150k-$250k': 4, '$250k+': 5}
 NET_WORTH_MAP = {'Under $100k': 1, '$100k-$249k': 2, '$250k-$499k': 3, '$500k+': 4}
 
 @st.cache_resource
@@ -137,15 +137,19 @@ def bucket_income_bq(val):
     from_100k_to_150k = [
         '$100,000 - $149,999'
     ]
-    over_150k = [
+    from_150k_to_250k = [
         '$150,000 - $174,999', '$150,000 to $199,999', '$175,000 - $199,999', 
-        '$200,000 - $249,999', '$250,000 +'
+        '$200,000 - $249,999'
+    ]
+    over_250k = [
+        '$250,000 +'
     ]
     
     if v in under_50k: return 'Under $50k'
     if v in from_50k_to_100k: return '$50k-$100k'
     if v in from_100k_to_150k: return '$100k-$150k'
-    if v in over_150k: return '$150k+'
+    if v in from_150k_to_250k: return '$150k-$250k'
+    if v in over_250k: return '$250k+'
     
     return 'Unknown'
 
