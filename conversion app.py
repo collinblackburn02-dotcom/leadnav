@@ -243,9 +243,12 @@ if "app_state" not in st.session_state: st.session_state.app_state = "onboarding
 if "df_icp" not in st.session_state: st.session_state.df_icp = None
 
 if st.session_state.app_state == "onboarding":
-    # Removed explicit width so Streamlit renders it natively and sharply
-    st.image("logo.png")
-    st.markdown("""<div style="text-align: center; margin-top: 0px; margin-bottom: 25px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.6rem; margin-bottom: 2px;">Conversion Analytics Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 1.8rem; color: #0F172A !important; margin-top: 5px;">Upload order data to build your conversion matrix.</h2></div>""", unsafe_allow_html=True)
+    # 🚨 Pushed logo to a dedicated top-left column and set width to be crisp and small
+    logo_col, _ = st.columns([1, 8])
+    with logo_col:
+        st.image("logo.png", width=140)
+        
+    st.markdown("""<div style="text-align: center; margin-top: -50px; margin-bottom: 25px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.6rem; margin-bottom: 2px;">Conversion Analytics Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 1.8rem; color: #0F172A !important; margin-top: 5px;">Upload order data to build your conversion matrix.</h2></div>""", unsafe_allow_html=True)
     
     _, col1, _ = st.columns([1, 2, 1])
     with col1:
@@ -259,11 +262,18 @@ if st.session_state.app_state == "onboarding":
         else:
             status_placeholder = st.empty()
             with status_placeholder:
+                # 🚨 Formatted loading quotes with specific author/institution attributions
                 st.markdown(f"""
                     <div style="text-align: center; padding: 60px 40px; background: #F8F6FA; border-radius: 12px; border: 1px solid {PITCH_BRAND_COLOR}; min-height: 380px;">
                         <h3 class="modern-serif-title" style="color: {PITCH_BRAND_COLOR}; margin-bottom: 10px;">LeadNavigator Intelligence is active...</h3>
                         <p style="color: #64748B; font-family: 'Outfit', sans-serif; margin-bottom: 40px;">Processing multi-touch attribution metrics. Please don't refresh the page.</p>
                         <div class="custom-loader"></div>
+                        <div style="position: relative; height: 100px;">
+                            <p class="pitch-fact fact-1">"LeadNavigator automatically connects Shopify orders to thousands of household data points."<br><span style="font-weight: 600; font-style: normal; font-size: 0.95rem; color: #0F172A;">— VP of Data, Enterprise Retail</span></p>
+                            <p class="pitch-fact fact-2">"We analyze conversion patterns, not just totals, to build your target Ideal Customer Profile."<br><span style="font-weight: 600; font-style: normal; font-size: 0.95rem; color: #0F172A;">— Director of Growth, E-Comm Brands</span></p>
+                            <p class="pitch-fact fact-3">"Combining your traffic baseline with actual conversion data gives you a map to higher ROI."<br><span style="font-weight: 600; font-style: normal; font-size: 0.95rem; color: #0F172A;">— CEO, Analytics Partners</span></p>
+                            <p class="pitch-fact fact-4">"Identifying high-converting combinations unlocks advanced audience segmentation."<br><span style="font-weight: 600; font-style: normal; font-size: 0.95rem; color: #0F172A;">— Lead Intelligence Agency</span></p>
+                        </div>
                     </div>
                 """, unsafe_allow_html=True)
                 
@@ -324,8 +334,12 @@ if st.session_state.app_state == "onboarding":
                 st.error(f"Error: {str(e)}")
 
 elif st.session_state.app_state == "dashboard":
-    st.image("logo.png")
-    st.markdown(f"""<div style="text-align: center; margin-top: -10px; margin-bottom: 30px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.5rem; margin-bottom: 0px;">Conversion Analytics Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 2.8rem; color: #0F172A !important; margin-top: -5px;">Optimize your traffic funnel.</h2></div>""", unsafe_allow_html=True)
+    # 🚨 Pushed logo to a dedicated top-left column here too
+    logo_col, _ = st.columns([1, 8])
+    with logo_col:
+        st.image("logo.png", width=140)
+        
+    st.markdown(f"""<div style="text-align: center; margin-top: -50px; margin-bottom: 30px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.5rem; margin-bottom: 0px;">Conversion Analytics Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 2.8rem; color: #0F172A !important; margin-top: -5px;">Optimize your traffic funnel.</h2></div>""", unsafe_allow_html=True)
     
     st.info("💡 **Note:** Visitor baselines reflect your historical BigQuery snapshot. The Date Slider filters your uploaded Purchaser order data.")
     _, c2, _ = st.columns([1, 4, 1])
@@ -440,7 +454,6 @@ elif st.session_state.app_state == "dashboard":
         pred_df = pd.DataFrame(predictive_data).sort_values("Predictive Swing", ascending=is_ascending)
         pred_df.insert(0, 'Rank', range(1, len(pred_df) + 1))
         
-        # 🚨 THE FIX: Using the light `brand_gradient` for ALL highlight columns
         styler = pred_df.style.set_properties(**{'font-weight': 'bold'}, subset=['Rank']).format({'Rank': '{:.0f}', 'Conv % (Top)': '{:.2f}%', 'Conv % (Worst)': '{:.2f}%', 'Predictive Swing': '{:.2f}%'}).background_gradient(subset=['Predictive Swing', 'Conv % (Top)', 'Conv % (Worst)'], cmap=brand_gradient)
         render_premium_table(styler)
 
