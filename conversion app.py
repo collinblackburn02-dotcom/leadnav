@@ -235,6 +235,7 @@ def load_visitor_base():
         
         df_demo.columns = [c.lower().strip() for c in df_demo.columns]
         df_state.columns = [c.lower().strip() for c in df_state.columns]
+        df_state['state'] = df_state['state'].str.upper() # 🚨 THE FIX: Match casing to purchasers
         
         df_demo = df_demo.rename(columns={
             'married': 'marital_status',
