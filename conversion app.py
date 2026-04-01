@@ -42,7 +42,6 @@ def apply_custom_theme(primary_color):
             .premium-table-container table {{ width: 100% !important; border-collapse: collapse !important; border: none !important; }}
             .premium-table-container th {{ font-family: 'Outfit', sans-serif !important; background-color: #F8F6FA !important; color: {primary_color} !important; font-weight: 700 !important; text-align: center !important; padding: 15px 12px !important; border-bottom: 2px solid {primary_color} !important; font-size: 0.95rem !important; text-transform: none !important; }}
             .premium-table-container td {{ font-family: 'Outfit', sans-serif !important; text-align: center !important; padding: 12px !important; border-bottom: 1px solid #EBE4F4 !important; font-size: 0.9rem !important; color: #1e293b !important; }}
-            /* 🚨 Fix: Centers the Rank column and makes it bold */
             .premium-table-container td:first-child {{ font-weight: 700 !important; color: #0F172A !important; text-align: center !important; }}
             
             .serif-gradient-centerpiece {{ font-family: 'Playfair Display', serif !important; background: linear-gradient(90deg, #4D148C 0%, #20B2AA 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block; font-weight: 700 !important; letter-spacing: -0.5px; }}
@@ -58,7 +57,6 @@ def apply_custom_theme(primary_color):
 
 apply_custom_theme(PITCH_BRAND_COLOR)
 
-# 🚨 THE COLOR FIX: Only using the light readable gradient for EVERYTHING
 brand_gradient = mcolors.LinearSegmentedColormap.from_list("brand_purple", ["#FFFFFF", "#FBF9FC", "#EBE4F4"])
 
 def render_premium_table(styler_obj):
@@ -67,7 +65,7 @@ def render_premium_table(styler_obj):
     html = styler_obj.to_html()
     st.markdown(f'<div class="premium-table-container">{html}</div>', unsafe_allow_html=True)
 
-# ================ 2. THE VERIFIED DATA ENGINE (FROM TURN 9) =================
+# ================ 2. THE VERIFIED DATA ENGINE =================
 DEMO_COLS = ['gender', 'age_range', 'marital_status', 'children', 'homeowner_status', 'income_bracket', 'net_worth_bracket']
 configs = [("Gender", "gender"), ("Age", "age_range"), ("Income", "income_bracket"), ("State", "state"), ("Net Worth", "net_worth_bracket"), ("Children", "children"), ("Marital Status", "marital_status"), ("Homeowner", "homeowner_status")]
 
@@ -80,7 +78,6 @@ def get_bq_client():
     if "private_key" in creds_dict: creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
     return bigquery.Client(credentials=service_account.Credentials.from_service_account_info(creds_dict), project=creds_dict["project_id"])
 
-# 🚨 Restored the exact, verified data cleaners that successfully protect CUBE "ALL" rows
 def clean_gender(val):
     v = str(val).strip().lower()
     if v in ['all', 'none', 'nan', '<na>', 'null', '']: return 'ALL'
@@ -242,11 +239,18 @@ def load_visitor_base():
 if "app_state" not in st.session_state: st.session_state.app_state = "onboarding"
 if "df_icp" not in st.session_state: st.session_state.df_icp = None
 
+# Custom HTML Logo block
+custom_html_logo = f"""
+    <div style="font-family: 'Outfit', sans-serif; font-size: 1.6rem; font-weight: 800; color: #0F172A; letter-spacing: -0.5px; margin-top: 10px;">
+        Lead<span style="color: {PITCH_BRAND_COLOR};">Navigator</span>
+    </div>
+"""
+
 if st.session_state.app_state == "onboarding":
-    # 🚨 Pushed logo to a dedicated top-left column and set width to be crisp and small
+    
     logo_col, _ = st.columns([1, 8])
     with logo_col:
-        st.image("logo.png", width=140)
+        st.markdown(custom_html_logo, unsafe_allow_html=True)
         
     st.markdown("""<div style="text-align: center; margin-top: -50px; margin-bottom: 25px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.6rem; margin-bottom: 2px;">Conversion Analytics Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 1.8rem; color: #0F172A !important; margin-top: 5px;">Upload order data to build your conversion matrix.</h2></div>""", unsafe_allow_html=True)
     
@@ -262,7 +266,6 @@ if st.session_state.app_state == "onboarding":
         else:
             status_placeholder = st.empty()
             with status_placeholder:
-                # 🚨 Formatted loading quotes with specific author/institution attributions
                 st.markdown(f"""
                     <div style="text-align: center; padding: 60px 40px; background: #F8F6FA; border-radius: 12px; border: 1px solid {PITCH_BRAND_COLOR}; min-height: 380px;">
                         <h3 class="modern-serif-title" style="color: {PITCH_BRAND_COLOR}; margin-bottom: 10px;">LeadNavigator Intelligence is active...</h3>
@@ -334,10 +337,10 @@ if st.session_state.app_state == "onboarding":
                 st.error(f"Error: {str(e)}")
 
 elif st.session_state.app_state == "dashboard":
-    # 🚨 Pushed logo to a dedicated top-left column here too
+    
     logo_col, _ = st.columns([1, 8])
     with logo_col:
-        st.image("logo.png", width=140)
+        st.markdown(custom_html_logo, unsafe_allow_html=True)
         
     st.markdown(f"""<div style="text-align: center; margin-top: -50px; margin-bottom: 30px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.5rem; margin-bottom: 0px;">Conversion Analytics Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 2.8rem; color: #0F172A !important; margin-top: -5px;">Optimize your traffic funnel.</h2></div>""", unsafe_allow_html=True)
     
