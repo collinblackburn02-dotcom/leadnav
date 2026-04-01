@@ -239,20 +239,20 @@ def load_visitor_base():
 if "app_state" not in st.session_state: st.session_state.app_state = "onboarding"
 if "df_icp" not in st.session_state: st.session_state.df_icp = None
 
-# Custom HTML Logo block
+# Custom HTML Logo block - white-space: nowrap ensures it never breaks to a second line
 custom_html_logo = f"""
-    <div style="font-family: 'Outfit', sans-serif; font-size: 1.6rem; font-weight: 800; color: #0F172A; letter-spacing: -0.5px; margin-top: 10px;">
+    <div style="font-family: 'Outfit', sans-serif; font-size: 1.6rem; font-weight: 800; color: #0F172A; letter-spacing: -0.5px; margin-top: 10px; white-space: nowrap;">
         Lead<span style="color: {PITCH_BRAND_COLOR};">Navigator</span>
     </div>
 """
 
 if st.session_state.app_state == "onboarding":
     
-    logo_col, _ = st.columns([1, 8])
+    logo_col, _ = st.columns([1.5, 8.5])
     with logo_col:
         st.markdown(custom_html_logo, unsafe_allow_html=True)
         
-    st.markdown("""<div style="text-align: center; margin-top: -50px; margin-bottom: 25px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.6rem; margin-bottom: 2px;">Conversion Analytics Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 1.8rem; color: #0F172A !important; margin-top: 5px;">Upload order data to build your conversion matrix.</h2></div>""", unsafe_allow_html=True)
+    st.markdown("""<div style="text-align: center; margin-top: 10px; margin-bottom: 25px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.6rem; margin-bottom: 2px;">Conversion Analytics Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 1.8rem; color: #0F172A !important; margin-top: 5px;">Upload order data to build your conversion matrix.</h2></div>""", unsafe_allow_html=True)
     
     _, col1, _ = st.columns([1, 2, 1])
     with col1:
@@ -338,11 +338,11 @@ if st.session_state.app_state == "onboarding":
 
 elif st.session_state.app_state == "dashboard":
     
-    logo_col, _ = st.columns([1, 8])
+    logo_col, _ = st.columns([1.5, 8.5])
     with logo_col:
         st.markdown(custom_html_logo, unsafe_allow_html=True)
         
-    st.markdown(f"""<div style="text-align: center; margin-top: -50px; margin-bottom: 30px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.5rem; margin-bottom: 0px;">Conversion Analytics Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 2.8rem; color: #0F172A !important; margin-top: -5px;">Optimize your traffic funnel.</h2></div>""", unsafe_allow_html=True)
+    st.markdown(f"""<div style="text-align: center; margin-top: 10px; margin-bottom: 30px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.5rem; margin-bottom: 0px;">Conversion Analytics Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 2.8rem; color: #0F172A !important; margin-top: -5px;">Optimize your traffic funnel.</h2></div>""", unsafe_allow_html=True)
     
     st.info("💡 **Note:** Visitor baselines reflect your historical BigQuery snapshot. The Date Slider filters your uploaded Purchaser order data.")
     _, c2, _ = st.columns([1, 4, 1])
