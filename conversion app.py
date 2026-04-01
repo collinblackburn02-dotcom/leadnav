@@ -122,25 +122,57 @@ def clean_age(val):
 def bucket_income_bq(val):
     v = str(val).strip().lower()
     if v in ['all', 'none', 'nan', '<na>', 'null', '']: return 'ALL'
-    nums = [int(n) for n in re.findall(r'\d+', v.replace(',', ''))]
-    if not nums: return 'Unknown'
-    lower = nums[0]
-    if lower < 50000: return 'Under $50k'
-    if 50000 <= lower < 100000: return '$50k-$100k'
-    if 100000 <= lower < 150000: return '$100k-$150k'
-    if lower >= 150000: return '$150k+'
+    
+    under_50k = [
+        'under $10,000', '$10,000 - $14,999', 'less than $20,000', 
+        '$20,000 - $24,999', '$25,000 - $29,999', '$30,000 - $34,999', 
+        '$35,000 - $39,999', '$40,000 - $44,999', '$45,000 - $49,999', 
+        '$45,000 to $59,999'
+    ]
+    from_50k_to_100k = [
+        '$50,000 - $54,999', '$55,000 - $59,999', '$60,000 - $64,999', 
+        '$65,000 - $74,999', '$75,000 - $99,999'
+    ]
+    from_100k_to_150k = [
+        '$100,000 - $149,999'
+    ]
+    over_150k = [
+        '$150,000 - $174,999', '$150,000 to $199,999', '$175,000 - $199,999', 
+        '$200,000 - $249,999', '$250,000 +'
+    ]
+    
+    if v in under_50k: return 'Under $50k'
+    if v in from_50k_to_100k: return '$50k-$100k'
+    if v in from_100k_to_150k: return '$100k-$150k'
+    if v in over_150k: return '$150k+'
+    
     return 'Unknown'
+
 
 def bucket_net_worth_bq(val):
     v = str(val).strip().lower()
     if v in ['all', 'none', 'nan', '<na>', 'null', '']: return 'ALL'
-    nums = [int(n) for n in re.findall(r'\d+', v.replace(',', ''))]
-    if not nums: return 'Unknown'
-    lower = nums[0]
-    if lower < 100000: return 'Under $100k'
-    if 100000 <= lower < 250000: return '$100k-$249k'
-    if 250000 <= lower < 500000: return '$250k-$499k'
-    if lower >= 500000: return '$500k+'
+    
+    under_100k = [
+        'less than $1', '$1 - $4,999', '$5,000 - $9,999', 
+        '$10,000 - $24,999', '$25,000 - $49,999', '$50,000 - $99,999', 
+        '-$2,499 to $2,499', '$2,500 to $24,999'
+    ]
+    from_100k_to_249k = [
+        '$100,000 - $249,999', '$150,000 to $249,999'
+    ]
+    from_250k_to_499k = [
+        '$250,000 - $499,999', '$375,000 to $499,999'
+    ]
+    over_500k = [
+        '$499,999 or more', '$750,000 to $999,999'
+    ]
+    
+    if v in under_100k: return 'Under $100k'
+    if v in from_100k_to_249k: return '$100k-$249k'
+    if v in from_250k_to_499k: return '$250k-$499k'
+    if v in over_500k: return '$500k+'
+    
     return 'Unknown'
 
 def normalize_demographics(df):
