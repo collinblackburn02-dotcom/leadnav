@@ -489,7 +489,7 @@ elif st.session_state.app_state == "dashboard":
                 if val: selected_filters[col_name] = val
 
     st.markdown("<br>", unsafe_allow_html=True)
-  if included_types:
+        if included_types:
         combos = []
         # 🚨 RESTORED: Hard cap at 3 variables so BigQuery doesn't explode
         max_combo_size = min(3, len(included_types))
