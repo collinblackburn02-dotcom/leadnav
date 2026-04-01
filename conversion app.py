@@ -235,7 +235,7 @@ def load_visitor_base():
         
         df_demo.columns = [c.lower().strip() for c in df_demo.columns]
         df_state.columns = [c.lower().strip() for c in df_state.columns]
-        df_state['state'] = df_state['state'].str.upper() # 🚨 THE FIX: Match casing to purchasers
+        
         
         df_demo = df_demo.rename(columns={
             'married': 'marital_status',
@@ -257,7 +257,7 @@ def load_visitor_base():
             if col != 'total_visitors': df_demo[col] = df_demo[col].astype(str).str.strip()
         for col in df_state.columns:
             if col != 'total_visitors': df_state[col] = df_state[col].astype(str).str.strip()
-
+        df_state['state'] = df_state['state'].str.upper() # 🚨 THE FIX: Match casing to purchasers
         df_demo = df_demo.replace(['nan', 'NaN', '<NA>', 'None', 'null', ''], 'ALL').fillna('ALL')
         df_state = df_state.replace(['nan', 'NaN', '<NA>', 'None', 'null', ''], 'ALL').fillna('ALL')
 
