@@ -270,10 +270,28 @@ def build_dashboard_views(orders_df, enriched_df, start_date, end_date, biz_type
 
 # ================ 3. APP FLOW =================
 if "app_state" not in st.session_state: 
-    st.session_state.app_state = "onboarding"
+    st.session_state.app_state = "login" # 🚨 Start the app locked!
     st.session_state.biz_type = "DTC Ecommerce"
 
-if st.session_state.app_state == "onboarding":
+if st.session_state.app_state == "login":
+    logo_col, _ = st.columns([1.5, 8.5])
+    with logo_col:
+        st.markdown(custom_html_logo, unsafe_allow_html=True)
+        
+    st.markdown(f"""<div style="text-align: center; margin-top: 60px; margin-bottom: 30px;"><h1 class="serif-gradient-centerpiece" style="font-size: 4rem; margin-bottom: 5px;">Welcome to LeadNavigator.</h1><h2 style="font-size: 1.5rem; color: #64748B; font-weight: 400;">Please enter your access key to continue.</h2></div>""", unsafe_allow_html=True)
+    
+    _, login_col, _ = st.columns([1, 1, 1])
+    with login_col:
+        pwd_guess = st.text_input("Access Key", type="password", label_visibility="collapsed", placeholder="Enter your access key...")
+        
+        if st.button("Unlock Dashboard", type="primary", use_container_width=True):
+            if "auth" in st.secrets and pwd_guess in st.secrets["auth"]["passwords"]:
+                st.session_state.app_state = "onboarding"
+                st.rerun()
+            else:
+                st.error("🚨 Incorrect access key. Please try again.")
+
+elif st.session_state.app_state == "onboarding":
     logo_col, _ = st.columns([1.5, 8.5])
     with logo_col:
         st.markdown(custom_html_logo, unsafe_allow_html=True)
