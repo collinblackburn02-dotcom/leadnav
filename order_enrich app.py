@@ -48,11 +48,11 @@ def apply_custom_theme(primary_color):
             .stDeployButton {{ display: none !important; }}
             div[data-testid="viewerBadge"] {{ display: none !important; }}
             /* Nuke the bottom right floating container */
-            .stApp > header { display: none !important; }
-            .stApp a { display: none !important; }
-            div[data-testid="stDecoration"] { display: none !important; }
-            div[data-testid="stToolbar"] { display: none !important; }
-            #st-actionbox { display: none !important; }
+            .stApp > header {{ display: none !important; }}
+            .stApp a {{ display: none !important; }}
+            div[data-testid="stDecoration"] {{ display: none !important; }}
+            div[data-testid="stToolbar"] {{ display: none !important; }}
+            #st-actionbox {{ display: none !important; }}
             
             .stMarkdown a svg {{ display: none !important; }}
             div[data-testid="stSlider"] label p {{ font-size: 1.2rem !important; font-weight: 700 !important; color: #0F172A !important; }}
