@@ -31,6 +31,20 @@ STATE_TO_REGION = {
     'AK':'West','AZ':'West','CA':'West','CO':'West','HI':'West','ID':'West','MT':'West','NM':'West','NV':'West','OR':'West','UT':'West','WA':'West','WY':'West'
 }
 
+US_STATES = {
+    'ALABAMA': 'AL', 'ALASKA': 'AK', 'ARIZONA': 'AZ', 'ARKANSAS': 'AR', 'CALIFORNIA': 'CA',
+    'COLORADO': 'CO', 'CONNECTICUT': 'CT', 'DELAWARE': 'DE', 'FLORIDA': 'FL', 'GEORGIA': 'GA',
+    'HAWAII': 'HI', 'IDAHO': 'ID', 'ILLINOIS': 'IL', 'INDIANA': 'IN', 'IOWA': 'IA',
+    'KANSAS': 'KS', 'KENTUCKY': 'KY', 'LOUISIANA': 'LA', 'MAINE': 'ME', 'MARYLAND': 'MD',
+    'MASSACHUSETTS': 'MA', 'MICHIGAN': 'MI', 'MINNESOTA': 'MN', 'MISSISSIPPI': 'MS', 'MISSOURI': 'MO',
+    'MONTANA': 'MT', 'NEBRASKA': 'NE', 'NEVADA': 'NV', 'NEW HAMPSHIRE': 'NH', 'NEW JERSEY': 'NJ',
+    'NEW MEXICO': 'NM', 'NEW YORK': 'NY', 'NORTH CAROLINA': 'NC', 'NORTH DAKOTA': 'ND', 'OHIO': 'OH',
+    'OKLAHOMA': 'OK', 'OREGON': 'OR', 'PENNSYLVANIA': 'PA', 'RHODE ISLAND': 'RI', 'SOUTH CAROLINA': 'SC',
+    'SOUTH DAKOTA': 'SD', 'TENNESSEE': 'TN', 'TEXAS': 'TX', 'UTAH': 'UT', 'VERMONT': 'VT',
+    'VIRGINIA': 'VA', 'WASHINGTON': 'WA', 'WEST VIRGINIA': 'WV', 'WISCONSIN': 'WI', 'WYOMING': 'WY',
+    'DISTRICT OF COLUMBIA': 'DC'
+}
+
 st.set_page_config(page_title=f"{PITCH_COMPANY_NAME} | Audience Engine", page_icon="🧭", layout="wide", initial_sidebar_state="collapsed")
 
 def apply_custom_theme(primary_color):
@@ -71,9 +85,10 @@ def apply_custom_theme(primary_color):
             .custom-loader {{ border: 3px solid #f3f3f3; border-top: 3px solid {primary_color}; border-radius: 50%; width: 32px; height: 32px; animation: spin 1s linear infinite; margin: 0 auto 30px auto; }}
             @keyframes spin {{ 0% {{ transform: rotate(0deg); }} 100% {{ transform: rotate(360deg); }} }}
 
-            @keyframes fadeLoop {{ 0% {{ opacity: 0; transform: translateY(5px); }} 1%, 24% {{ opacity: 1; transform: translateY(0); }} 25%, 100% {{ opacity: 0; transform: translateY(-5px); }} }}
-            .pitch-fact {{ font-family: 'Outfit', sans-serif; font-size: 1.15rem; color: #475569; font-weight: 400; font-style: italic; position: absolute; width: 100%; opacity: 0; animation: fadeLoop 80s infinite; line-height: 1.5; text-align: center; }}
-            .fact-1 {{ animation-delay: 0s; }} .fact-2 {{ animation-delay: 20s; }} .fact-3 {{ animation-delay: 40s; }} .fact-4 {{ animation-delay: 60s; }}
+            /* Faster 16-second loop (4 seconds per quote) */
+            @keyframes fadeLoop {{ 0% {{ opacity: 0; transform: translateY(5px); }} 5%, 20% {{ opacity: 1; transform: translateY(0); }} 25%, 100% {{ opacity: 0; transform: translateY(-5px); }} }}
+            .pitch-fact {{ font-family: 'Outfit', sans-serif; font-size: 1.15rem; color: #475569; font-weight: 400; font-style: italic; position: absolute; width: 100%; opacity: 0; animation: fadeLoop 16s infinite; line-height: 1.5; text-align: center; }}
+            .fact-1 {{ animation-delay: 0s; }} .fact-2 {{ animation-delay: 4s; }} .fact-3 {{ animation-delay: 8s; }} .fact-4 {{ animation-delay: 12s; }}
         </style>
     """, unsafe_allow_html=True)
 
@@ -88,6 +103,10 @@ custom_html_logo = f"""
 """
 
 # ================ 2. DATA ENGINE =================
+
+def map_state_abbrev(state_val):
+    val = str(state_val).strip().upper()
+    return US_STATES.get(val, val)
 
 @st.cache_data(show_spinner=False)
 def clean_api_response(df):
@@ -114,13 +133,20 @@ def clean_api_response(df):
     if 'marital_status' in df.columns:
         df['marital_status'] = df['marital_status'].astype(str).str.strip().str.title()
         df['marital_status'] = df['marital_status'].replace({'Y': 'Married', 'N': 'Single', 'Yes': 'Married', 'No': 'Single'})
+
+    # 🚨 FIX: Capitalize Seniority and Handle Exec Titles
+    if 'seniority' in df.columns:
+        df['seniority'] = df['seniority'].astype(str).str.strip().str.title()
+        exec_map = {'Vp': 'VP', 'Ceo': 'CEO', 'Cto': 'CTO', 'Cfo': 'CFO', 'Coo': 'COO', 'Cmo': 'CMO', 'Svp': 'SVP', 'Evp': 'EVP', 'Hr': 'HR'}
+        df['seniority'] = df['seniority'].replace(exec_map)
             
+    # 🚨 FIX: Force State Full Names to Abbreviations for Region Map
     if 'state_raw' in df.columns: 
-        df['state_raw'] = df['state_raw'].astype(str).str.strip().str.upper()
+        df['state_raw'] = df['state_raw'].apply(map_state_abbrev)
         df['region'] = df['state_raw'].map(STATE_TO_REGION).fillna('Unknown')
         
     if 'co_state' in df.columns:
-        df['co_state'] = df['co_state'].astype(str).str.strip().str.upper()
+        df['co_state'] = df['co_state'].apply(map_state_abbrev)
         df['co_region'] = df['co_state'].map(STATE_TO_REGION).fillna('Unknown')
         
     if 'naics' in df.columns:
@@ -343,7 +369,7 @@ elif st.session_state.app_state == "onboarding":
                             st.session_state.active_var = "Industry"
                             st.session_state.active_loc_level = "Company Region"
                         else:
-                            st.session_state.active_var = "Location"
+                            st.session_state.active_var = "Gender"
                             st.session_state.active_loc_level = "Region"
                             
                         st.session_state.app_state = "dashboard"
@@ -431,5 +457,10 @@ elif st.session_state.app_state == "dashboard":
             use_container_width=True
         )
         
+    # 🚨 FIX: Force cache clear on Go Back
     if action_col.button("← Go Back", use_container_width=True, type="secondary"): 
-        st.session_state.app_state = "onboarding"; st.rerun()
+        for key in ['dash_data', 'cleaned_orders', 'cleaned_n8n', 'integrity_stats', 'last_computed_dates']:
+            if key in st.session_state:
+                del st.session_state[key]
+        st.session_state.app_state = "onboarding"
+        st.rerun()
