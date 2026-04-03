@@ -139,6 +139,15 @@ def clean_api_response(df):
         df['seniority'] = df['seniority'].astype(str).str.strip().str.title()
         exec_map = {'Vp': 'VP', 'Ceo': 'CEO', 'Cto': 'CTO', 'Cfo': 'CFO', 'Coo': 'COO', 'Cmo': 'CMO', 'Svp': 'SVP', 'Evp': 'EVP', 'Hr': 'HR'}
         df['seniority'] = df['seniority'].replace(exec_map)
+
+    # 🚨 FIX: Title Case Company Revenue
+    if 'co_revenue' in df.columns:
+        df['co_revenue'] = df['co_revenue'].astype(str).str.strip().str.title()
+
+    # 🚨 FIX: Hide Company Size of Zero AND the actual text "zero"
+    if 'co_size' in df.columns:
+        df['co_size'] = df['co_size'].astype(str).str.strip()
+        df['co_size'] = df['co_size'].replace(['0', '0.0', 'zero', 'Zero', 'ZERO'], 'Unknown')
             
     # 🚨 FIX: Force State Full Names to Abbreviations for Region Map
     if 'state_raw' in df.columns: 
