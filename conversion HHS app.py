@@ -59,9 +59,20 @@ def render_premium_table(styler_obj):
     st.markdown(f'<div class="premium-table-container">{html}</div>', unsafe_allow_html=True)
 
 # ================ 2. THE VERIFIED DATA ENGINE =================
-DEMO_COLS = ['gender', 'age_range', 'marital_status', 'children', 'homeowner_status', 'income_bracket', 'net_worth_bracket']
-configs = [("Gender", "gender"), ("Age", "age_range"), ("Income", "income_bracket"), ("State", "state"), ("Net Worth", "net_worth_bracket"), ("Children", "children"), ("Marital Status", "marital_status"), ("Homeowner", "homeowner_status")]
+# ================ 2. THE VERIFIED DATA ENGINE =================
+DEMO_COLS = ['gender', 'age_range', 'marital_status', 'children', 'homeowner_status', 'income_bracket', 'net_worth_bracket', 'credit_rating']
 
+configs = [
+    ("Gender", "gender"), 
+    ("Age", "age_range"), 
+    ("Income", "income_bracket"), 
+    ("State", "state"), 
+    ("Net Worth", "net_worth_bracket"), 
+    ("Children", "children"), 
+    ("Marital Status", "marital_status"), 
+    ("Homeowner", "homeowner_status"),
+    ("Credit Rating", "credit_rating") # 👉 Added Credit Rating here!
+]
 INCOME_MAP = {'Under $50k': 1, '$50k-$100k': 2, '$100k-$150k': 3, '$150k-$250k': 4, '$250k+': 5}
 NET_WORTH_MAP = {'Under $100k': 1, '$100k-$249k': 2, '$250k-$499k': 3, '$500k+': 4}
 
