@@ -122,38 +122,37 @@ def clean_age(val):
     if '55' in v and '64' in v: return '55-64'
     return 'Unknown'
 
+import re
+
 def bucket_income_bq(val):
-    # 🚨 THE FIX: Instantly swap " to " for a hyphen so the text matches perfectly
-    v = str(val).strip().lower().replace(" to ", " - ")
-    if v in ['all', 'none', 'nan', '<na>', 'null', '']: return 'ALL'
+    v = str(val).strip().lower()
+    if v in ['all', 'none', 'nan', '<na>', 'null', 'unknown', '']: return 'ALL'
     
-    under_50k = ['under $10,000', '$10,000 - $14,999', 'less than $20,000', '$20,000 - $24,999', '$25,000 - $29,999', '$30,000 - $34,999', '$35,000 - $39,999', '$40,000 - $44,999', '$45,000 - $49,999', '$45,000 - $59,999']
-    from_50k_to_100k = ['$50,000 - $54,999', '$55,000 - $59,999', '$60,000 - $64,999', '$65,000 - $74,999', '$75,000 - $99,999']
-    from_100k_to_150k = ['$100,000 - $149,999']
-    from_150k_to_250k = ['$150,000 - $174,999', '$150,000 - $199,999', '$175,000 - $199,999', '$200,000 - $249,999']
-    over_250k = ['$250,000 +']
-    
-    if v in under_50k: return 'Under $50k'
-    if v in from_50k_to_100k: return '$50k-$100k'
-    if v in from_100k_to_150k: return '$100k-$150k'
-    if v in from_150k_to_250k: return '$150k-$250k'
-    if v in over_250k: return '$250k+'
+    # Extracts the first number in the string (removes commas)
+    nums = re.findall(r'\d+', v.replace(',', ''))
+    if nums:
+        first_num = int(nums[0])
+        if first_num < 50000: return 'Under $50k'
+        elif first_num < 100000: return '$50k-$100k'
+        elif first_num < 150000: return '$100k-$150k'
+        elif first_num < 250000: return '$150k-$250k'
+        else: return '$250k+' # Catches 250k to 499k, 500k+, etc.
+        
     return 'Unknown'
 
 def bucket_net_worth_bq(val):
-    # 🚨 THE FIX: Instantly swap " to " for a hyphen here too
-    v = str(val).strip().lower().replace(" to ", " - ")
-    if v in ['all', 'none', 'nan', '<na>', 'null', '']: return 'ALL'
+    v = str(val).strip().lower()
+    if v in ['all', 'none', 'nan', '<na>', 'null', 'unknown', '']: return 'ALL'
     
-    under_100k = ['less than $1', '$1 - $4,999', '$5,000 - $9,999', '$10,000 - $24,999', '$25,000 - $49,999', '$50,000 - $99,999', '-$2,499 - $2,499', '$2,500 - $24,999']
-    from_100k_to_249k = ['$100,000 - $249,999', '$150,000 - $249,999']
-    from_250k_to_499k = ['$250,000 - $499,999', '$375,000 - $499,999']
-    over_500k = ['$499,999 or more', '$750,000 - $999,999']
-    
-    if v in under_100k: return 'Under $100k'
-    if v in from_100k_to_249k: return '$100k-$249k'
-    if v in from_250k_to_499k: return '$250k-$499k'
-    if v in over_500k: return '$500k+'
+    # Extracts the first number in the string (removes commas)
+    nums = re.findall(r'\d+', v.replace(',', ''))
+    if nums:
+        first_num = int(nums[0])
+        if first_num < 100000: return 'Under $100k'
+        elif first_num < 250000: return '$100k-$249k'
+        elif first_num < 500000: return '$250k-$499k'
+        else: return '$500k+' # Catches 500k to 749k, 1M+, etc.
+        
     return 'Unknown'
 
 def normalize_demographics(df):
