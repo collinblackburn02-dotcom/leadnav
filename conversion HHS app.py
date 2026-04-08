@@ -132,15 +132,30 @@ def get_real_number(v):
 
 def bucket_income_bq(val):
     v = str(val).strip().lower()
-    if v in ['all', 'none', 'nan', '<na>', 'null', 'unknown', '']: return 'ALL'
+    # Explicitly catch the "Unknown" strings from your BQ results
+    if v in ['unknown', 'all', 'none', 'nan', '<na>', 'null', '']: 
+        return 'Unknown'
+    
     num = get_real_number(v)
-    if num is not None:
-        if num < 50000: return 'Under $50k'
-        elif num < 100000: return '$50k-$100k'
-        elif num < 150000: return '$100k-$150k'
-        elif num < 249999: return '$150k-$250k' 
-        else: return '$250k+'
-    return 'Unknown'
+    if num is None: return 'Unknown'
+
+    # Handle the specific "Less Than $20,000" and "$20k-$44k" strings
+    if num < 45000: 
+        return 'Under $45k'
+    
+    # This now correctly captures the $45k-$59k, $60k-$74k, and $75k-$99k groups
+    elif num < 100000: 
+        return '$45k-$100k'
+        
+    elif num < 150000: 
+        return '$100k-$150k'
+    
+    # Captures $150k-$199k and $200k-$249k
+    elif num < 250000: 
+        return '$150k-$250k' 
+    
+    else: 
+        return '$250k+'
 
 def bucket_net_worth_bq(val):
     v = str(val).strip().lower()
