@@ -342,9 +342,13 @@ elif st.session_state.app_state == "dashboard":
     df_p = df_p_filtered[~df_p_filtered[selected_col].isin(EXCLUDE_LIST)]
     df_p_grp = df_p.groupby(selected_col).agg(Purchases=('Order_ID', 'nunique'), Revenue=('Total', 'sum')).reset_index()
     
-    df_merged = pd.merge(df_v_grp, df_p_grp, on=selected_col, how='left').fillna(0)
+    # Changed to an OUTER merge so segments with purchasers but zero visitors are not dropped
+    df_merged = pd.merge(df_v_grp, df_p_grp, on=selected_col, how='outer').fillna(0)
 
     if not df_merged.empty:
+        # Pad the visitor count with the purchaser count
+        df_merged['Visitors'] = df_merged['Visitors'] + df_merged['Purchases']
+        
         df_merged['Conv %'] = (df_merged['Purchases'] / df_merged['Visitors'] * 100).round(2)
         df_merged['Rev/Visitor'] = (df_merged['Revenue'] / df_merged['Visitors']).round(2)
         
@@ -380,7 +384,11 @@ elif st.session_state.app_state == "dashboard":
         df_p_sub = df_p_filtered[~df_p_filtered[col_name].isin(EXCLUDE_LIST)]
         grp_p = df_p_sub.groupby(col_name).agg(Purchases=('Order_ID', 'nunique')).reset_index()
         
-        grp = pd.merge(grp_v, grp_p, on=col_name, how='left').fillna(0).rename(columns={'total_visitors': 'Visitors'})
+        # Changed to an OUTER merge
+        grp = pd.merge(grp_v, grp_p, on=col_name, how='outer').fillna(0).rename(columns={'total_visitors': 'Visitors'})
+        
+        # Pad the visitor count with the purchaser count
+        grp['Visitors'] = grp['Visitors'] + grp['Purchases']
         
         # 🚨 FILTER BY PURCHASERS INSTEAD OF VISITORS
         grp = grp[grp['Purchases'] >= min_purchasers]
@@ -455,8 +463,11 @@ elif st.session_state.app_state == "dashboard":
                     temp_p = temp_p[~temp_p[col].isin(EXCLUDE_LIST)]
                 grp_p = temp_p.groupby(sub_cols).agg(Purchases=('Order_ID', 'nunique'), Revenue=('Total', 'sum')).reset_index()
                 
-                # Merge Visitors and Purchasers
-                grp = pd.merge(grp_v, grp_p, on=sub_cols, how='left').fillna(0).rename(columns={'total_visitors': 'Visitors'})
+                # Merge Visitors and Purchasers (Changed to OUTER merge)
+                grp = pd.merge(grp_v, grp_p, on=sub_cols, how='outer').fillna(0).rename(columns={'total_visitors': 'Visitors'})
+                
+                # Pad the visitor count with the purchaser count
+                grp['Visitors'] = grp['Visitors'] + grp['Purchases']
                 
                 # Keep explicit filters visible, blank out unused variables
                 for col in included_types:
