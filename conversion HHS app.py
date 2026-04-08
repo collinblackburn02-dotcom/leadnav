@@ -224,40 +224,43 @@ def load_order_base():
 def load_visitor_base():
     client = get_bq_client()
     try:
-        df_demo = client.query("SELECT * FROM `leadnav-hhs.HHSpixeltest.weekly_demographic_summary`").to_dataframe()
-        df_state = client.query("SELECT * FROM `leadnav-hhs.HHSpixeltest.weekly_state_summary`").to_dataframe()
+        # 1. Pull from the new master summary table
+        df_raw = client.query("SELECT * FROM `leadnav-hhs.HHSpixeltest.daily_visitor_summary`").to_dataframe()
         
-        df_demo.columns = [c.lower().strip() for c in df_demo.columns]
-        df_state.columns = [c.lower().strip() for c in df_state.columns]
+        df_raw.columns = [c.lower().strip() for c in df_raw.columns]
         
-        df_demo = df_demo.rename(columns={
-            'married': 'marital_status',
-            'age': 'age_range',
-            'income': 'income_bracket',
-            'net_worth': 'net_worth_bracket',
-            'homeowner': 'homeowner_status'
+        # 2. Lock in the date column so Streamlit can filter it later
+        df_raw['visit_date'] = pd.to_datetime(df_raw['visit_date']).dt.date
+        
+        # 3. Rename columns to match the app's internal engine
+        df_raw = df_raw.rename(columns={
+            'income_raw': 'income_bracket',
+            'net_worth_raw': 'net_worth_bracket',
+            'homeowner_raw': 'homeowner_status'
         })
 
-        if 'gender' in df_demo.columns: df_demo['gender'] = df_demo['gender'].apply(clean_gender)
-        if 'children' in df_demo.columns: df_demo['children'] = df_demo['children'].apply(clean_yes_no)
-        if 'marital_status' in df_demo.columns: df_demo['marital_status'] = df_demo['marital_status'].apply(clean_marital)
-        if 'age_range' in df_demo.columns: df_demo['age_range'] = df_demo['age_range'].apply(clean_age)
-        if 'homeowner_status' in df_demo.columns: df_demo['homeowner_status'] = df_demo['homeowner_status'].apply(clean_homeowner_bq)
-        if 'income_bracket' in df_demo.columns: df_demo['income_bracket'] = df_demo['income_bracket'].apply(bucket_income_bq)
-        if 'net_worth_bracket' in df_demo.columns: df_demo['net_worth_bracket'] = df_demo['net_worth_bracket'].apply(bucket_net_worth_bq)
+        # 4. Apply all your custom cleaning functions
+        if 'gender' in df_raw.columns: df_raw['gender'] = df_raw['gender'].apply(clean_gender)
+        if 'children' in df_raw.columns: df_raw['children'] = df_raw['children'].apply(clean_yes_no)
+        if 'marital_status' in df_raw.columns: df_raw['marital_status'] = df_raw['marital_status'].apply(clean_marital)
+        if 'age_range' in df_raw.columns: df_raw['age_range'] = df_raw['age_range'].apply(clean_age)
+        if 'homeowner_status' in df_raw.columns: df_raw['homeowner_status'] = df_raw['homeowner_status'].apply(clean_homeowner_bq)
+        if 'income_bracket' in df_raw.columns: df_raw['income_bracket'] = df_raw['income_bracket'].apply(bucket_income_bq)
+        if 'net_worth_bracket' in df_raw.columns: df_raw['net_worth_bracket'] = df_raw['net_worth_bracket'].apply(bucket_net_worth_bq)
         
-        for col in df_demo.columns:
-            if col != 'total_visitors': df_demo[col] = df_demo[col].astype(str).str.strip()
-        
-        for col in df_state.columns:
-            if col != 'total_visitors': 
-                df_state[col] = df_state[col].astype(str).str.strip().str.upper()
+        # 5. Clean up strings and format State
+        for col in df_raw.columns:
+            if col not in ['total_visitors', 'visit_date']: 
+                df_raw[col] = df_raw[col].astype(str).str.strip()
+                if col == 'state':
+                    df_raw[col] = df_raw[col].str.upper()
 
-        df_demo = df_demo.replace(['nan', 'NaN', '<NA>', 'None', 'null', ''], 'ALL').fillna('ALL')
-        df_state = df_state.replace(['nan', 'NaN', '<NA>', 'None', 'null', ''], 'ALL').fillna('ALL')
+        # 6. Fill blanks with "ALL"
+        df_raw = df_raw.replace(['nan', 'NaN', '<NA>', 'None', 'null', ''], 'ALL').fillna('ALL')
 
-        df_demo = df_demo.groupby(DEMO_COLS, as_index=False)['total_visitors'].sum()
-        df_state = df_state.groupby('state', as_index=False)['total_visitors'].sum()
+        # 7. Spit out the two exact grouped dataframes the app expects, but keep the Date!
+        df_demo = df_raw.groupby(['visit_date'] + DEMO_COLS, as_index=False)['total_visitors'].sum()
+        df_state = df_raw.groupby(['visit_date', 'state'], as_index=False)['total_visitors'].sum()
         
         return df_demo, df_state, None
     except Exception as e:
@@ -353,10 +356,9 @@ elif st.session_state.app_state == "dashboard":
 
     metric_map = {"Conv %": "Conv %", "Purchases": "Purchases", "Revenue": "Revenue", "Visitors": "Visitors", "Rev/Visitor": "Rev/Visitor"}
 
-    df_p_filtered = st.session_state.df_icp[
-        (st.session_state.df_icp['order_date'] >= current_dates[0]) & 
-        (st.session_state.df_icp['order_date'] <= current_dates[1])
-    ].copy()
+   # Filter the Visitor dataframes by the slider dates
+st.session_state.df_demo_cube = df_demo[(df_demo['visit_date'] >= current_dates[0]) & (df_demo['visit_date'] <= current_dates[1])]
+st.session_state.df_state_cube = df_state[(df_state['visit_date'] >= current_dates[0]) & (df_state['visit_date'] <= current_dates[1])]
 
     for _, col_name in configs:
         if col_name not in df_p_filtered.columns:
