@@ -435,9 +435,12 @@ elif st.session_state.app_state == "dashboard":
 
     st.markdown("<br>", unsafe_allow_html=True)
     
-    if included_types:
+if included_types:
         combos = []
-        max_combo_size = min(3, len(included_types))
+        
+        # 1. Identify which columns have active filters vs which are unfiltered
+        filtered_cols = list(selected_filters.keys())
+        unfiltered_cols = [c for c in included_types if c not in filtered_cols]
         
         base_v = st.session_state.df_demo_cube.copy()
         base_p = df_p_filtered.copy()
@@ -446,9 +449,20 @@ elif st.session_state.app_state == "dashboard":
             base_v = base_v[base_v[col].isin(vals)]
             base_p = base_p[base_p[col].isin(vals)]
 
-        for r in range(1, max_combo_size + 1):
-            for subset in itertools.combinations(included_types, r):
-                sub_cols = list(subset)
+        # 2. Max total variables shown should be 3, unless the user explicitly forces more via filters
+        max_total_vars = max(3, len(filtered_cols))
+        max_extra_vars = max_total_vars - len(filtered_cols)
+        
+        # If no filters are applied, start combos at length 1. If filters exist, start at length 0 (just the filters).
+        min_r = 1 if len(filtered_cols) == 0 else 0
+        
+        for r in range(min_r, max_extra_vars + 1):
+            for subset in itertools.combinations(unfiltered_cols, r):
+                # 3. Every combination is built AROUND the explicit filters
+                sub_cols = filtered_cols + list(subset)
+                
+                if not sub_cols:
+                    continue
                 
                 # Process Visitors
                 temp_v = base_v.copy()
@@ -463,19 +477,17 @@ elif st.session_state.app_state == "dashboard":
                     temp_p = temp_p[~temp_p[col].isin(EXCLUDE_LIST)]
                 grp_p = temp_p.groupby(sub_cols).agg(Purchases=('Order_ID', 'nunique'), Revenue=('Total', 'sum')).reset_index()
                 
-                # Merge Visitors and Purchasers (Changed to OUTER merge)
+                # Merge Visitors and Purchasers (OUTER merge)
                 grp = pd.merge(grp_v, grp_p, on=sub_cols, how='outer').fillna(0).rename(columns={'total_visitors': 'Visitors'})
                 
                 # Pad the visitor count with the purchaser count
                 grp['Visitors'] = grp['Visitors'] + grp['Purchases']
                 
-                # Keep explicit filters visible, blank out unused variables
+                # Blank out unused variables
                 for col in included_types:
                     if col not in sub_cols:
-                        if col in selected_filters:
-                            grp[col] = ", ".join(selected_filters[col])
-                        else:
-                            grp[col] = ""
+                        grp[col] = ""
+                        
                 combos.append(grp)
                 
         if combos:
