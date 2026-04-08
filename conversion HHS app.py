@@ -121,13 +121,13 @@ def clean_age(val):
     return 'Unknown'
 
 def get_real_number(v):
-    v_str = str(v).lower().replace(',', '')
+    v_str = str(val).lower().replace(',', '') if 'val' in locals() else str(v).lower().replace(',', '')
     match = re.search(r'(\d+\.?\d*)', v_str)
     if not match: return None
-    val = float(match.group(1))
-    if re.search(r'(m\b|million)', v_str): val *= 1000000
-    elif re.search(r'(k\b|thousand)', v_str): val *= 1000
-    return val
+    val_num = float(match.group(1))
+    if re.search(r'(m\b|million)', v_str): val_num *= 1000000
+    elif re.search(r'(k\b|thousand)', v_str): val_num *= 1000
+    return val_num
 
 def bucket_income_bq(val):
     v = str(val).strip().lower()
@@ -296,7 +296,7 @@ elif st.session_state.app_state == "dashboard":
         sort_order = st.radio("Ranking Order", ["High to Low", "Low to High"])
         is_ascending = (sort_order == "Low to High")
     with ctrl3:
-        min_visitors = st.number_input("Minimum Traffic Floor", value=10)
+        min_purchasers = st.number_input("Minimum Purchases", value=1, min_value=0)
     with ctrl4:
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("🔄 Force Data Refresh", use_container_width=True): 
@@ -331,13 +331,13 @@ elif st.session_state.app_state == "dashboard":
                 
     selected_col = dict(configs)[st.session_state.active_single_var]
     
+    # 🚨 DYNAMIC GROUPING FIX
     if selected_col == 'state':
-        df_v_grp = st.session_state.df_state_map[~st.session_state.df_state_map['state'].isin(EXCLUDE_LIST)].copy().rename(columns={'total_visitors': 'Visitors'})
+        df_v_sub = st.session_state.df_state_map[~st.session_state.df_state_map['state'].isin(EXCLUDE_LIST)]
+        df_v_grp = df_v_sub.groupby('state', as_index=False)['total_visitors'].sum().rename(columns={'total_visitors': 'Visitors'})
     else:
-        mask = (st.session_state.df_demo_cube[selected_col] != 'ALL') & (~st.session_state.df_demo_cube[selected_col].isin(EXCLUDE_LIST))
-        for c in DEMO_COLS:
-            if c != selected_col: mask &= (st.session_state.df_demo_cube[c] == 'ALL')
-        df_v_grp = st.session_state.df_demo_cube[mask][[selected_col, 'total_visitors']].rename(columns={'total_visitors': 'Visitors'})
+        df_v_sub = st.session_state.df_demo_cube[~st.session_state.df_demo_cube[selected_col].isin(EXCLUDE_LIST)]
+        df_v_grp = df_v_sub.groupby(selected_col, as_index=False)['total_visitors'].sum().rename(columns={'total_visitors': 'Visitors'})
     
     df_p = df_p_filtered[~df_p_filtered[selected_col].isin(EXCLUDE_LIST)]
     df_p_grp = df_p.groupby(selected_col).agg(Purchases=('Order_ID', 'nunique'), Revenue=('Total', 'sum')).reset_index()
@@ -347,7 +347,9 @@ elif st.session_state.app_state == "dashboard":
     if not df_merged.empty:
         df_merged['Conv %'] = (df_merged['Purchases'] / df_merged['Visitors'] * 100).round(2)
         df_merged['Rev/Visitor'] = (df_merged['Revenue'] / df_merged['Visitors']).round(2)
-        df_merged = df_merged[df_merged['Visitors'] >= min_visitors].sort_values(metric_map[metric_choice], ascending=is_ascending)
+        
+        # 🚨 FILTER BY PURCHASERS INSTEAD OF VISITORS
+        df_merged = df_merged[df_merged['Purchases'] >= min_purchasers].sort_values(metric_map[metric_choice], ascending=is_ascending)
         
         if not df_merged.empty:
             display_df = df_merged.rename(columns={selected_col: st.session_state.active_single_var})
@@ -355,9 +357,9 @@ elif st.session_state.app_state == "dashboard":
             styler = display_df.style.set_properties(**{'font-weight': 'bold'}, subset=['Rank']).format({'Rank': '{:.0f}', 'Visitors': '{:,.0f}', 'Purchases': '{:,.0f}', 'Revenue': '${:,.2f}', 'Conv %': '{:.2f}%', 'Rev/Visitor': '${:,.2f}'}).background_gradient(subset=['Rev/Visitor', 'Conv %'], cmap=brand_gradient)
             render_premium_table(styler)
         else:
-            st.warning("No segments met the Minimum Traffic Floor criteria. You can lower the floor in the Global Controls above.")
+            st.warning("No segments met the Minimum Purchases criteria. You can lower the floor in the Global Controls above.")
     else:
-        st.warning("No segments met the Minimum Traffic Floor criteria. You can lower the floor in the Global Controls above.")
+        st.warning("No segments met the Minimum Purchases criteria. You can lower the floor in the Global Controls above.")
 
     st.markdown("<hr>", unsafe_allow_html=True)
     
@@ -367,19 +369,21 @@ elif st.session_state.app_state == "dashboard":
     st.subheader("🏆 Top Conversion Drivers")
     predictive_data = []
     for label, col_name in configs:
+        # 🚨 DYNAMIC GROUPING FIX
         if col_name == 'state':
-            grp_v = st.session_state.df_state_map[~st.session_state.df_state_map['state'].isin(EXCLUDE_LIST)].copy()
+            df_v_sub = st.session_state.df_state_map[~st.session_state.df_state_map['state'].isin(EXCLUDE_LIST)]
+            grp_v = df_v_sub.groupby('state', as_index=False)['total_visitors'].sum()
         else:
-            mask = (st.session_state.df_demo_cube[col_name] != 'ALL') & (~st.session_state.df_demo_cube[col_name].isin(EXCLUDE_LIST))
-            for c in DEMO_COLS:
-                if c != col_name: mask &= (st.session_state.df_demo_cube[c] == 'ALL')
-            grp_v = st.session_state.df_demo_cube[mask][[col_name, 'total_visitors']]
+            df_v_sub = st.session_state.df_demo_cube[~st.session_state.df_demo_cube[col_name].isin(EXCLUDE_LIST)]
+            grp_v = df_v_sub.groupby(col_name, as_index=False)['total_visitors'].sum()
         
         df_p_sub = df_p_filtered[~df_p_filtered[col_name].isin(EXCLUDE_LIST)]
         grp_p = df_p_sub.groupby(col_name).agg(Purchases=('Order_ID', 'nunique')).reset_index()
         
         grp = pd.merge(grp_v, grp_p, on=col_name, how='left').fillna(0).rename(columns={'total_visitors': 'Visitors'})
-        grp = grp[grp['Visitors'] >= min_visitors]
+        
+        # 🚨 FILTER BY PURCHASERS INSTEAD OF VISITORS
+        grp = grp[grp['Purchases'] >= min_purchasers]
         
         if len(grp) >= 2:
             grp['Conv %'] = (grp['Purchases'] / grp['Visitors']) * 100
@@ -468,11 +472,12 @@ elif st.session_state.app_state == "dashboard":
             res['Conv %'] = (res['Purchases'] / res['Visitors'] * 100).round(2)
             res['Rev/Visitor'] = (res['Revenue'] / res['Visitors']).round(2)
             
-            final_res = res[res['Visitors'] >= min_visitors].sort_values(metric_map[metric_choice], ascending=is_ascending)
+            # 🚨 FILTER BY PURCHASERS INSTEAD OF VISITORS
+            final_res = res[res['Purchases'] >= min_purchasers].sort_values(metric_map[metric_choice], ascending=is_ascending)
             ordered_cols = included_types + ["Visitors", "Purchases", "Revenue", "Conv %", "Rev/Visitor"]
             rename_dict = {c[1]: c[0] for c in configs}
             
-            if final_res.empty: st.warning("No combinations met the Traffic Floor minimum.")
+            if final_res.empty: st.warning("No combinations met the Minimum Purchases criteria.")
             else:
                 st.metric("Total Segments Found", f"{len(final_res):,}")
                 
