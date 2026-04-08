@@ -124,6 +124,24 @@ def clean_age(val):
 
 import re
 
+def get_real_number(v):
+    # Extracts the first valid number (including decimals, like 1.5)
+    v_str = str(v).lower().replace(',', '')
+    match = re.search(r'(\d+\.?\d*)', v_str)
+    if not match: return None
+    
+    val = float(match.group(1))
+    
+    # If the string uses "m" or "million" (e.g., $1.5M) -> Multiply by 1,000,000
+    if re.search(r'(m\b|million)', v_str):
+        val *= 1000000
+    # If the string uses "k" (e.g., $750k) -> Multiply by 1,000
+    elif re.search(r'(k\b|thousand)', v_str):
+        val *= 1000
+        
+    return val
+
+
 def bucket_income_bq(val):
     v = str(val).strip().lower()
     if v in ['all', 'none', 'nan', '<na>', 'null', 'unknown', '']: return 'ALL'
@@ -138,6 +156,7 @@ def bucket_income_bq(val):
         else: return '$250k+'
         
     return 'Unknown'
+
 
 def bucket_net_worth_bq(val):
     v = str(val).strip().lower()
