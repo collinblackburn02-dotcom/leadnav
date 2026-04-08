@@ -460,35 +460,41 @@ elif st.session_state.app_state == "dashboard":
         combos = []
         max_combo_size = min(3, len(included_types))
         
+        # 🚨 THE FIX: Pre-filter the ENTIRE database before running any combinations
+        base_v = st.session_state.df_demo_cube.copy()
+        base_p = df_p_filtered.copy()
+        
+        for col, vals in selected_filters.items():
+            base_v = base_v[base_v[col].isin(vals)]
+            base_p = base_p[base_p[col].isin(vals)]
+
         for r in range(1, max_combo_size + 1):
             for subset in itertools.combinations(included_types, r):
                 sub_cols = list(subset)
                 
-                mask = pd.Series(True, index=st.session_state.df_demo_cube.index)
-                for col in DEMO_COLS:
-                    if col in sub_cols: mask &= (st.session_state.df_demo_cube[col] != 'ALL') & (~st.session_state.df_demo_cube[col].isin(EXCLUDE_LIST))
-                    else: mask &= (st.session_state.df_demo_cube[col] == 'ALL')
-                
-                for col, vals in selected_filters.items(): 
-                    if col in sub_cols: mask &= st.session_state.df_demo_cube[col].isin(vals)
-                        
-                temp_v = st.session_state.df_demo_cube[mask].copy()
+                # Process Visitors
+                temp_v = base_v.copy()
+                for col in sub_cols:
+                    temp_v = temp_v[(temp_v[col] != 'ALL') & (~temp_v[col].isin(EXCLUDE_LIST))]
                 if temp_v.empty: continue
+                grp_v = temp_v.groupby(sub_cols, as_index=False)['total_visitors'].sum()
                 
-                temp_p = df_p_filtered.copy()
+                # Process Purchasers
+                temp_p = base_p.copy()
                 for col in sub_cols:
                     temp_p = temp_p[~temp_p[col].isin(EXCLUDE_LIST)]
-                    if col in selected_filters: 
-                        temp_p = temp_p[temp_p[col].isin(selected_filters[col])]
-                    
-                grp_v = temp_v[sub_cols + ['total_visitors']]
                 grp_p = temp_p.groupby(sub_cols).agg(Purchases=('Order_ID', 'nunique'), Revenue=('Total', 'sum')).reset_index()
                 
+                # Merge Visitors and Purchasers
                 grp = pd.merge(grp_v, grp_p, on=sub_cols, how='left').fillna(0).rename(columns={'total_visitors': 'Visitors'})
                 
+                # Keep explicit filters visible, blank out unused variables
                 for col in included_types:
                     if col not in sub_cols:
-                        grp[col] = ""
+                        if col in selected_filters:
+                            grp[col] = ", ".join(selected_filters[col])
+                        else:
+                            grp[col] = ""
                 combos.append(grp)
                 
         if combos:
