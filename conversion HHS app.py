@@ -128,15 +128,14 @@ def bucket_income_bq(val):
     v = str(val).strip().lower()
     if v in ['all', 'none', 'nan', '<na>', 'null', 'unknown', '']: return 'ALL'
     
-    # Extracts the first number in the string (removes commas)
-    nums = re.findall(r'\d+', v.replace(',', ''))
-    if nums:
-        first_num = int(nums[0])
-        if first_num < 50000: return 'Under $50k'
-        elif first_num < 100000: return '$50k-$100k'
-        elif first_num < 150000: return '$100k-$150k'
-        elif first_num < 250000: return '$150k-$250k'
-        else: return '$250k+' # Catches 250k to 499k, 500k+, etc.
+    num = get_real_number(v)
+    if num is not None:
+        if num < 50000: return 'Under $50k'
+        elif num < 100000: return '$50k-$100k'
+        elif num < 150000: return '$100k-$150k'
+        # 🚨 Boundary fix for Income
+        elif num < 249999: return '$150k-$250k' 
+        else: return '$250k+'
         
     return 'Unknown'
 
@@ -144,14 +143,13 @@ def bucket_net_worth_bq(val):
     v = str(val).strip().lower()
     if v in ['all', 'none', 'nan', '<na>', 'null', 'unknown', '']: return 'ALL'
     
-    # Extracts the first number in the string (removes commas)
-    nums = re.findall(r'\d+', v.replace(',', ''))
-    if nums:
-        first_num = int(nums[0])
-        if first_num < 100000: return 'Under $100k'
-        elif first_num < 250000: return '$100k-$249k'
-        elif first_num < 500000: return '$250k-$499k'
-        else: return '$500k+' # Catches 500k to 749k, 1M+, etc.
+    num = get_real_number(v)
+    if num is not None:
+        if num < 100000: return 'Under $100k'
+        elif num < 250000: return '$100k-$249k'
+        # 🚨 Boundary fix for Net Worth: Pushes "499,999 or more" into the top bucket
+        elif num < 499999: return '$250k-$499k' 
+        else: return '$500k+'
         
     return 'Unknown'
 
