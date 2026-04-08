@@ -4,14 +4,13 @@ from google.cloud import bigquery
 from google.oauth2 import service_account
 import matplotlib.colors as mcolors
 import itertools
+import re
 
 # ================ 1. CONFIGURATION & THEME =================
 PITCH_COMPANY_NAME = "LeadNavigator" 
 PITCH_BRAND_COLOR = "#4D148C" 
 
-# We no longer need Aidan's Webhook URL here because BQ handles it!
 BQ_UNIQUE_ORDERS_VIEW = "leadnav-hhs.HHSpixeltest.heavenly_heat_unique_orders"
-
 EXCLUDE_LIST = ['Unknown', 'U', '', 'None', 'nan', 'NaN', 'null', 'NULL', '<NA>', 'ALL']
 
 st.set_page_config(page_title=f"{PITCH_COMPANY_NAME} | Conversion Engine", page_icon="🧭", layout="wide", initial_sidebar_state="collapsed")
@@ -59,7 +58,6 @@ def render_premium_table(styler_obj):
     st.markdown(f'<div class="premium-table-container">{html}</div>', unsafe_allow_html=True)
 
 # ================ 2. THE VERIFIED DATA ENGINE =================
-# ================ 2. THE VERIFIED DATA ENGINE =================
 DEMO_COLS = ['gender', 'age_range', 'marital_status', 'children', 'homeowner_status', 'income_bracket', 'net_worth_bracket']
 
 configs = [
@@ -70,7 +68,7 @@ configs = [
     ("Net Worth", "net_worth_bracket"), 
     ("Children", "children"), 
     ("Marital Status", "marital_status"), 
-    ("Homeowner", "homeowner_status"),
+    ("Homeowner", "homeowner_status")
 ]
 INCOME_MAP = {'Under $50k': 1, '$50k-$100k': 2, '$100k-$150k': 3, '$150k-$250k': 4, '$250k+': 5}
 NET_WORTH_MAP = {'Under $100k': 1, '$100k-$249k': 2, '$250k-$499k': 3, '$500k+': 4}
@@ -122,54 +120,36 @@ def clean_age(val):
     if '55' in v and '64' in v: return '55-64'
     return 'Unknown'
 
-import re
-
 def get_real_number(v):
-    # Extracts the first valid number (including decimals, like 1.5)
     v_str = str(v).lower().replace(',', '')
     match = re.search(r'(\d+\.?\d*)', v_str)
     if not match: return None
-    
     val = float(match.group(1))
-    
-    # If the string uses "m" or "million" (e.g., $1.5M) -> Multiply by 1,000,000
-    if re.search(r'(m\b|million)', v_str):
-        val *= 1000000
-    # If the string uses "k" (e.g., $750k) -> Multiply by 1,000
-    elif re.search(r'(k\b|thousand)', v_str):
-        val *= 1000
-        
+    if re.search(r'(m\b|million)', v_str): val *= 1000000
+    elif re.search(r'(k\b|thousand)', v_str): val *= 1000
     return val
-
 
 def bucket_income_bq(val):
     v = str(val).strip().lower()
     if v in ['all', 'none', 'nan', '<na>', 'null', 'unknown', '']: return 'ALL'
-    
     num = get_real_number(v)
     if num is not None:
         if num < 50000: return 'Under $50k'
         elif num < 100000: return '$50k-$100k'
         elif num < 150000: return '$100k-$150k'
-        # 🚨 Boundary fix for Income
         elif num < 249999: return '$150k-$250k' 
         else: return '$250k+'
-        
     return 'Unknown'
-
 
 def bucket_net_worth_bq(val):
     v = str(val).strip().lower()
     if v in ['all', 'none', 'nan', '<na>', 'null', 'unknown', '']: return 'ALL'
-    
     num = get_real_number(v)
     if num is not None:
         if num < 100000: return 'Under $100k'
         elif num < 250000: return '$100k-$249k'
-        # 🚨 Boundary fix for Net Worth: Pushes "499,999 or more" into the top bucket
         elif num < 499999: return '$250k-$499k' 
         else: return '$500k+'
-        
     return 'Unknown'
 
 def normalize_demographics(df):
@@ -184,38 +164,19 @@ def normalize_demographics(df):
 
     for col in df.columns:
         df[col] = df[col].replace(["", "nan", "NaN", "None", "null", "NULL", "<NA>", "unknown", "Unknown"], "Unknown")
-        
     return df
 
-@st.cache_data(show_spinner=False, ttl=1800) # Caches for 30 mins
+@st.cache_data(show_spinner=False, ttl=1800)
 def load_order_base():
-    """Pulls directly from our smart deduplicating view in BigQuery."""
     client = get_bq_client()
     try:
         df_orders = client.query(f"SELECT * FROM `{BQ_UNIQUE_ORDERS_VIEW}`").to_dataframe()
         if df_orders.empty: return df_orders, None
 
-        # Rename core columns to match what the dashboard engine expects
-        df_orders = df_orders.rename(columns={
-            'order_id': 'Order_ID',
-            'revenue': 'Total',
-            'email': 'email_match'
-        })
-        
-        # Ensure date format
+        df_orders = df_orders.rename(columns={'order_id': 'Order_ID', 'revenue': 'Total', 'email': 'email_match'})
         df_orders['order_date'] = pd.to_datetime(df_orders['order_date'], errors='coerce', utc=True).dt.date
-        
-        # Map BQ demographic names to our normalization engine's inputs
-        df_orders = df_orders.rename(columns={
-            'age': 'age_range',
-            'income': 'income_raw',
-            'net_worth': 'net_worth_raw',
-            'homeowner': 'homeowner_raw'
-        })
-
-        # Run it through the exact same cleaner the Visitor data uses
+        df_orders = df_orders.rename(columns={'age': 'age_range', 'income': 'income_raw', 'net_worth': 'net_worth_raw', 'homeowner': 'homeowner_raw'})
         df_orders = normalize_demographics(df_orders)
-        
         return df_orders, None
     except Exception as e:
         return pd.DataFrame(), str(e)
@@ -224,22 +185,12 @@ def load_order_base():
 def load_visitor_base():
     client = get_bq_client()
     try:
-        # 1. Pull from the new master summary table
         df_raw = client.query("SELECT * FROM `leadnav-hhs.HHSpixeltest.daily_visitor_summary`").to_dataframe()
-        
         df_raw.columns = [c.lower().strip() for c in df_raw.columns]
-        
-        # 2. Lock in the date column so Streamlit can filter it later
         df_raw['visit_date'] = pd.to_datetime(df_raw['visit_date']).dt.date
         
-        # 3. Rename columns to match the app's internal engine
-        df_raw = df_raw.rename(columns={
-            'income_raw': 'income_bracket',
-            'net_worth_raw': 'net_worth_bracket',
-            'homeowner_raw': 'homeowner_status'
-        })
+        df_raw = df_raw.rename(columns={'income_raw': 'income_bracket', 'net_worth_raw': 'net_worth_bracket', 'homeowner_raw': 'homeowner_status'})
 
-        # 4. Apply all your custom cleaning functions
         if 'gender' in df_raw.columns: df_raw['gender'] = df_raw['gender'].apply(clean_gender)
         if 'children' in df_raw.columns: df_raw['children'] = df_raw['children'].apply(clean_yes_no)
         if 'marital_status' in df_raw.columns: df_raw['marital_status'] = df_raw['marital_status'].apply(clean_marital)
@@ -248,17 +199,14 @@ def load_visitor_base():
         if 'income_bracket' in df_raw.columns: df_raw['income_bracket'] = df_raw['income_bracket'].apply(bucket_income_bq)
         if 'net_worth_bracket' in df_raw.columns: df_raw['net_worth_bracket'] = df_raw['net_worth_bracket'].apply(bucket_net_worth_bq)
         
-        # 5. Clean up strings and format State
         for col in df_raw.columns:
             if col not in ['total_visitors', 'visit_date']: 
                 df_raw[col] = df_raw[col].astype(str).str.strip()
                 if col == 'state':
                     df_raw[col] = df_raw[col].str.upper()
 
-        # 6. Fill blanks with "ALL"
         df_raw = df_raw.replace(['nan', 'NaN', '<NA>', 'None', 'null', ''], 'ALL').fillna('ALL')
 
-        # 7. Spit out the two exact grouped dataframes the app expects, but keep the Date!
         df_demo = df_raw.groupby(['visit_date'] + DEMO_COLS, as_index=False)['total_visitors'].sum()
         df_state = df_raw.groupby(['visit_date', 'state'], as_index=False)['total_visitors'].sum()
         
@@ -270,7 +218,6 @@ def load_visitor_base():
 if "app_state" not in st.session_state: st.session_state.app_state = "onboarding"
 if "df_icp" not in st.session_state: st.session_state.df_icp = None
 
-# Custom HTML Logo block
 custom_html_logo = f"""
     <div style="font-family: 'Outfit', sans-serif; font-size: 1.6rem; font-weight: 800; color: #0F172A; letter-spacing: -0.5px; margin-top: 10px; white-space: nowrap;">
         Lead<span style="color: {PITCH_BRAND_COLOR};">Navigator</span>
@@ -299,11 +246,11 @@ if st.session_state.app_state == "onboarding":
                 </div>
             """, unsafe_allow_html=True)
             
-        # 1. Load Orders directly from BQ View
+        # 1. Load Orders
         st.session_state.df_icp, order_err = load_order_base()
         
-        # 2. Load Visitors directly from BQ Tables
-        st.session_state.df_demo_cube, st.session_state.df_state_map, visitor_err = load_visitor_base()
+        # 2. Load Visitors into our BASE state so we don't accidentally delete data when sliding
+        st.session_state.df_demo_base, st.session_state.df_state_base, visitor_err = load_visitor_base()
         
         status_placeholder.empty()
 
@@ -326,12 +273,19 @@ elif st.session_state.app_state == "dashboard":
         
     st.markdown(f"""<div style="text-align: center; margin-top: 10px; margin-bottom: 30px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.5rem; margin-bottom: 0px;">Conversion Analytics Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 2.8rem; color: #0F172A !important; margin-top: -5px;">Optimize your traffic funnel.</h2></div>""", unsafe_allow_html=True)
     
-    st.info("💡 **Note:** Visitor baselines reflect your historical BigQuery snapshot. The Date Slider filters your live BigQuery Order data.")
     _, c2, _ = st.columns([1, 4, 1])
-    with c2: st.slider("Filter Purchaser Date", min_value=st.session_state.min_date, max_value=st.session_state.max_date, key="date_filter", format="MMM DD, YYYY")
+    with c2: st.slider("Filter Traffic & Purchaser Date", min_value=st.session_state.min_date, max_value=st.session_state.max_date, key="date_filter", format="MMM DD, YYYY")
     
     current_dates = st.session_state.get("date_filter")
     
+    # 🚨 FILTER ORDERS
+    df_p = st.session_state.df_icp.copy()
+    df_p_filtered = df_p[(df_p['order_date'] >= current_dates[0]) & (df_p['order_date'] <= current_dates[1])]
+
+    # 🚨 FILTER VISITORS (Using our safe base copies)
+    st.session_state.df_demo_cube = st.session_state.df_demo_base[(st.session_state.df_demo_base['visit_date'] >= current_dates[0]) & (st.session_state.df_demo_base['visit_date'] <= current_dates[1])]
+    st.session_state.df_state_map = st.session_state.df_state_base[(st.session_state.df_state_base['visit_date'] >= current_dates[0]) & (st.session_state.df_state_base['visit_date'] <= current_dates[1])]
+
     st.markdown("<hr style='margin-top: 10px; margin-bottom: 30px;'>", unsafe_allow_html=True)
     st.markdown('### 🎛️ Global Dashboard Controls')
     
@@ -346,7 +300,6 @@ elif st.session_state.app_state == "dashboard":
     with ctrl4:
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("🔄 Force Data Refresh", use_container_width=True): 
-            # Clears the cache so it forces a fresh pull from BQ
             load_order_base.clear()
             load_visitor_base.clear()
             st.session_state.app_state = "onboarding"
@@ -355,10 +308,6 @@ elif st.session_state.app_state == "dashboard":
     st.markdown("<hr style='margin-top: 10px; margin-bottom: 30px;'>", unsafe_allow_html=True)
 
     metric_map = {"Conv %": "Conv %", "Purchases": "Purchases", "Revenue": "Revenue", "Visitors": "Visitors", "Rev/Visitor": "Rev/Visitor"}
-
-   # Filter the Visitor dataframes by the slider dates
-st.session_state.df_demo_cube = df_demo[(df_demo['visit_date'] >= current_dates[0]) & (df_demo['visit_date'] <= current_dates[1])]
-st.session_state.df_state_cube = df_state[(df_state['visit_date'] >= current_dates[0]) & (df_state['visit_date'] <= current_dates[1])]
 
     for _, col_name in configs:
         if col_name not in df_p_filtered.columns:
@@ -478,7 +427,6 @@ st.session_state.df_state_cube = df_state[(df_state['visit_date'] >= current_dat
         combos = []
         max_combo_size = min(3, len(included_types))
         
-        # 🚨 THE FIX: Pre-filter the ENTIRE database before running any combinations
         base_v = st.session_state.df_demo_cube.copy()
         base_p = df_p_filtered.copy()
         
