@@ -46,7 +46,8 @@ brand_gradient = mcolors.LinearSegmentedColormap.from_list("brand_purple", ["#FF
 def render_premium_table(styler_obj):
     try: styler_obj = styler_obj.hide(axis="index")
     except AttributeError: styler_obj = styler_obj.hide_index() 
-    st.markdown(f'<div class="premium-table-container">{styler_obj.to_html()}</div>', unsafe_allow_html=True)
+    html = styler_obj.to_html()
+    st.markdown(f'<div class="premium-table-container">{html}</div>', unsafe_allow_html=True)
 
 # ================ 2. DATA ENGINE =================
 DEMO_COLS = ['gender', 'age_range', 'marital_status', 'children', 'homeowner_status', 'income_bracket', 'net_worth_bracket']
@@ -101,10 +102,10 @@ def load_order_base():
         df = client.query(f"SELECT * FROM `{BQ_UNIQUE_ORDERS_VIEW}`").to_dataframe()
         df.columns = [c.lower().strip() for c in df.columns]
         
-        # Consistent Renaming and Bucketing
-        df = df.rename(columns={'order_id': 'Order_ID', 'revenue': 'Total', 'age': 'age_range', 'income': 'income_raw', 'net_worth': 'net_worth_raw', 'homeowner': 'homeowner_status'})
+        # Consistent Renaming
+        df = df.rename(columns={'order_id': 'Order_ID', 'revenue': 'Total', 'age': 'age_range', 'income': 'income_raw', 'net_worth': 'net_worth_raw', 'homeowner': 'homeowner_status', 'marital_status': 'marital_status'})
         
-        # 🚨 OMIT $0 ORDERS
+        # OMIT $0 ORDERS
         if 'Total' in df.columns:
             df['Total'] = pd.to_numeric(df['Total'], errors='coerce').fillna(0)
             df = df[df['Total'] > 0]
@@ -114,9 +115,10 @@ def load_order_base():
         df['net_worth_bracket'] = df['net_worth_raw'].apply(bucket_net_worth_bq)
         df['state'] = df['state'].astype(str).str.strip().str.upper()
         
-        # Ensure 'homeowner_status' strings are clean
-        if 'homeowner_status' in df.columns:
-            df['homeowner_status'] = df['homeowner_status'].astype(str).str.strip().replace(['nan','NaN','None',''], 'Unknown')
+        # Clean string columns
+        for col in DEMO_COLS:
+            if col in df.columns:
+                df[col] = df[col].astype(str).str.strip().replace(['nan', 'NaN', 'None', 'null', ''], 'Unknown')
 
         return df, None
     except Exception as e: return pd.DataFrame(), str(e)
@@ -168,12 +170,12 @@ elif st.session_state.app_state == "dashboard":
     logo_col, _ = st.columns([1.5, 8.5])
     with logo_col: st.markdown(f'<div style="font-family: \'Outfit\', sans-serif; font-size: 1.6rem; font-weight: 800; color: #0F172A;">Lead<span style="color: {PITCH_BRAND_COLOR};">Navigator</span></div>', unsafe_allow_html=True)
     
-    st.markdown(f"""<div style="text-align: center; margin-top: 10px; margin-bottom: 30px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.5rem;">Conversion Analytics Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 2.8rem; color: #0F172A !important; margin-top: -5px;">Optimize your traffic funnel.</h2></div>""", unsafe_allow_html=True)
+    st.markdown(f"""<div style="text-align: center; margin-top: 10px; margin-bottom: 30px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.5rem; margin-bottom: 0px;">Conversion Analytics Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 2.8rem; color: #0F172A !important; margin-top: -5px;">Optimize your traffic funnel.</h2></div>""", unsafe_allow_html=True)
     
     _, c2, _ = st.columns([1, 4, 1])
     with c2: st.slider("Filter Traffic & Purchaser Date", min_value=st.session_state.min_date, max_value=st.session_state.max_date, key="date_filter", format="MMM DD, YYYY")
     
-    # 🚨 DATA INTEGRITY TETHER
+    # 🚨 DATA INTEGRITY FILTER
     current_dates = st.session_state.get("date_filter")
     active_days = set(st.session_state.df_demo_base[(st.session_state.df_demo_base['visit_date'] >= current_dates[0]) & (st.session_state.df_demo_base['visit_date'] <= current_dates[1])]['visit_date'].unique())
     orders_in_range = st.session_state.df_icp[(st.session_state.df_icp['order_date'] >= current_dates[0]) & (st.session_state.df_icp['order_date'] <= current_dates[1])]
@@ -220,7 +222,6 @@ elif st.session_state.app_state == "dashboard":
     df_merged = pd.merge(df_v_grp, df_p_grp, on=selected_col, how='outer').fillna(0)
 
     if not df_merged.empty:
-        # Pad visitors with purchasers if visitors are missing from pixel
         if 'Visitors' not in df_merged.columns: df_merged['Visitors'] = 0
         df_merged['Visitors'] += df_merged['Purchases']
         df_merged['Conv %'] = (df_merged['Purchases'] / df_merged['Visitors'] * 100).round(2)
@@ -230,7 +231,7 @@ elif st.session_state.app_state == "dashboard":
         if not df_merged.empty:
             df_merged.insert(0, 'Rank', range(1, len(df_merged) + 1))
             display_df = df_merged.rename(columns={selected_col: st.session_state.active_single_var})
-            # 🔄 NEW COLUMN ORDER: Rank, Trait, Revenue, Visitors, Purchases, Conv %, Rev/Visitor
+            # Correct Column Order: Rank, Trait, Revenue, Visitors, Purchases, Conv %, Rev/Visitor
             display_cols = ['Rank', st.session_state.active_single_var, 'Revenue', 'Visitors', 'Purchases', 'Conv %', 'Rev/Visitor']
             styler = display_df[display_cols].style.set_properties(**{'font-weight': 'bold'}, subset=['Rank']).format({'Visitors': '{:,.0f}', 'Purchases': '{:,.0f}', 'Revenue': '${:,.2f}', 'Conv %': '{:.2f}%', 'Rev/Visitor': '${:,.2f}'}).background_gradient(subset=['Rev/Visitor', 'Conv %'], cmap=brand_gradient)
             render_premium_table(styler)
@@ -285,7 +286,6 @@ elif st.session_state.app_state == "dashboard":
                 st.metric("Total Segments Found", f"{len(final_res):,}")
                 final_res.insert(0, 'Rank', range(1, len(final_res) + 1))
                 rename_dict = {c[1]: c[0] for c in configs}
-                # 🔄 NEW COLUMN ORDER: Rank, Traits..., Revenue, Visitors, Purchases, Conv %, Rev/Visitor
                 display_cols = ['Rank'] + [rename_dict.get(c, c) for c in included_types] + ['Revenue', 'Visitors', 'Purchases', 'Conv %', 'Rev/Visitor']
                 display_df = final_res.head(50).rename(columns=rename_dict)[display_cols]
                 render_premium_table(display_df.style.format({'Rank': '{:.0f}', 'Visitors': '{:,.0f}', 'Purchases': '{:,.0f}', 'Revenue': '${:,.2f}', 'Conv %': '{:.2f}%', 'Rev/Visitor': '${:,.2f}'}).background_gradient(subset=['Rev/Visitor', 'Conv %'], cmap=brand_gradient))
