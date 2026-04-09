@@ -46,8 +46,7 @@ brand_gradient = mcolors.LinearSegmentedColormap.from_list("brand_purple", ["#FF
 def render_premium_table(styler_obj):
     try: styler_obj = styler_obj.hide(axis="index")
     except AttributeError: styler_obj = styler_obj.hide_index() 
-    html = styler_obj.to_html()
-    st.markdown(f'<div class="premium-table-container">{html}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="premium-table-container">{styler_obj.to_html()}</div>', unsafe_allow_html=True)
 
 # ================ 2. DATA ENGINE =================
 DEMO_COLS = ['gender', 'age_range', 'marital_status', 'children', 'homeowner_status', 'income_bracket', 'net_worth_bracket']
@@ -64,6 +63,44 @@ def get_bq_client():
     if "private_key" in creds_dict: creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
     return bigquery.Client(credentials=service_account.Credentials.from_service_account_info(creds_dict), project=creds_dict["project_id"])
 
+# --- NORMALIZATION FUNCTIONS (Restored to fix JOIN errors) ---
+def clean_gender(val):
+    v = str(val).strip().lower()
+    if v in ['m', 'male']: return 'Male'
+    if v in ['f', 'female']: return 'Female'
+    return 'Unknown'
+
+def clean_yes_no(val):
+    v = str(val).strip().lower()
+    if v in ['y', 'yes', 'true', 't', '1']: return 'Yes'
+    if v in ['n', 'no', 'false', 'f', '0']: return 'No'
+    return 'Unknown'
+
+def clean_marital(val):
+    v = str(val).strip().lower()
+    if v in ['y', 'yes', 'true', 't', 'married', 'm']: return 'Married'
+    if v in ['n', 'no', 'false', 'f', 'single', 's']: return 'Single'
+    if 'divorced' in v or v == 'd': return 'Divorced'
+    return 'Unknown'
+
+def clean_homeowner(val):
+    v = str(val).strip().lower()
+    if v in ['y', 'yes', 'true', 't', 'homeowner']: return 'Homeowner'
+    if v in ['n', 'no', 'false', 'f', 'renter']: return 'Renter'
+    if 'homeowner' in v: return 'Homeowner'
+    if 'renter' in v: return 'Renter'
+    return 'Unknown'
+
+def clean_age(val):
+    v = str(val).strip().lower()
+    if '65' in v: return '65+'
+    if '18' in v and '24' in v: return '18-24'
+    if '25' in v and '34' in v: return '25-34'
+    if '35' in v and '44' in v: return '35-44'
+    if '45' in v and '54' in v: return '45-54'
+    if '55' in v and '64' in v: return '55-64'
+    return 'Unknown'
+
 def get_real_number(v):
     if pd.isna(v): return None
     v_str = str(v).lower().replace(',', '')
@@ -76,7 +113,6 @@ def get_real_number(v):
 
 def bucket_income_bq(val):
     v = str(val).strip().lower()
-    if v in ['unknown', 'all', 'none', 'nan', '<na>', 'null', '']: return 'Unknown'
     num = get_real_number(v)
     if num is None: return 'Unknown'
     if num < 45000: return 'Under $45k'
@@ -87,7 +123,6 @@ def bucket_income_bq(val):
 
 def bucket_net_worth_bq(val):
     v = str(val).strip().lower()
-    if v in ['unknown', 'all', 'none', 'nan', '<na>', 'null', '']: return 'Unknown'
     num = get_real_number(v)
     if num is None: return 'Unknown'
     if num < 95000: return 'Under $100k'
@@ -95,17 +130,27 @@ def bucket_net_worth_bq(val):
     elif num < 450000: return '$250k-$499k' 
     else: return '$500k+'
 
+def normalize_demographics(df):
+    if 'gender' in df.columns: df['gender'] = df['gender'].apply(clean_gender)
+    if 'children' in df.columns: df['children'] = df['children'].apply(clean_yes_no)
+    if 'marital_status' in df.columns: df['marital_status'] = df['marital_status'].apply(clean_marital)
+    if 'age_range' in df.columns: df['age_range'] = df['age_range'].apply(clean_age)
+    if 'homeowner_status' in df.columns: df['homeowner_status'] = df['homeowner_status'].apply(clean_homeowner)
+    if 'state' in df.columns: df['state'] = df['state'].astype(str).str.strip().str.upper()
+    
+    for col in DEMO_COLS + ['state']:
+        if col in df.columns:
+            df[col] = df[col].astype(str).str.strip().replace(['nan', 'NaN', 'None', 'null', 'NULL', '<NA>', 'unknown', 'Unknown', 'ALL', ''], 'Unknown')
+    return df
+
 @st.cache_data(show_spinner=False, ttl=1800)
 def load_order_base():
     client = get_bq_client()
     try:
         df = client.query(f"SELECT * FROM `{BQ_UNIQUE_ORDERS_VIEW}`").to_dataframe()
         df.columns = [c.lower().strip() for c in df.columns]
-        
-        # Consistent Renaming
         df = df.rename(columns={'order_id': 'Order_ID', 'revenue': 'Total', 'age': 'age_range', 'income': 'income_raw', 'net_worth': 'net_worth_raw', 'homeowner': 'homeowner_status', 'marital_status': 'marital_status'})
         
-        # OMIT $0 ORDERS
         if 'Total' in df.columns:
             df['Total'] = pd.to_numeric(df['Total'], errors='coerce').fillna(0)
             df = df[df['Total'] > 0]
@@ -113,14 +158,8 @@ def load_order_base():
         df['order_date'] = pd.to_datetime(df['order_date'], errors='coerce', utc=True).dt.date
         df['income_bracket'] = df['income_raw'].apply(bucket_income_bq)
         df['net_worth_bracket'] = df['net_worth_raw'].apply(bucket_net_worth_bq)
-        df['state'] = df['state'].astype(str).str.strip().str.upper()
         
-        # Clean string columns
-        for col in DEMO_COLS:
-            if col in df.columns:
-                df[col] = df[col].astype(str).str.strip().replace(['nan', 'NaN', 'None', 'null', ''], 'Unknown')
-
-        return df, None
+        return normalize_demographics(df), None
     except Exception as e: return pd.DataFrame(), str(e)
 
 @st.cache_data(show_spinner=False, ttl=1800)
@@ -133,10 +172,10 @@ def load_visitor_base():
         df = df.rename(columns={'income_raw': 'income_bracket', 'net_worth_raw': 'net_worth_bracket', 'homeowner_raw': 'homeowner_status'})
         df['total_visitors'] = pd.to_numeric(df['total_visitors'], errors='coerce').fillna(0)
         
-        for col in DEMO_COLS:
-            if 'income' in col: df[col] = df[col].apply(bucket_income_bq)
-            elif 'net_worth' in col: df[col] = df[col].apply(bucket_net_worth_bq)
-            df[col] = df[col].astype(str).str.strip().replace(['nan', 'NaN', 'None', 'null', ''], 'Unknown')
+        if 'income_bracket' in df.columns: df['income_bracket'] = df['income_bracket'].apply(bucket_income_bq)
+        if 'net_worth_bracket' in df.columns: df['net_worth_bracket'] = df['net_worth_bracket'].apply(bucket_net_worth_bq)
+        
+        df = normalize_demographics(df)
         
         df_demo = df.groupby(['visit_date'] + DEMO_COLS, as_index=False)['total_visitors'].sum()
         df_state = df.groupby(['visit_date', 'state'], as_index=False)['total_visitors'].sum()
@@ -175,7 +214,6 @@ elif st.session_state.app_state == "dashboard":
     _, c2, _ = st.columns([1, 4, 1])
     with c2: st.slider("Filter Traffic & Purchaser Date", min_value=st.session_state.min_date, max_value=st.session_state.max_date, key="date_filter", format="MMM DD, YYYY")
     
-    # 🚨 DATA INTEGRITY FILTER
     current_dates = st.session_state.get("date_filter")
     active_days = set(st.session_state.df_demo_base[(st.session_state.df_demo_base['visit_date'] >= current_dates[0]) & (st.session_state.df_demo_base['visit_date'] <= current_dates[1])]['visit_date'].unique())
     orders_in_range = st.session_state.df_icp[(st.session_state.df_icp['order_date'] >= current_dates[0]) & (st.session_state.df_icp['order_date'] <= current_dates[1])]
@@ -231,7 +269,6 @@ elif st.session_state.app_state == "dashboard":
         if not df_merged.empty:
             df_merged.insert(0, 'Rank', range(1, len(df_merged) + 1))
             display_df = df_merged.rename(columns={selected_col: st.session_state.active_single_var})
-            # Correct Column Order: Rank, Trait, Revenue, Visitors, Purchases, Conv %, Rev/Visitor
             display_cols = ['Rank', st.session_state.active_single_var, 'Revenue', 'Visitors', 'Purchases', 'Conv %', 'Rev/Visitor']
             styler = display_df[display_cols].style.set_properties(**{'font-weight': 'bold'}, subset=['Rank']).format({'Visitors': '{:,.0f}', 'Purchases': '{:,.0f}', 'Revenue': '${:,.2f}', 'Conv %': '{:.2f}%', 'Rev/Visitor': '${:,.2f}'}).background_gradient(subset=['Rev/Visitor', 'Conv %'], cmap=brand_gradient)
             render_premium_table(styler)
