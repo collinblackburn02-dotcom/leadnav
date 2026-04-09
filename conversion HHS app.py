@@ -100,6 +100,11 @@ def load_order_base():
     try:
         df = client.query(f"SELECT * FROM `{BQ_UNIQUE_ORDERS_VIEW}`").to_dataframe()
         df = df.rename(columns={'order_id': 'Order_ID', 'revenue': 'Total', 'email': 'email_match', 'age': 'age_range', 'income': 'income_raw', 'net_worth': 'net_worth_raw', 'homeowner': 'homeowner_raw'})
+        
+        # 🚨 OMIT $0 ORDERS
+        df['Total'] = pd.to_numeric(df['Total'], errors='coerce').fillna(0)
+        df = df[df['Total'] > 0]
+        
         df['order_date'] = pd.to_datetime(df['order_date'], errors='coerce', utc=True).dt.date
         df['income_bracket'] = df['income_raw'].apply(bucket_income_bq)
         df['net_worth_bracket'] = df['net_worth_raw'].apply(bucket_net_worth_bq)
@@ -133,7 +138,7 @@ if "app_state" not in st.session_state: st.session_state.app_state = "onboarding
 if st.session_state.app_state == "onboarding":
     logo_col, _ = st.columns([1.5, 8.5])
     with logo_col: st.markdown(f'<div style="font-family: \'Outfit\', sans-serif; font-size: 1.6rem; font-weight: 800; color: #0F172A;">Lead<span style="color: {PITCH_BRAND_COLOR};">Navigator</span></div>', unsafe_allow_html=True)
-    st.markdown("""<div style="text-align: center; margin-top: 40px; margin-bottom: 25px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.6rem;">Conversion Analytics Dashboard.</h1><h2 style="font-size: 1.8rem; color: #0F172A;">Synchronize with BigQuery to view live conversions.</h2></div>""", unsafe_allow_html=True)
+    st.markdown("""<div style="text-align: center; margin-top: 40px; margin-bottom: 25px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.6rem;">Conversion Analytics Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 1.8rem; color: #0F172A !important;">Synchronize with BigQuery to view live conversions.</h2></div>""", unsafe_allow_html=True)
     
     _, center_col, _ = st.columns([2, 1.5, 2])
     if center_col.button("🔄 Sync Database", type="primary", use_container_width=True):
@@ -154,14 +159,14 @@ elif st.session_state.app_state == "dashboard":
     logo_col, _ = st.columns([1.5, 8.5])
     with logo_col: st.markdown(f'<div style="font-family: \'Outfit\', sans-serif; font-size: 1.6rem; font-weight: 800; color: #0F172A;">Lead<span style="color: {PITCH_BRAND_COLOR};">Navigator</span></div>', unsafe_allow_html=True)
     
-    st.markdown(f"""<div style="text-align: center; margin-top: 10px; margin-bottom: 30px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.5rem;">Conversion Analytics Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 2.8rem; color: #0F172A !important;">Optimize your traffic funnel.</h2></div>""", unsafe_allow_html=True)
+    st.markdown(f"""<div style="text-align: center; margin-top: 10px; margin-bottom: 30px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.5rem; margin-bottom: 0px;">Conversion Analytics Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 2.8rem; color: #0F172A !important; margin-top: -5px;">Optimize your traffic funnel.</h2></div>""", unsafe_allow_html=True)
     
     _, c2, _ = st.columns([1, 4, 1])
     with c2: st.slider("Filter Traffic & Purchaser Date", min_value=st.session_state.min_date, max_value=st.session_state.max_date, key="date_filter", format="MMM DD, YYYY")
     
-    # 🚨 DATA INTEGRITY FILTER
     current_dates = st.session_state.get("date_filter")
     active_days = set(st.session_state.df_demo_base[(st.session_state.df_demo_base['visit_date'] >= current_dates[0]) & (st.session_state.df_demo_base['visit_date'] <= current_dates[1])]['visit_date'].unique())
+    
     orders_in_range = st.session_state.df_icp[(st.session_state.df_icp['order_date'] >= current_dates[0]) & (st.session_state.df_icp['order_date'] <= current_dates[1])]
     df_p_filtered = orders_in_range[orders_in_range['order_date'].isin(active_days)]
     
@@ -213,9 +218,8 @@ elif st.session_state.app_state == "dashboard":
         
         if not df_merged.empty:
             df_merged.insert(0, 'Rank', range(1, len(df_merged) + 1))
-            # 🔄 NEW COLUMN ORDER: Rank, Trait, Revenue, Visitors, Purchases, Conv %, Rev/Visitor
-            col_order = ['Rank', selected_col, 'Revenue', 'Visitors', 'Purchases', 'Conv %', 'Rev/Visitor']
             display_df = df_merged.rename(columns={selected_col: st.session_state.active_single_var})
+            # 🔄 Correct Column Order: Rank, Trait, Revenue, Visitors, Purchases, Conv %, Rev/Visitor
             display_df = display_df[['Rank', st.session_state.active_single_var, 'Revenue', 'Visitors', 'Purchases', 'Conv %', 'Rev/Visitor']]
             
             styler = display_df.style.set_properties(**{'font-weight': 'bold'}, subset=['Rank']).format({'Visitors': '{:,.0f}', 'Purchases': '{:,.0f}', 'Revenue': '${:,.2f}', 'Conv %': '{:.2f}%', 'Rev/Visitor': '${:,.2f}'}).background_gradient(subset=['Rev/Visitor', 'Conv %'], cmap=brand_gradient)
@@ -267,7 +271,7 @@ elif st.session_state.app_state == "dashboard":
                 st.metric("Total Segments Found", f"{len(final_res):,}")
                 final_res.insert(0, 'Rank', range(1, len(final_res) + 1))
                 rename_dict = {c[1]: c[0] for c in configs}
-                # 🔄 NEW COLUMN ORDER: Rank, Traits..., Revenue, Visitors, Purchases, Conv %, Rev/Visitor
+                # 🔄 Correct Column Order: Rank, Traits..., Revenue, Visitors, Purchases, Conv %, Rev/Visitor
                 display_cols = ['Rank'] + [rename_dict.get(c, c) for c in included_types] + ['Revenue', 'Visitors', 'Purchases', 'Conv %', 'Rev/Visitor']
                 display_df = final_res.head(50).rename(columns=rename_dict)[display_cols]
                 
