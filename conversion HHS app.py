@@ -229,34 +229,30 @@ elif st.session_state.app_state == "dashboard":
     with ctrl1: metric_choice = st.radio("Primary Metric", ["Rev/Visitor", "Conv %", "Revenue", "Purchases", "Visitors"])
     with ctrl2: sort_order = st.radio("Ranking Order", ["High to Low", "Low to High"]); is_ascending = (sort_order == "Low to High")
     with ctrl3: min_purchasers = st.number_input("Min Purchases", value=1, min_value=0)
-    with ctrl4: 
-        # 1. Get unique SKUs
-        if 'lineitem_name' in df_p_filtered.columns:
-            sku_options = sorted([str(x) for x in df_p_filtered['lineitem_name'].dropna().unique() if str(x) not in EXCLUDE_LIST])
-        else:
-            sku_options = []
+    with ctrl4:
+        # 1. Create the Master Toggle
+        product_filter_on = st.toggle("Filter by Product", value=False)
         
-        # 2. Add "ALL" to the top of the list
-        display_options = ["ALL"] + sku_options
-        
-        # 3. Multiselect defaults to just ["ALL"]
-        selected_skus = st.multiselect("Filter by Product (SKU)", options=display_options, default=["ALL"])
+        selected_skus = []
+        if product_filter_on:
+            # 2. Only show the dropdown if the toggle is ON
+            if 'lineitem_name' in df_p_filtered.columns:
+                sku_options = sorted([str(x) for x in df_p_filtered['lineitem_name'].dropna().unique() if str(x) not in EXCLUDE_LIST])
+            else:
+                sku_options = []
+            
+            selected_skus = st.multiselect("Select Specific SKUs", options=sku_options)
 
-    # 4. Filter Logic: If "ALL" is in the list or nothing is selected, show everything.
-    # Otherwise, filter by the specific SKUs chosen.
-    if not selected_skus or "ALL" in selected_skus:
-        # No extra filtering needed, df_p_filtered stays as is
-        pass 
-    else:
+    # 3. Filter Logic
+    if product_filter_on and selected_skus:
+        # If toggle is ON and items are picked, filter the data
         df_p_filtered = df_p_filtered[df_p_filtered['lineitem_name'].isin(selected_skus)]
-
-    # 4. Filter Logic: If "ALL" is in the list or nothing is selected, show everything.
-    # Otherwise, filter by the specific SKUs chosen.
-    if not selected_skus or "ALL" in selected_skus:
-        # No extra filtering needed, df_p_filtered stays as is
-        pass 
+    elif product_filter_on and not selected_skus:
+        # If toggle is ON but nothing picked, show zero data (standard behavior)
+        df_p_filtered = df_p_filtered.iloc[0:0]
     else:
-        df_p_filtered = df_p_filtered[df_p_filtered['lineitem_name'].isin(selected_skus)]
+        # If toggle is OFF, show everything (don't touch the dataframe)
+        pass
 
     # 🚨 NEW: Apply the selected SKUs to the orders table before running math
     if 'lineitem_name' in df_p_filtered.columns and selected_skus:
