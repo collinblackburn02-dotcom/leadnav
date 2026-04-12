@@ -229,18 +229,26 @@ elif st.session_state.app_state == "dashboard":
     with ctrl1: metric_choice = st.radio("Primary Metric", ["Rev/Visitor", "Conv %", "Revenue", "Purchases", "Visitors"])
     with ctrl2: sort_order = st.radio("Ranking Order", ["High to Low", "Low to High"]); is_ascending = (sort_order == "Low to High")
     with ctrl3: min_purchasers = st.number_input("Min Purchases", value=1, min_value=0)
-    with ctrl4: 
-        # 🚨 NEW: Extract SKUs dynamically and default to all
+   with ctrl4: 
+        # 1. Get unique SKUs
         if 'lineitem_name' in df_p_filtered.columns:
-            all_skus = sorted([str(x) for x in df_p_filtered['lineitem_name'].dropna().unique() if str(x) not in EXCLUDE_LIST])
+            sku_options = sorted([str(x) for x in df_p_filtered['lineitem_name'].dropna().unique() if str(x) not in EXCLUDE_LIST])
         else:
-            all_skus = []
-        selected_skus = st.multiselect("Filter by Product (SKU)", options=all_skus, default=all_skus)
-    with ctrl5:
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("🔄 Force Refresh", use_container_width=True): 
-            load_order_base.clear(); load_visitor_base.clear()
-            st.session_state.app_state = "onboarding"; st.rerun()
+            sku_options = []
+        
+        # 2. Add "ALL" to the top of the list
+        display_options = ["All"] + sku_options
+        
+        # 3. Multiselect defaults to just ["ALL"]
+        selected_skus = st.multiselect("Filter by Product (SKU)", options=display_options, default=["ALL"])
+
+    # 4. Filter Logic: If "ALL" is in the list or nothing is selected, show everything.
+    # Otherwise, filter by the specific SKUs chosen.
+    if not selected_skus or "ALL" in selected_skus:
+        # No extra filtering needed, df_p_filtered stays as is
+        pass 
+    else:
+        df_p_filtered = df_p_filtered[df_p_filtered['lineitem_name'].isin(selected_skus)]
 
     # 🚨 NEW: Apply the selected SKUs to the orders table before running math
     if 'lineitem_name' in df_p_filtered.columns and selected_skus:
