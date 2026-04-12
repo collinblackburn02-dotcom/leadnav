@@ -229,7 +229,7 @@ elif st.session_state.app_state == "dashboard":
     with ctrl1: metric_choice = st.radio("Primary Metric", ["Rev/Visitor", "Conv %", "Revenue", "Purchases", "Visitors"])
     with ctrl2: sort_order = st.radio("Ranking Order", ["High to Low", "Low to High"]); is_ascending = (sort_order == "Low to High")
     with ctrl3: min_purchasers = st.number_input("Min Purchases", value=1, min_value=0)
-   with ctrl4: 
+    with ctrl4: 
         # 1. Get unique SKUs
         if 'lineitem_name' in df_p_filtered.columns:
             sku_options = sorted([str(x) for x in df_p_filtered['lineitem_name'].dropna().unique() if str(x) not in EXCLUDE_LIST])
