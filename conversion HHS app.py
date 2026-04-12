@@ -63,7 +63,7 @@ def get_bq_client():
     if "private_key" in creds_dict: creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
     return bigquery.Client(credentials=service_account.Credentials.from_service_account_info(creds_dict), project=creds_dict["project_id"])
 
-# --- NORMALIZATION FUNCTIONS (Restored to fix JOIN errors) ---
+# --- NORMALIZATION FUNCTIONS ---
 def clean_gender(val):
     v = str(val).strip().lower()
     if v in ['m', 'male']: return 'Male'
@@ -223,18 +223,33 @@ elif st.session_state.app_state == "dashboard":
     st.session_state.df_state_map = st.session_state.df_state_base[(st.session_state.df_state_base['visit_date'] >= current_dates[0]) & (st.session_state.df_state_base['visit_date'] <= current_dates[1])]
 
     st.markdown("<hr>", unsafe_allow_html=True)
-    ctrl1, ctrl2, ctrl3, ctrl4 = st.columns(4)
-    with ctrl1: metric_choice = st.radio("Primary Metric Leaderboard", ["Rev/Visitor", "Conv %", "Revenue", "Purchases", "Visitors"])
+    
+    # 🚨 NEW: 5 Columns to accommodate the Product/SKU filter gracefully
+    ctrl1, ctrl2, ctrl3, ctrl4, ctrl5 = st.columns([1.2, 1.2, 1.1, 2.5, 1.2])
+    with ctrl1: metric_choice = st.radio("Primary Metric", ["Rev/Visitor", "Conv %", "Revenue", "Purchases", "Visitors"])
     with ctrl2: sort_order = st.radio("Ranking Order", ["High to Low", "Low to High"]); is_ascending = (sort_order == "Low to High")
-    with ctrl3: min_purchasers = st.number_input("Minimum Purchases", value=1, min_value=0)
-    with ctrl4:
+    with ctrl3: min_purchasers = st.number_input("Min Purchases", value=1, min_value=0)
+    with ctrl4: 
+        # 🚨 NEW: Extract SKUs dynamically and default to all
+        if 'lineitem_name' in df_p_filtered.columns:
+            all_skus = sorted([str(x) for x in df_p_filtered['lineitem_name'].dropna().unique() if str(x) not in EXCLUDE_LIST])
+        else:
+            all_skus = []
+        selected_skus = st.multiselect("Filter by Product (SKU)", options=all_skus, default=all_skus)
+    with ctrl5:
         st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("🔄 Force Data Refresh", use_container_width=True): 
+        if st.button("🔄 Force Refresh", use_container_width=True): 
             load_order_base.clear(); load_visitor_base.clear()
             st.session_state.app_state = "onboarding"; st.rerun()
+
+    # 🚨 NEW: Apply the selected SKUs to the orders table before running math
+    if 'lineitem_name' in df_p_filtered.columns and selected_skus:
+        df_p_filtered = df_p_filtered[df_p_filtered['lineitem_name'].isin(selected_skus)]
+    elif not selected_skus:
+        df_p_filtered = df_p_filtered.iloc[0:0] # Show zero orders if everything is unselected
     
     if len(orders_in_range) > len(df_p_filtered):
-        st.info(f"🛡️ **Integrity Shield:** {len(orders_in_range) - len(df_p_filtered)} orders from 'Ghost Days' (0 visitors) were excluded.")
+        st.info(f"🛡️ **Integrity Shield:** {len(orders_in_range) - len(df_p_filtered)} orders from 'Ghost Days' (0 visitors) or filtered SKUs were excluded.")
 
     st.markdown("<hr>", unsafe_allow_html=True)
     metric_map = {"Conv %": "Conv %", "Purchases": "Purchases", "Revenue": "Revenue", "Visitors": "Visitors", "Rev/Visitor": "Rev/Visitor"}
