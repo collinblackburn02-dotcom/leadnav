@@ -239,8 +239,8 @@ elif st.session_state.app_state == "dashboard":
         # 2. Add "ALL" to the top of the list
         display_options = ["All"] + sku_options
         
-        # 3. Multiselect defaults to just ["ALL"]
-        selected_skus = st.multiselect("Filter by Product (SKU)", options=display_options, default=["ALL"])
+        # 3. Multiselect defaults to just ["All"]
+        selected_skus = st.multiselect("Filter by Product (SKU)", options=display_options, default=["All"])
 
     # 4. Filter Logic: If "ALL" is in the list or nothing is selected, show everything.
     # Otherwise, filter by the specific SKUs chosen.
