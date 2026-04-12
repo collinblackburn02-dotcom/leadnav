@@ -63,7 +63,6 @@ def get_bq_client():
     if "private_key" in creds_dict: creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
     return bigquery.Client(credentials=service_account.Credentials.from_service_account_info(creds_dict), project=creds_dict["project_id"])
 
-# --- NORMALIZATION FUNCTIONS ---
 def clean_gender(val):
     v = str(val).strip().lower()
     if v in ['m', 'male']: return 'Male'
@@ -150,15 +149,12 @@ def load_order_base():
         df = client.query(f"SELECT * FROM `{BQ_UNIQUE_ORDERS_VIEW}`").to_dataframe()
         df.columns = [c.lower().strip() for c in df.columns]
         df = df.rename(columns={'order_id': 'Order_ID', 'revenue': 'Total', 'age': 'age_range', 'income': 'income_raw', 'net_worth': 'net_worth_raw', 'homeowner': 'homeowner_status', 'marital_status': 'marital_status'})
-        
         if 'Total' in df.columns:
             df['Total'] = pd.to_numeric(df['Total'], errors='coerce').fillna(0)
             df = df[df['Total'] > 0]
-        
         df['order_date'] = pd.to_datetime(df['order_date'], errors='coerce', utc=True).dt.date
         df['income_bracket'] = df['income_raw'].apply(bucket_income_bq)
         df['net_worth_bracket'] = df['net_worth_raw'].apply(bucket_net_worth_bq)
-        
         return normalize_demographics(df), None
     except Exception as e: return pd.DataFrame(), str(e)
 
@@ -171,32 +167,26 @@ def load_visitor_base():
         df['visit_date'] = pd.to_datetime(df['visit_date']).dt.date
         df = df.rename(columns={'income_raw': 'income_bracket', 'net_worth_raw': 'net_worth_bracket', 'homeowner_raw': 'homeowner_status'})
         df['total_visitors'] = pd.to_numeric(df['total_visitors'], errors='coerce').fillna(0)
-        
         if 'income_bracket' in df.columns: df['income_bracket'] = df['income_bracket'].apply(bucket_income_bq)
         if 'net_worth_bracket' in df.columns: df['net_worth_bracket'] = df['net_worth_bracket'].apply(bucket_net_worth_bq)
-        
         df = normalize_demographics(df)
-        
         df_demo = df.groupby(['visit_date'] + DEMO_COLS, as_index=False)['total_visitors'].sum()
         df_state = df.groupby(['visit_date', 'state'], as_index=False)['total_visitors'].sum()
         return df_demo, df_state, None
     except Exception as e: return pd.DataFrame(), pd.DataFrame(), str(e)
 
-# ================ 3. APP FLOW =================
 if "app_state" not in st.session_state: st.session_state.app_state = "onboarding"
 
 if st.session_state.app_state == "onboarding":
     logo_col, _ = st.columns([1.5, 8.5])
     with logo_col: st.markdown(f'<div style="font-family: \'Outfit\', sans-serif; font-size: 1.6rem; font-weight: 800; color: #0F172A;">Lead<span style="color: {PITCH_BRAND_COLOR};">Navigator</span></div>', unsafe_allow_html=True)
     st.markdown("""<div style="text-align: center; margin-top: 40px; margin-bottom: 25px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.6rem;">Conversion Analytics Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 1.8rem; color: #0F172A !important;">Synchronize with BigQuery to view live conversions.</h2></div>""", unsafe_allow_html=True)
-    
     _, center_col, _ = st.columns([2, 1.5, 2])
     if center_col.button("🔄 Sync Database", type="primary", use_container_width=True):
         with st.status("Connecting to Identity Graph...", expanded=True) as status:
             st.session_state.df_icp, order_err = load_order_base()
             st.session_state.df_demo_base, st.session_state.df_state_base, visitor_err = load_visitor_base()
             status.update(label="Sync Complete!", state="complete", expanded=False)
-        
         if not order_err and not visitor_err:
             st.session_state.min_date = st.session_state.df_demo_base['visit_date'].min()
             st.session_state.max_date = st.session_state.df_demo_base['visit_date'].max()
@@ -205,10 +195,8 @@ if st.session_state.app_state == "onboarding":
             st.rerun()
 
 elif st.session_state.app_state == "dashboard":
-    included_types = [] 
     logo_col, _ = st.columns([1.5, 8.5])
     with logo_col: st.markdown(f'<div style="font-family: \'Outfit\', sans-serif; font-size: 1.6rem; font-weight: 800; color: #0F172A;">Lead<span style="color: {PITCH_BRAND_COLOR};">Navigator</span></div>', unsafe_allow_html=True)
-    
     st.markdown(f"""<div style="text-align: center; margin-top: 10px; margin-bottom: 30px;"><h1 class="serif-gradient-centerpiece" style="font-size: 3.5rem; margin-bottom: 0px;">Conversion Analytics Dashboard.</h1><h2 class="serif-subheadline" style="font-size: 2.8rem; color: #0F172A !important; margin-top: -5px;">Optimize your traffic funnel.</h2></div>""", unsafe_allow_html=True)
     
     _, c2, _ = st.columns([1, 4, 1])
@@ -217,6 +205,8 @@ elif st.session_state.app_state == "dashboard":
     current_dates = st.session_state.get("date_filter")
     active_days = set(st.session_state.df_demo_base[(st.session_state.df_demo_base['visit_date'] >= current_dates[0]) & (st.session_state.df_demo_base['visit_date'] <= current_dates[1])]['visit_date'].unique())
     orders_in_range = st.session_state.df_icp[(st.session_state.df_icp['order_date'] >= current_dates[0]) & (st.session_state.df_icp['order_date'] <= current_dates[1])]
+    
+    # Pre-filter by Ghost Days
     df_p_filtered = orders_in_range[orders_in_range['order_date'].isin(active_days)]
     
     st.session_state.df_demo_cube = st.session_state.df_demo_base[(st.session_state.df_demo_base['visit_date'] >= current_dates[0]) & (st.session_state.df_demo_base['visit_date'] <= current_dates[1])]
@@ -224,44 +214,38 @@ elif st.session_state.app_state == "dashboard":
 
     st.markdown("<hr>", unsafe_allow_html=True)
     
-    # 🚨 NEW: 5 Columns to accommodate the Product/SKU filter gracefully
+    # ================ 4. CONTROLS =================
     ctrl1, ctrl2, ctrl3, ctrl4, ctrl5 = st.columns([1.2, 1.2, 1.1, 2.5, 1.2])
     with ctrl1: metric_choice = st.radio("Primary Metric", ["Rev/Visitor", "Conv %", "Revenue", "Purchases", "Visitors"])
     with ctrl2: sort_order = st.radio("Ranking Order", ["High to Low", "Low to High"]); is_ascending = (sort_order == "Low to High")
     with ctrl3: min_purchasers = st.number_input("Min Purchases", value=1, min_value=0)
-    with ctrl4:
-        # 1. Create the Master Toggle
-        product_filter_on = st.toggle("Filter by Product", value=False)
-        
-        selected_skus = []
-        if product_filter_on:
-            # 2. Only show the dropdown if the toggle is ON
-            if 'lineitem_name' in df_p_filtered.columns:
-                sku_options = sorted([str(x) for x in df_p_filtered['lineitem_name'].dropna().unique() if str(x) not in EXCLUDE_LIST])
-            else:
-                sku_options = []
-            
-            selected_skus = st.multiselect("Select Specific SKUs", options=sku_options)
-
-    # 3. Filter Logic
-    if product_filter_on and selected_skus:
-        # If toggle is ON and items are picked, filter the data
-        df_p_filtered = df_p_filtered[df_p_filtered['lineitem_name'].isin(selected_skus)]
-    elif product_filter_on and not selected_skus:
-        # If toggle is ON but nothing picked, show zero data (standard behavior)
-        df_p_filtered = df_p_filtered.iloc[0:0]
-    else:
-        # If toggle is OFF, show everything (don't touch the dataframe)
-        pass
-
-    # 🚨 NEW: Apply the selected SKUs to the orders table before running math
-    if 'lineitem_name' in df_p_filtered.columns and selected_skus:
-        df_p_filtered = df_p_filtered[df_p_filtered['lineitem_name'].isin(selected_skus)]
-    elif not selected_skus:
-        df_p_filtered = df_p_filtered.iloc[0:0] # Show zero orders if everything is unselected
     
+    # 🚨 SKU FILTER UI
+    with ctrl4:
+        sku_toggle = st.toggle("Filter by Product", value=False)
+        if sku_toggle:
+            if 'lineitem_name' in orders_in_range.columns:
+                sku_opts = sorted([str(x) for x in orders_in_range['lineitem_name'].dropna().unique() if str(x) not in EXCLUDE_LIST])
+            else:
+                sku_opts = []
+            selected_skus = st.multiselect("Select SKUs", options=sku_opts)
+            # Apply filter ONLY if toggle is on
+            if selected_skus:
+                df_p_filtered = df_p_filtered[df_p_filtered['lineitem_name'].isin(selected_skus)]
+            else:
+                df_p_filtered = df_p_filtered.iloc[0:0] # Show none if toggle is on but none selected
+        else:
+            # Toggle is off, df_p_filtered stays the full set (ALL)
+            pass
+
+    with ctrl5:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🔄 Force Refresh", use_container_width=True): 
+            load_order_base.clear(); load_visitor_base.clear()
+            st.session_state.app_state = "onboarding"; st.rerun()
+
     if len(orders_in_range) > len(df_p_filtered):
-        st.info(f"🛡️ **Integrity Shield:** {len(orders_in_range) - len(df_p_filtered)} orders from 'Ghost Days' (0 visitors) or filtered SKUs were excluded.")
+        st.info(f"🛡️ **Integrity Shield:** {len(orders_in_range) - len(df_p_filtered)} orders excluded (Filters or Ghost Days).")
 
     st.markdown("<hr>", unsafe_allow_html=True)
     metric_map = {"Conv %": "Conv %", "Purchases": "Purchases", "Revenue": "Revenue", "Visitors": "Visitors", "Rev/Visitor": "Rev/Visitor"}
@@ -271,7 +255,6 @@ elif st.session_state.app_state == "dashboard":
     # ========================================================
     st.subheader("🔍 Single Variable Deep Dive")
     if "active_single_var" not in st.session_state: st.session_state.active_single_var = "Gender"
-    
     v_cols = st.columns(8)
     for i, (label, col_name) in enumerate(configs):
         if v_cols[i].button(label, key=f"btn_{label}", type="primary" if st.session_state.active_single_var == label else "secondary", use_container_width=True):
@@ -292,7 +275,6 @@ elif st.session_state.app_state == "dashboard":
         df_merged['Conv %'] = (df_merged['Purchases'] / df_merged['Visitors'] * 100).round(2)
         df_merged['Rev/Visitor'] = (df_merged['Revenue'] / df_merged['Visitors']).round(2)
         df_merged = df_merged[df_merged['Purchases'] >= min_purchasers].sort_values(metric_map[metric_choice], ascending=is_ascending)
-        
         if not df_merged.empty:
             df_merged.insert(0, 'Rank', range(1, len(df_merged) + 1))
             display_df = df_merged.rename(columns={selected_col: st.session_state.active_single_var})
@@ -323,7 +305,6 @@ elif st.session_state.app_state == "dashboard":
         base_v, base_p = st.session_state.df_demo_cube.copy(), df_p_filtered.copy()
         for col, vals in selected_filters.items():
             base_v = base_v[base_v[col].isin(vals)]; base_p = base_p[base_p[col].isin(vals)]
-
         for r in range(1 if not filtered_cols else 0, (max(3, len(filtered_cols)) - len(filtered_cols)) + 1):
             for subset in itertools.combinations(unfiltered_cols, r):
                 sub_cols = filtered_cols + list(subset)
@@ -331,21 +312,17 @@ elif st.session_state.app_state == "dashboard":
                 grp_v = base_v[~base_v[sub_cols].isin(EXCLUDE_LIST).any(axis=1)].groupby(sub_cols, as_index=False)['total_visitors'].sum()
                 grp_p = base_p[~base_p[sub_cols].isin(EXCLUDE_LIST).any(axis=1)].groupby(sub_cols).agg(Purchases=('Order_ID', 'nunique'), Revenue=('Total', 'sum')).reset_index()
                 grp = pd.merge(grp_v, grp_p, on=sub_cols, how='outer').fillna(0)
-                
                 if 'total_visitors' in grp.columns: grp = grp.rename(columns={'total_visitors': 'Visitors'})
                 else: grp['Visitors'] = 0
-                
                 grp['Visitors'] += grp['Purchases']
                 for col in included_types:
                     if col not in sub_cols: grp[col] = ""
                 combos.append(grp)
-        
         if combos:
             res = pd.concat(combos, ignore_index=True).drop_duplicates(subset=included_types)
             res['Conv %'] = (res['Purchases'] / res['Visitors'] * 100).round(2)
             res['Rev/Visitor'] = (res['Revenue'] / res['Visitors']).round(2)
             final_res = res[res['Purchases'] >= min_purchasers].sort_values(metric_map[metric_choice], ascending=is_ascending)
-            
             if not final_res.empty:
                 st.metric("Total Segments Found", f"{len(final_res):,}")
                 final_res.insert(0, 'Rank', range(1, len(final_res) + 1))
