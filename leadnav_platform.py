@@ -8,11 +8,12 @@ import itertools
 import re
 import requests
 from datetime import datetime, timedelta
+import io
  
 # ================ 1. CONFIGURATION & THEME =================
 PITCH_COMPANY_NAME = "LeadNavigator"
 PITCH_BRAND_COLOR = "#4D148C"
-N8N_WEBHOOK_URL = "https://your-n8n-instance.com/webhook/order-enrichment"
+N8N_WEBHOOK_URL = "https://n8n.srv1144572.hstgr.cloud/webhook/669d6ef0-1393-479e-81c5-5b0bea4262b7"
  
 # BigQuery table references
 BQ_B2C_VISITOR_TABLE = "leadnav-hhs.leadnav_platform.b2c_visitor_summary"
@@ -112,6 +113,75 @@ def load_visitor_base(pixel_id, tenant_type):
         return df_demo, df_state, None
     except Exception as e:
         return pd.DataFrame(), pd.DataFrame(), str(e)
+ 
+# ================ 3B. BUCKETING & CLEANING FUNCTIONS =================
+def get_real_number(v):
+    """Extract numeric value from string with K/M multipliers."""
+    if pd.isna(v): return None
+    v_str = str(v).lower().replace(',', '')
+    match = re.search(r'(\d+\.?\d*)', v_str)
+    if not match: return None
+    val_num = float(match.group(1))
+    if re.search(r'(m\b|million)', v_str): val_num *= 1000000
+    elif re.search(r'(k\b|thousand)', v_str): val_num *= 1000
+    return val_num
+ 
+def bucket_income(val):
+    """Convert income value to bucket."""
+    num = get_real_number(val)
+    if num is None: return 'Unknown'
+    if num < 50000: return 'Under $50k'
+    elif num < 100000: return '$50k-$100k'
+    elif num < 200000: return '$100k-$200k'
+    else: return '$200k+'
+ 
+def bucket_net_worth(val):
+    """Convert net worth value to bucket."""
+    num = get_real_number(val)
+    if num is None: return 'Unknown'
+    if num < 100000: return 'Under $100k'
+    elif num < 500000: return '$100k-$500k'
+    elif num < 1000000: return '$500k-$1M'
+    else: return '$1M+'
+ 
+def clean_gender(val):
+    """Clean gender values."""
+    if pd.isna(val): return 'Unknown'
+    val_str = str(val).strip().upper()
+    if val_str == 'M': return 'Male'
+    elif val_str == 'F': return 'Female'
+    return str(val)
+ 
+def clean_boolean(val):
+    """Clean Y/N to Yes/No."""
+    if pd.isna(val): return 'Unknown'
+    val_str = str(val).strip().upper()
+    if val_str in ['Y', 'YES']: return 'Yes'
+    elif val_str in ['N', 'NO']: return 'No'
+    return str(val)
+ 
+def clean_marital(val):
+    """Clean marital status values."""
+    if pd.isna(val): return 'Unknown'
+    val_str = str(val).strip().upper()
+    if val_str in ['Y', 'YES']: return 'Married'
+    elif val_str in ['N', 'NO']: return 'Single'
+    return str(val)
+ 
+def clean_homeowner(val):
+    """Clean homeowner values."""
+    if pd.isna(val): return 'Unknown'
+    val_str = str(val).strip().lower()
+    if 'homeowner' in val_str or val_str == 'yes':
+        return 'Homeowner'
+    elif 'renter' in val_str:
+        return 'Renter'
+    return str(val)
+ 
+def clean_state(val):
+    """Clean state to uppercase 2-letter code."""
+    if pd.isna(val): return 'Unknown'
+    return str(val).strip().upper()
  
 @st.cache_data(ttl=3600)
 def load_order_base(pixel_id, tenant_type):
@@ -460,20 +530,146 @@ def dashboard_page():
  
     # ===== FILE UPLOAD SECTION =====
     st.subheader("📁 Upload Order Export for Enrichment")
+    st.markdown("Upload your Shopify order export CSV. Must include an **Email** column and a **Total** or **Revenue** column.")
     uploaded_file = st.file_uploader("Choose a CSV file", type=['csv'])
     if uploaded_file is not None:
-        if st.button("Trigger n8n Enrichment Pipeline", type="primary"):
-            with st.spinner("Transmitting to enrichment pipeline..."):
-                files = {'file': (uploaded_file.name, uploaded_file.getvalue(), 'text/csv')}
-                data = {'pixel_id': pixel_id, 'tenant_type': tenant_type}
+        if st.button("🚀 Run Enrichment", type="primary"):
+            with st.spinner("Enriching profiles via Identity Graph..."):
                 try:
-                    response = requests.post(N8N_WEBHOOK_URL, files=files, data=data)
+                    # Read CSV and extract unique emails
+                    raw_df = pd.read_csv(io.BytesIO(uploaded_file.getvalue()), encoding='latin1', on_bad_lines='skip')
+                    raw_df.columns = [str(c).strip().lower() for c in raw_df.columns]
+ 
+                    # Find email column
+                    email_col = next((c for c in raw_df.columns if 'email' in c), None)
+                    if not email_col:
+                        st.error("No email column found in your CSV. Please check the file.")
+                        st.stop()
+ 
+                    # Find revenue column
+                    revenue_col = next((c for c in raw_df.columns if any(x in c for x in ['total', 'revenue', 'amount'])), None)
+ 
+                    unique_emails = raw_df[email_col].dropna().astype(str).str.lower().str.strip()
+                    unique_emails = unique_emails[unique_emails.str.contains('@', na=False)].unique().tolist()
+ 
+                    # Send emails as JSON to N8N webhook
+                    response = requests.post(N8N_WEBHOOK_URL, json={"emails": unique_emails}, timeout=180)
+ 
                     if response.status_code == 200:
-                        st.success("Success! Click 'Force Refresh' to see updated conversions.")
+                        # Parse enriched CSV response
+                        try:
+                            enriched_df = pd.read_csv(io.StringIO(response.text), on_bad_lines='skip', engine='python')
+                        except Exception:
+                            st.error("Could not parse enriched response as CSV.")
+                            st.stop()
+ 
+                        # Normalize column names to lowercase
+                        enriched_df.columns = [str(c).strip().lower() for c in enriched_df.columns]
+ 
+                        # Column mapping from n8n response
+                        N8N_COLUMN_MAPPER = {
+                            "gender": "gender",
+                            "married": "marital_status",
+                            "age_range": "age_range",
+                            "income_range": "income_bucket",
+                            "personal_state": "state",
+                            "homeowner": "homeowner",
+                            "children": "children",
+                            "net_worth": "net_worth_bucket",
+                        }
+ 
+                        # Map columns if they exist
+                        for src_col, dst_col in N8N_COLUMN_MAPPER.items():
+                            if src_col in enriched_df.columns:
+                                enriched_df[dst_col] = enriched_df[src_col]
+ 
+                        # Keep email column for later join
+                        if email_col not in enriched_df.columns:
+                            enriched_df[email_col] = enriched_df.get('email', '')
+ 
+                        # Apply bucketing to income and net_worth
+                        if 'income_bucket' in enriched_df.columns:
+                            enriched_df['income_bucket'] = enriched_df['income_bucket'].apply(bucket_income)
+                        if 'net_worth_bucket' in enriched_df.columns:
+                            enriched_df['net_worth_bucket'] = enriched_df['net_worth_bucket'].apply(bucket_net_worth)
+ 
+                        # Clean demographic fields
+                        if 'gender' in enriched_df.columns:
+                            enriched_df['gender'] = enriched_df['gender'].apply(clean_gender)
+                        if 'children' in enriched_df.columns:
+                            enriched_df['children'] = enriched_df['children'].apply(clean_boolean)
+                        if 'marital_status' in enriched_df.columns:
+                            enriched_df['marital_status'] = enriched_df['marital_status'].apply(clean_marital)
+                        if 'homeowner' in enriched_df.columns:
+                            enriched_df['homeowner'] = enriched_df['homeowner'].apply(clean_homeowner)
+                        if 'state' in enriched_df.columns:
+                            enriched_df['state'] = enriched_df['state'].apply(clean_state)
+ 
+                        # Join with original CSV to get revenue data
+                        if revenue_col:
+                            revenue_df = raw_df[[email_col, revenue_col]].rename(columns={revenue_col: 'Total'}).copy()
+                            revenue_df[email_col] = revenue_df[email_col].astype(str).str.lower().str.strip()
+                            enriched_df[email_col] = enriched_df[email_col].astype(str).str.lower().str.strip()
+                            enriched_df = pd.merge(enriched_df, revenue_df, on=email_col, how='left')
+                        else:
+                            enriched_df['Total'] = 0.0
+ 
+                        # Convert Total to numeric
+                        enriched_df['Total'] = pd.to_numeric(enriched_df['Total'], errors='coerce').fillna(0.0)
+ 
+                        # Build temp orders DataFrame with same structure as load_order_base
+                        temp_orders = pd.DataFrame()
+ 
+                        # Create Order_ID (temporary prefix with index)
+                        temp_orders['Order_ID'] = 'TEMP_' + enriched_df.index.astype(str)
+                        temp_orders['Total'] = enriched_df['Total']
+ 
+                        # Use today's date as order_date
+                        temp_orders['order_date'] = datetime.now()
+ 
+                        # Copy demographic columns if they exist
+                        for col in ['gender', 'age_range', 'income_bucket', 'net_worth_bucket', 'homeowner', 'marital_status', 'children', 'state']:
+                            if col in enriched_df.columns:
+                                temp_orders[col] = enriched_df[col]
+                            else:
+                                temp_orders[col] = 'Unknown'
+ 
+                        # Add other required columns (empty or default)
+                        temp_orders['customer_email'] = enriched_df.get(email_col, '')
+                        temp_orders['lineitem_name'] = 'Enriched Import'
+                        temp_orders['pixel_id'] = pixel_id
+ 
+                        # Add B2B columns if tenant is B2B
+                        if tenant_type == 'B2B':
+                            temp_orders['company_name'] = enriched_df.get('company_name', 'Unknown')
+                            temp_orders['company_industry'] = enriched_df.get('company_industry', 'Unknown')
+                            temp_orders['employee_count_range'] = enriched_df.get('employee_count_range', 'Unknown')
+                            temp_orders['job_title'] = enriched_df.get('job_title', 'Unknown')
+                            temp_orders['seniority'] = enriched_df.get('seniority', 'Unknown')
+                            temp_orders['company_revenue'] = enriched_df.get('company_revenue', 'Unknown')
+ 
+                        # Append to existing orders
+                        if not st.session_state.df_orders.empty:
+                            st.session_state.df_orders = pd.concat(
+                                [st.session_state.df_orders, temp_orders],
+                                ignore_index=True
+                            )
+                        else:
+                            st.session_state.df_orders = temp_orders
+ 
+                        # Show success message
+                        num_enriched = len(temp_orders)
+                        st.success(f"✅ {num_enriched} orders enriched and loaded into dashboard. Data is temporary — not saved to database.")
+ 
+                        # Show info banner about temporary data
+                        st.info(f"📊 Dashboard includes {num_enriched} temporarily enriched orders (not saved to database)")
+ 
+                        # Rerun to recalculate dashboard with new data
+                        st.rerun()
                     else:
-                        st.error(f"Webhook failed: {response.status_code}")
+                        st.error(f"Webhook failed with status {response.status_code}: {response.text}")
                 except Exception as e:
-                    st.error(f"Error communicating with n8n: {e}")
+                    st.error(f"Error enriching data: {e}")
  
 # ================ 9. MAIN APP FLOW =================
 def main():
