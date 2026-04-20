@@ -563,10 +563,26 @@ def dashboard_page():
                             st.error("Could not parse enriched response as CSV.")
                             st.stop()
 
-                        # Normalize column names to lowercase
+                        # Normalize enriched column names to lowercase
                         enriched_df.columns = [str(c).strip().lower() for c in enriched_df.columns]
 
-                        # Column mapping from n8n response
+                        # --- Email resolution: replicate clean_api_response from lead magnet ---
+                        # n8n returns email in one of these standard columns
+                        STANDARD_EMAIL_COLS = ['personal_emails', 'business_email', 'email_match', 'deep_verified_emails']
+                        enriched_email_col = next((c for c in STANDARD_EMAIL_COLS if c in enriched_df.columns), None)
+
+                        if enriched_email_col is None:
+                            st.error(f"Could not find email column in enriched response. Got columns: {list(enriched_df.columns[:15])}")
+                            st.stop()
+
+                        # Rename to email_match and explode comma-separated addresses
+                        enriched_df = enriched_df.rename(columns={enriched_email_col: 'email_match'})
+                        enriched_df['email_match'] = enriched_df['email_match'].astype(str).str.split(',')
+                        enriched_df = enriched_df.explode('email_match')
+                        enriched_df['email_match'] = enriched_df['email_match'].str.strip().str.lower()
+                        enriched_df = enriched_df[enriched_df['email_match'].str.contains('@', na=False)].drop_duplicates('email_match')
+
+                        # --- Column mapping from n8n response to dashboard field names ---
                         N8N_COLUMN_MAPPER = {
                             "gender": "gender",
                             "married": "marital_status",
@@ -577,23 +593,15 @@ def dashboard_page():
                             "children": "children",
                             "net_worth": "net_worth_bucket",
                         }
-
-                        # Map columns if they exist
                         for src_col, dst_col in N8N_COLUMN_MAPPER.items():
                             if src_col in enriched_df.columns:
                                 enriched_df[dst_col] = enriched_df[src_col]
 
-                        # Keep email column for later join
-                        if email_col not in enriched_df.columns:
-                            enriched_df[email_col] = enriched_df.get('email', '')
-
-                        # Apply bucketing to income and net_worth
+                        # Apply bucketing and cleaning to enriched demographic fields
                         if 'income_bucket' in enriched_df.columns:
                             enriched_df['income_bucket'] = enriched_df['income_bucket'].apply(bucket_income)
                         if 'net_worth_bucket' in enriched_df.columns:
                             enriched_df['net_worth_bucket'] = enriched_df['net_worth_bucket'].apply(bucket_net_worth)
-
-                        # Clean demographic fields
                         if 'gender' in enriched_df.columns:
                             enriched_df['gender'] = enriched_df['gender'].apply(clean_gender)
                         if 'children' in enriched_df.columns:
@@ -605,50 +613,55 @@ def dashboard_page():
                         if 'state' in enriched_df.columns:
                             enriched_df['state'] = enriched_df['state'].apply(clean_state)
 
-                        # Join with original CSV to get revenue data
+                        # --- Join: orders CSV (left) joined to enriched data on email ---
+                        # Normalize orders email column for join
+                        orders_join = raw_df.copy()
+                        orders_join['email_match'] = orders_join[email_col].astype(str).str.lower().str.strip()
+
+                        # Detect order date column in CSV (Shopify exports: "Created at", etc.)
+                        date_col = next((c for c in orders_join.columns if any(x in c for x in ['created', 'date', 'ordered'])), None)
+
+                        # Build join columns list
+                        join_cols = ['email_match']
                         if revenue_col:
-                            revenue_df = raw_df[[email_col, revenue_col]].rename(columns={revenue_col: 'Total'}).copy()
-                            revenue_df[email_col] = revenue_df[email_col].astype(str).str.lower().str.strip()
-                            enriched_df[email_col] = enriched_df[email_col].astype(str).str.lower().str.strip()
-                            enriched_df = pd.merge(enriched_df, revenue_df, on=email_col, how='left')
+                            join_cols.append(revenue_col)
+                        if date_col:
+                            join_cols.append(date_col)
+
+                        joined_df = pd.merge(orders_join[join_cols], enriched_df, on='email_match', how='left')
+
+                        if revenue_col:
+                            joined_df = joined_df.rename(columns={revenue_col: 'Total'})
                         else:
-                            enriched_df['Total'] = 0.0
+                            joined_df['Total'] = 0.0
 
-                        # Convert Total to numeric
-                        enriched_df['Total'] = pd.to_numeric(enriched_df['Total'], errors='coerce').fillna(0.0)
+                        joined_df['Total'] = pd.to_numeric(joined_df['Total'], errors='coerce').fillna(0.0)
 
-                        # Build temp orders DataFrame with same structure as load_order_base
+                        # --- Build temp_orders DataFrame matching load_order_base structure ---
                         temp_orders = pd.DataFrame()
+                        temp_orders['Order_ID'] = 'TEMP_' + joined_df.index.astype(str)
+                        temp_orders['Total'] = joined_df['Total']
 
-                        # Create Order_ID (temporary prefix with index)
-                        temp_orders['Order_ID'] = 'TEMP_' + enriched_df.index.astype(str)
-                        temp_orders['Total'] = enriched_df['Total']
+                        # Use order date from CSV if present, otherwise today
+                        if date_col and date_col in joined_df.columns:
+                            temp_orders['order_date'] = pd.to_datetime(joined_df[date_col], errors='coerce').fillna(datetime.now())
+                        else:
+                            temp_orders['order_date'] = datetime.now()
 
-                        # Use today's date as order_date
-                        temp_orders['order_date'] = datetime.now()
-
-                        # Copy demographic columns if they exist
+                        # Copy demographic columns
                         for col in ['gender', 'age_range', 'income_bucket', 'net_worth_bucket', 'homeowner', 'marital_status', 'children', 'state']:
-                            if col in enriched_df.columns:
-                                temp_orders[col] = enriched_df[col]
-                            else:
-                                temp_orders[col] = 'Unknown'
+                            temp_orders[col] = joined_df[col] if col in joined_df.columns else 'Unknown'
 
-                        # Add other required columns (empty or default)
-                        temp_orders['customer_email'] = enriched_df.get(email_col, '')
+                        temp_orders['customer_email'] = joined_df['email_match']
                         temp_orders['lineitem_name'] = 'Enriched Import'
                         temp_orders['pixel_id'] = pixel_id
 
-                        # Add B2B columns if tenant is B2B
+                        # B2B firmographic columns
                         if tenant_type == 'B2B':
-                            temp_orders['company_name'] = enriched_df.get('company_name', 'Unknown')
-                            temp_orders['company_industry'] = enriched_df.get('company_industry', 'Unknown')
-                            temp_orders['employee_count_range'] = enriched_df.get('employee_count_range', 'Unknown')
-                            temp_orders['job_title'] = enriched_df.get('job_title', 'Unknown')
-                            temp_orders['seniority'] = enriched_df.get('seniority', 'Unknown')
-                            temp_orders['company_revenue'] = enriched_df.get('company_revenue', 'Unknown')
+                            for b2b_col in ['company_name', 'company_industry', 'employee_count_range', 'job_title', 'seniority', 'company_revenue']:
+                                temp_orders[b2b_col] = joined_df[b2b_col] if b2b_col in joined_df.columns else 'Unknown'
 
-                        # Append to existing orders
+                        # Append to existing orders in session state (not saved to BQ)
                         if not st.session_state.df_orders.empty:
                             st.session_state.df_orders = pd.concat(
                                 [st.session_state.df_orders, temp_orders],
@@ -657,14 +670,10 @@ def dashboard_page():
                         else:
                             st.session_state.df_orders = temp_orders
 
-                        # Show success message
                         num_enriched = len(temp_orders)
-                        st.success(f"✅ {num_enriched} orders enriched and loaded into dashboard. Data is temporary — not saved to database.")
-
-                        # Show info banner about temporary data
-                        st.info(f"📊 Dashboard includes {num_enriched} temporarily enriched orders (not saved to database)")
-
-                        # Rerun to recalculate dashboard with new data
+                        num_matched = int(temp_orders[['gender', 'age_range', 'income_bucket']].ne('Unknown').any(axis=1).sum())
+                        st.success(f"✅ {num_enriched} orders enriched — {num_matched} matched with identity data. Temporary only, not saved to database.")
+                        st.info("📊 Dashboard now includes your enriched orders. Use the date filter above to scope results.")
                         st.rerun()
                     else:
                         st.error(f"Webhook failed with status {response.status_code}: {response.text}")
