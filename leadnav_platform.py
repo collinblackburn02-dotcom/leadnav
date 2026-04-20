@@ -206,8 +206,11 @@ def load_order_base(pixel_id, tenant_type):
         if df.empty:
             return pd.DataFrame(), None
 
-        # Parse date and rename columns
-        df['order_date'] = pd.to_datetime(df['order_date'])
+        # Parse date — strip UTC timezone so it compares cleanly with date picker values
+        parsed_dates = pd.to_datetime(df['order_date'], errors='coerce')
+        if parsed_dates.dt.tz is not None:
+            parsed_dates = parsed_dates.dt.tz_convert(None)
+        df['order_date'] = parsed_dates
         df = df.rename(columns={'order_id': 'Order_ID', 'revenue': 'Total'})
 
         return df, None
@@ -341,7 +344,10 @@ def dashboard_page():
         df_state_filtered = df_state.copy()
 
     if not df_orders.empty:
-        orders_in_range = df_orders[(df_orders['order_date'] >= pd.Timestamp(start_date)) & (df_orders['order_date'] <= pd.Timestamp(end_date))].copy()
+        _order_dates = pd.to_datetime(df_orders['order_date'], errors='coerce')
+        if _order_dates.dt.tz is not None:
+            _order_dates = _order_dates.dt.tz_convert(None)
+        orders_in_range = df_orders[(_order_dates >= pd.Timestamp(start_date)) & (_order_dates <= pd.Timestamp(end_date))].copy()
     else:
         orders_in_range = df_orders.copy()
 
