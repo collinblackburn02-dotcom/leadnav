@@ -360,28 +360,46 @@ def login_page():
         )
         # Tagline
         st.markdown(
-            '<p style="text-align: center; color: #0F172A; font-size: 1.05rem; '
-            'font-weight: 600; letter-spacing: 0.04em; margin-top: 0.4rem; margin-bottom: 2rem;">'
+            '<p style="text-align: center; color: #0F172A; font-size: 1.55rem; '
+            'font-weight: 600; letter-spacing: 0.02em; margin-top: 0.4rem; margin-bottom: 2rem;">'
             'Conversion Insights Dashboard</p>',
             unsafe_allow_html=True
         )
 
-        username = st.text_input("Username", key="login_username")
-        password = st.text_input("Password", type="password", key="login_password")
+        # Narrow inner columns for the form fields
+        _, fc, _ = st.columns([0.4, 1, 0.4])
+        with fc:
+            username = st.text_input("Username", key="login_username")
+            password = st.text_input("Password", type="password", key="login_password")
+            st.markdown("<br>", unsafe_allow_html=True)
 
-        st.markdown("<br>", unsafe_allow_html=True)
-
-        if st.button("Login", use_container_width=True, type="primary"):
-            users = dict(st.secrets.get("users", {}))
-            if username in users and users[username].get("password") == password:
-                st.session_state.username = username
-                st.session_state.pixel_id = users[username].get("pixel_id")
-                st.session_state.tenant_type = users[username].get("tenant_type")
-                st.session_state.client_name = users[username].get("client_name", username.replace("_", " ").title())
-                st.session_state.app_state = 'onboarding'
-                st.rerun()
-            else:
-                st.error("Invalid username or password")
+            if st.button("Login", use_container_width=True, type="primary"):
+                users = dict(st.secrets.get("users", {}))
+                if username in users and users[username].get("password") == password:
+                    st.session_state.username = username
+                    st.session_state.pixel_id = users[username].get("pixel_id")
+                    st.session_state.tenant_type = users[username].get("tenant_type")
+                    st.session_state.client_name = users[username].get("client_name", username.replace("_", " ").title())
+                    # Auto-sync BigQuery on login — skip the onboarding page
+                    with st.spinner("Syncing your data..."):
+                        df_demo, df_state, error = load_visitor_base(
+                            st.session_state.pixel_id, st.session_state.tenant_type
+                        )
+                        df_orders, order_error = load_order_base(
+                            st.session_state.pixel_id, st.session_state.tenant_type
+                        )
+                    if error:
+                        st.error(f"Error loading visitor data: {error}")
+                    elif order_error:
+                        st.error(f"Error loading order data: {order_error}")
+                    else:
+                        st.session_state.df_demo = df_demo
+                        st.session_state.df_state = df_state
+                        st.session_state.df_orders = df_orders
+                        st.session_state.app_state = 'dashboard'
+                        st.rerun()
+                else:
+                    st.error("Invalid username or password")
 
 # ================ 7. ONBOARDING PAGE =================
 def onboarding_page():
