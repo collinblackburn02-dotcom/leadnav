@@ -46,7 +46,62 @@ def apply_custom_theme(primary_color):
 
         .auth-box {{ max-width: 400px; margin: 100px auto; padding: 30px; background: white; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); border: 1px solid #EBE4F4; }}
         .header-bar {{ display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; margin-bottom: 2rem; border-bottom: 1px solid #EBE4F4; }}
-        .header-logo {{ font-family: 'Playfair Display', serif !important; font-size: 1.5rem; font-weight: 700; color: #0F172A; }}
+        .header-logo {{ font-family: 'Playfair Display', serif !important; font-size: 1.8rem; font-weight: 700; color: #0F172A; line-height: 1.1; white-space: nowrap; }}
+
+        /* Date inputs */
+        .stDateInput input {{
+            border: 1.5px solid #EBE4F4 !important;
+            border-radius: 10px !important;
+            padding: 10px 16px !important;
+            font-family: 'Outfit', sans-serif !important;
+            font-size: 0.95rem !important;
+            font-weight: 500 !important;
+            background: #FFFFFF !important;
+            box-shadow: 0 2px 8px rgba(77,20,140,0.05) !important;
+            color: #0F172A !important;
+            transition: border-color 0.2s, box-shadow 0.2s !important;
+        }}
+        .stDateInput input:focus {{
+            border-color: {primary_color} !important;
+            box-shadow: 0 0 0 3px rgba(77,20,140,0.1) !important;
+            outline: none !important;
+        }}
+        .stDateInput label {{
+            font-weight: 700 !important;
+            font-size: 0.72rem !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.09em !important;
+            color: #94A3B8 !important;
+        }}
+
+        /* Control section labels */
+        .ctrl-label {{
+            font-family: 'Outfit', sans-serif;
+            font-weight: 700;
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.09em;
+            color: #94A3B8;
+            margin: 0 0 6px 0;
+            padding: 0;
+        }}
+
+        /* Number input */
+        .stNumberInput input {{
+            border: 1.5px solid #EBE4F4 !important;
+            border-radius: 8px !important;
+            font-family: 'Outfit', sans-serif !important;
+            font-weight: 600 !important;
+            font-size: 1rem !important;
+            text-align: center !important;
+            background: #FFFFFF !important;
+        }}
+
+        /* Multiselect tags */
+        .stMultiSelect [data-baseweb="tag"] {{
+            background-color: {primary_color} !important;
+            border-radius: 6px !important;
+        }}
     </style>
 """, unsafe_allow_html=True)
 
@@ -226,10 +281,12 @@ if 'tenant_type' not in st.session_state:
     st.session_state.tenant_type = None
 if 'username' not in st.session_state:
     st.session_state.username = None
+if 'client_name' not in st.session_state:
+    st.session_state.client_name = None
 
 # ================ 5. HEADER WITH LOGO & LOGOUT =================
 def render_header():
-    col1, col2 = st.columns([1, 20])
+    col1, col2 = st.columns([10, 1])
     with col1:
         st.markdown(f'<div class="header-logo">Lead<span style="color: {PITCH_BRAND_COLOR};">Navigator</span></div>', unsafe_allow_html=True)
     with col2:
@@ -254,6 +311,7 @@ def login_page():
             st.session_state.username = username
             st.session_state.pixel_id = users[username].get("pixel_id")
             st.session_state.tenant_type = users[username].get("tenant_type")
+            st.session_state.client_name = users[username].get("client_name", username.replace("_", " ").title())
             st.session_state.app_state = 'onboarding'
             st.rerun()
         else:
@@ -314,7 +372,8 @@ def dashboard_page():
         DEMO_COLS = ['industry', 'employee_count_range', 'job_title', 'seniority', 'company_revenue']
 
     # Main headline
-    st.markdown(f'<h1 style="text-align: center;"><span class="serif-gradient-centerpiece">{tenant_type} Analytics Dashboard</span></h1>', unsafe_allow_html=True)
+    client_name = st.session_state.get('client_name') or st.session_state.get('username', '')
+    st.markdown(f'<h1 style="text-align: center;"><span class="serif-gradient-centerpiece">{client_name} Conversion Dashboard</span></h1>', unsafe_allow_html=True)
 
     # Date slider
     if 'date_range' not in st.session_state:
@@ -366,31 +425,60 @@ def dashboard_page():
     st.divider()
 
     # ===== CONTROLS SECTION =====
-    ctrl1, ctrl2, ctrl3, ctrl4, ctrl5 = st.columns([1.2, 1.2, 1.1, 2.5, 1.2])
+    if 'metric_choice' not in st.session_state:
+        st.session_state.metric_choice = 'Rev/Visitor'
+    if 'sort_asc' not in st.session_state:
+        st.session_state.sort_asc = False
+
+    ctrl1, ctrl2, ctrl3, ctrl4, ctrl5 = st.columns([2.8, 1.5, 1.0, 2.5, 1.1])
+
     with ctrl1:
-        metric_choice = st.radio("Primary Metric", ["Rev/Visitor", "Conv %", "Revenue", "Purchases", "Visitors"])
+        st.markdown('<p class="ctrl-label">Rank By</p>', unsafe_allow_html=True)
+        m_cols = st.columns(5)
+        for i, m in enumerate(["Rev/Visitor", "Conv %", "Revenue", "Purchases", "Visitors"]):
+            if m_cols[i].button(m, key=f"metric_{m}",
+                                type="primary" if st.session_state.metric_choice == m else "secondary",
+                                use_container_width=True):
+                st.session_state.metric_choice = m
+                st.rerun()
+    metric_choice = st.session_state.metric_choice
+
     with ctrl2:
-        sort_order = st.radio("Ranking Order", ["High to Low", "Low to High"])
-        is_ascending = (sort_order == "Low to High")
+        st.markdown('<p class="ctrl-label">Sort By</p>', unsafe_allow_html=True)
+        s_cols = st.columns(2)
+        if s_cols[0].button("↓ High–Low", key="sort_htl",
+                            type="primary" if not st.session_state.sort_asc else "secondary",
+                            use_container_width=True):
+            st.session_state.sort_asc = False
+            st.rerun()
+        if s_cols[1].button("↑ Low–High", key="sort_lth",
+                            type="primary" if st.session_state.sort_asc else "secondary",
+                            use_container_width=True):
+            st.session_state.sort_asc = True
+            st.rerun()
+    is_ascending = st.session_state.sort_asc
+
     with ctrl3:
-        min_purchasers = st.number_input("Min Purchases", value=1, min_value=0)
+        st.markdown('<p class="ctrl-label">Min Purchases</p>', unsafe_allow_html=True)
+        min_purchasers = st.number_input("", value=1, min_value=0, label_visibility="collapsed")
 
     with ctrl4:
-        sku_toggle = st.toggle("Filter by Product", value=False)
+        st.markdown('<p class="ctrl-label">Filter by Product</p>', unsafe_allow_html=True)
+        sku_toggle = st.toggle("Enable product filter", value=False, label_visibility="collapsed")
         if sku_toggle and not orders_in_range.empty:
             if 'lineitem_name' in orders_in_range.columns:
                 sku_opts = sorted([str(x) for x in orders_in_range['lineitem_name'].dropna().unique() if str(x) not in EXCLUDE_LIST])
             else:
                 sku_opts = []
-            selected_skus = st.multiselect("Select SKUs", options=sku_opts)
+            selected_skus = st.multiselect("Select products", options=sku_opts, label_visibility="collapsed")
             if selected_skus:
                 df_p_filtered = df_p_filtered[df_p_filtered['lineitem_name'].isin(selected_skus)]
             else:
                 df_p_filtered = df_p_filtered.iloc[0:0]
 
     with ctrl5:
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("🔄 Force Refresh", use_container_width=True):
+        st.markdown('<p class="ctrl-label">&nbsp;</p>', unsafe_allow_html=True)
+        if st.button("↺  Refresh Data", use_container_width=True):
             load_order_base.clear()
             load_visitor_base.clear()
             st.session_state.app_state = "onboarding"
