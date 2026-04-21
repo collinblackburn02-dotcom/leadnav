@@ -87,6 +87,22 @@ def apply_custom_theme(primary_color):
             text-align: center;
         }}
 
+        /* Text inputs (login form) */
+        .stTextInput input {{
+            border: 1.5px solid #EBE4F4 !important;
+            border-radius: 10px !important;
+            padding: 10px 16px !important;
+            font-family: 'Outfit', sans-serif !important;
+            font-size: 0.95rem !important;
+            background: #FFFFFF !important;
+            box-shadow: 0 2px 8px rgba(77,20,140,0.04) !important;
+        }}
+        .stTextInput input:focus {{
+            border-color: {primary_color} !important;
+            box-shadow: 0 0 0 3px rgba(77,20,140,0.1) !important;
+            outline: none !important;
+        }}
+
         /* Number input */
         .stNumberInput input {{
             border: 1.5px solid #EBE4F4 !important;
@@ -313,25 +329,49 @@ def render_header():
 
 # ================ 6. LOGIN PAGE =================
 def login_page():
-    st.markdown('<div class="auth-box">', unsafe_allow_html=True)
-    st.markdown(f'<h1 class="modern-serif-title" style="text-align: center;">Welcome to {PITCH_COMPANY_NAME}</h1>', unsafe_allow_html=True)
+    # Top-left logo (same style as dashboard header)
+    st.markdown(
+        f'<div style="padding: 1.5rem 0 0 0;">'
+        f'<span style="font-family: \'Playfair Display\', serif; font-size: 1.8rem; font-weight: 700; color: #0F172A; white-space: nowrap;">'
+        f'Lead<span style="color: {PITCH_BRAND_COLOR};">Navigator</span></span></div>',
+        unsafe_allow_html=True
+    )
 
-    username = st.text_input("Username", key="login_username")
-    password = st.text_input("Password", type="password", key="login_password")
+    st.markdown("<br><br>", unsafe_allow_html=True)
 
-    if st.button("Login"):
-        users = dict(st.secrets.get("users", {}))
-        if username in users and users[username].get("password") == password:
-            st.session_state.username = username
-            st.session_state.pixel_id = users[username].get("pixel_id")
-            st.session_state.tenant_type = users[username].get("tenant_type")
-            st.session_state.client_name = users[username].get("client_name", username.replace("_", " ").title())
-            st.session_state.app_state = 'onboarding'
-            st.rerun()
-        else:
-            st.error("Invalid username or password")
+    # Center the form using columns
+    _, center, _ = st.columns([1, 1.1, 1])
+    with center:
+        # Gradient headline
+        st.markdown(
+            f'<h1 style="text-align: center; margin-bottom: 0.25rem;">'
+            f'<span class="serif-gradient-centerpiece">Welcome to {PITCH_COMPANY_NAME}</span></h1>',
+            unsafe_allow_html=True
+        )
+        # Tagline
+        st.markdown(
+            '<p style="text-align: center; color: #94A3B8; font-size: 0.95rem; '
+            'font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; margin-top: 0; margin-bottom: 2rem;">'
+            'Conversion Insights Dashboard</p>',
+            unsafe_allow_html=True
+        )
 
-    st.markdown('</div>', unsafe_allow_html=True)
+        username = st.text_input("Username", key="login_username")
+        password = st.text_input("Password", type="password", key="login_password")
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        if st.button("Login", use_container_width=True, type="primary"):
+            users = dict(st.secrets.get("users", {}))
+            if username in users and users[username].get("password") == password:
+                st.session_state.username = username
+                st.session_state.pixel_id = users[username].get("pixel_id")
+                st.session_state.tenant_type = users[username].get("tenant_type")
+                st.session_state.client_name = users[username].get("client_name", username.replace("_", " ").title())
+                st.session_state.app_state = 'onboarding'
+                st.rerun()
+            else:
+                st.error("Invalid username or password")
 
 # ================ 7. ONBOARDING PAGE =================
 def onboarding_page():
@@ -481,7 +521,7 @@ def dashboard_page():
 
     with ctrl3:
         st.markdown('<p class="ctrl-label">Min Purchases</p>', unsafe_allow_html=True)
-        min_purchasers = st.number_input("", value=1, min_value=0, label_visibility="collapsed")
+        min_purchasers = st.number_input("Min Purchases", value=1, min_value=0, label_visibility="collapsed")
 
     with ctrl4:
         st.markdown('<p class="ctrl-label">Filter by Product</p>', unsafe_allow_html=True)
@@ -641,9 +681,10 @@ def dashboard_page():
     uploaded_file = st.file_uploader("Choose a CSV file", type=['csv'])
     if uploaded_file is not None:
         if st.button("🚀 Run Enrichment", type="primary"):
-            with st.spinner("Enriching profiles via Identity Graph..."):
+            with st.status("Running enrichment...", expanded=True) as status:
                 try:
                     # Read CSV and extract unique emails
+                    st.write("📂 Reading order file...")
                     raw_df = pd.read_csv(io.BytesIO(uploaded_file.getvalue()), encoding='latin1', on_bad_lines='skip')
                     raw_df.columns = [str(c).strip().lower() for c in raw_df.columns]
 
@@ -659,8 +700,11 @@ def dashboard_page():
                     unique_emails = raw_df[email_col].dropna().astype(str).str.lower().str.strip()
                     unique_emails = unique_emails[unique_emails.str.contains('@', na=False)].unique().tolist()
 
+                    st.write(f"📧 Sending {len(unique_emails):,} unique emails to identity graph...")
+
                     # Send emails as JSON to N8N webhook
                     response = requests.post(N8N_WEBHOOK_URL, json={"emails": unique_emails}, timeout=180)
+                    st.write("✅ Identity graph responded — parsing results...")
 
                     if response.status_code == 200:
                         # Parse enriched CSV response
@@ -779,8 +823,8 @@ def dashboard_page():
 
                         num_enriched = len(temp_orders)
                         num_matched = int(temp_orders[['gender', 'age_range', 'income_bucket']].ne('Unknown').any(axis=1).sum())
-                        st.success(f"✅ {num_enriched} orders enriched — {num_matched} matched with identity data. Temporary only, not saved to database.")
-                        st.info("📊 Dashboard now includes your enriched orders. Use the date filter above to scope results.")
+                        status.update(label=f"✅ Done — {num_enriched} orders enriched, {num_matched} matched with identity data", state="complete", expanded=False)
+                        st.success("📊 Dashboard now includes your enriched orders. Temporary only — not saved to database.")
                         st.rerun()
                     else:
                         st.error(f"Webhook failed with status {response.status_code}: {response.text}")
