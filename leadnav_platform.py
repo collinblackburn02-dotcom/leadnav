@@ -444,7 +444,7 @@ def dashboard_page():
     if 'sort_asc' not in st.session_state:
         st.session_state.sort_asc = False
 
-    ctrl1, ctrl2, ctrl3, ctrl4 = st.columns([3.5, 1.8, 1.2, 2.5])
+    ctrl1, ctrl2, ctrl3, ctrl4 = st.columns([3.5, 1.2, 1.2, 2.5])
 
     with ctrl1:
         st.markdown('<p class="ctrl-label">Rank By</p>', unsafe_allow_html=True)
