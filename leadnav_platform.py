@@ -87,6 +87,15 @@ def apply_custom_theme(primary_color):
             text-align: center;
         }}
 
+        /* Text input labels */
+        .stTextInput label {{
+            font-family: 'Outfit', sans-serif !important;
+            font-weight: 700 !important;
+            font-size: 0.85rem !important;
+            color: {primary_color} !important;
+            letter-spacing: 0.02em !important;
+        }}
+
         /* Text inputs (login form) */
         .stTextInput input {{
             border: 1.5px solid #EBE4F4 !important;
@@ -340,18 +349,19 @@ def login_page():
     st.markdown("<br><br>", unsafe_allow_html=True)
 
     # Center the form using columns
-    _, center, _ = st.columns([1, 1.1, 1])
+    _, center, _ = st.columns([0.4, 2, 0.4])
     with center:
-        # Gradient headline
+        # Gradient headline — use div not h1 to avoid Streamlit's anchor icon
         st.markdown(
-            f'<h1 style="text-align: center; margin-bottom: 0.25rem;">'
-            f'<span class="serif-gradient-centerpiece">Welcome to {PITCH_COMPANY_NAME}</span></h1>',
+            f'<div style="text-align: center; margin-bottom: 0.25rem; white-space: nowrap;">'
+            f'<span class="serif-gradient-centerpiece" style="font-size: 2.6rem;">'
+            f'Welcome to {PITCH_COMPANY_NAME}</span></div>',
             unsafe_allow_html=True
         )
         # Tagline
         st.markdown(
-            '<p style="text-align: center; color: #94A3B8; font-size: 0.95rem; '
-            'font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; margin-top: 0; margin-bottom: 2rem;">'
+            '<p style="text-align: center; color: #0F172A; font-size: 1.05rem; '
+            'font-weight: 600; letter-spacing: 0.04em; margin-top: 0.4rem; margin-bottom: 2rem;">'
             'Conversion Insights Dashboard</p>',
             unsafe_allow_html=True
         )
