@@ -102,6 +102,14 @@ def apply_custom_theme(primary_color):
             background-color: {primary_color} !important;
             border-radius: 6px !important;
         }}
+
+        /* Prevent button label wrapping */
+        .stButton > button {{
+            white-space: nowrap !important;
+            font-size: 0.78rem !important;
+            padding: 6px 10px !important;
+            font-weight: 600 !important;
+        }}
     </style>
 """, unsafe_allow_html=True)
 
@@ -430,7 +438,7 @@ def dashboard_page():
     if 'sort_asc' not in st.session_state:
         st.session_state.sort_asc = False
 
-    ctrl1, ctrl2, ctrl3, ctrl4, ctrl5 = st.columns([2.8, 1.5, 1.0, 2.5, 1.1])
+    ctrl1, ctrl2, ctrl3, ctrl4, ctrl5 = st.columns([3.2, 1.4, 0.9, 2.5, 1.0])
 
     with ctrl1:
         st.markdown('<p class="ctrl-label">Rank By</p>', unsafe_allow_html=True)
@@ -446,12 +454,12 @@ def dashboard_page():
     with ctrl2:
         st.markdown('<p class="ctrl-label">Sort By</p>', unsafe_allow_html=True)
         s_cols = st.columns(2)
-        if s_cols[0].button("↓ High–Low", key="sort_htl",
+        if s_cols[0].button("↓ High→Low", key="sort_htl",
                             type="primary" if not st.session_state.sort_asc else "secondary",
                             use_container_width=True):
             st.session_state.sort_asc = False
             st.rerun()
-        if s_cols[1].button("↑ Low–High", key="sort_lth",
+        if s_cols[1].button("↑ Low→High", key="sort_lth",
                             type="primary" if st.session_state.sort_asc else "secondary",
                             use_container_width=True):
             st.session_state.sort_asc = True
