@@ -560,7 +560,9 @@ def dashboard_page():
 
     with ctrl4:
         st.markdown('<p class="ctrl-label">Filter by Product</p>', unsafe_allow_html=True)
-        sku_toggle = st.toggle("Enable product filter", value=False, label_visibility="collapsed")
+        _, tog_col, _ = st.columns([1, 1, 1])
+        with tog_col:
+            sku_toggle = st.toggle("Enable product filter", value=False, label_visibility="collapsed")
         if sku_toggle and not orders_in_range.empty:
             if 'lineitem_name' in orders_in_range.columns:
                 sku_opts = sorted([str(x) for x in orders_in_range['lineitem_name'].dropna().unique() if str(x) not in EXCLUDE_LIST])
