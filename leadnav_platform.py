@@ -555,8 +555,8 @@ def dashboard_page():
     is_ascending = st.session_state.sort_asc
 
     with ctrl3:
-        st.markdown('<p class="ctrl-label">Min Purchases</p>', unsafe_allow_html=True)
-        min_purchasers = st.number_input("Min Purchases", value=1, min_value=0, label_visibility="collapsed")
+        st.markdown('<p class="ctrl-label">Minimum Purchases</p>', unsafe_allow_html=True)
+        min_purchasers = st.number_input("Minimum Purchases", value=1, min_value=0, label_visibility="collapsed")
 
     with ctrl4:
         st.markdown('<p class="ctrl-label">Filter by Product</p>', unsafe_allow_html=True)
