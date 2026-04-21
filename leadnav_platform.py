@@ -442,26 +442,33 @@ def dashboard_page():
 
     with ctrl1:
         st.markdown('<p class="ctrl-label">Rank By</p>', unsafe_allow_html=True)
-        m_cols = st.columns(5)
-        for i, m in enumerate(["Rev/Visitor", "Conv %", "Revenue", "Purchases", "Visitors"]):
-            if m_cols[i].button(m, key=f"metric_{m}",
-                                type="primary" if st.session_state.metric_choice == m else "secondary",
-                                use_container_width=True):
+        metrics = ["Rev/Visitor", "Conv %", "Revenue", "Purchases", "Visitors"]
+        row1 = st.columns(3)
+        row2 = st.columns(3)
+        for i, m in enumerate(metrics[:3]):
+            if row1[i].button(m, key=f"metric_{m}",
+                              type="primary" if st.session_state.metric_choice == m else "secondary",
+                              use_container_width=True):
+                st.session_state.metric_choice = m
+                st.rerun()
+        for i, m in enumerate(metrics[3:]):
+            if row2[i].button(m, key=f"metric_{m}",
+                              type="primary" if st.session_state.metric_choice == m else "secondary",
+                              use_container_width=True):
                 st.session_state.metric_choice = m
                 st.rerun()
     metric_choice = st.session_state.metric_choice
 
     with ctrl2:
         st.markdown('<p class="ctrl-label">Sort By</p>', unsafe_allow_html=True)
-        s_cols = st.columns(2)
-        if s_cols[0].button("↓ High→Low", key="sort_htl",
-                            type="primary" if not st.session_state.sort_asc else "secondary",
-                            use_container_width=True):
+        if st.button("High to Low", key="sort_htl",
+                     type="primary" if not st.session_state.sort_asc else "secondary",
+                     use_container_width=True):
             st.session_state.sort_asc = False
             st.rerun()
-        if s_cols[1].button("↑ Low→High", key="sort_lth",
-                            type="primary" if st.session_state.sort_asc else "secondary",
-                            use_container_width=True):
+        if st.button("Low to High", key="sort_lth",
+                     type="primary" if st.session_state.sort_asc else "secondary",
+                     use_container_width=True):
             st.session_state.sort_asc = True
             st.rerun()
     is_ascending = st.session_state.sort_asc
