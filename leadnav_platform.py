@@ -84,6 +84,7 @@ def apply_custom_theme(primary_color):
             color: #94A3B8;
             margin: 0 0 6px 0;
             padding: 0;
+            text-align: center;
         }}
 
         /* Number input */
@@ -298,11 +299,16 @@ def render_header():
     with col1:
         st.markdown(f'<div class="header-logo">Lead<span style="color: {PITCH_BRAND_COLOR};">Navigator</span></div>', unsafe_allow_html=True)
     with col2:
-        if st.button("Logout", key="logout_btn"):
+        if st.button("Logout", key="logout_btn", use_container_width=True):
             st.session_state.app_state = 'login'
             st.session_state.pixel_id = None
             st.session_state.tenant_type = None
             st.session_state.username = None
+            st.rerun()
+        if st.button("↺ Refresh", key="header_refresh_btn", use_container_width=True):
+            load_order_base.clear()
+            load_visitor_base.clear()
+            st.session_state.app_state = "onboarding"
             st.rerun()
 
 # ================ 6. LOGIN PAGE =================
@@ -438,7 +444,7 @@ def dashboard_page():
     if 'sort_asc' not in st.session_state:
         st.session_state.sort_asc = False
 
-    ctrl1, ctrl2, ctrl3, ctrl4, ctrl5 = st.columns([3.2, 1.4, 0.9, 2.5, 1.0])
+    ctrl1, ctrl2, ctrl3, ctrl4 = st.columns([3.5, 1.8, 1.2, 2.5])
 
     with ctrl1:
         st.markdown('<p class="ctrl-label">Rank By</p>', unsafe_allow_html=True)
@@ -490,14 +496,6 @@ def dashboard_page():
                 df_p_filtered = df_p_filtered[df_p_filtered['lineitem_name'].isin(selected_skus)]
             else:
                 df_p_filtered = df_p_filtered.iloc[0:0]
-
-    with ctrl5:
-        st.markdown('<p class="ctrl-label">&nbsp;</p>', unsafe_allow_html=True)
-        if st.button("↺  Refresh Data", use_container_width=True):
-            load_order_base.clear()
-            load_visitor_base.clear()
-            st.session_state.app_state = "onboarding"
-            st.rerun()
 
     metric_map = {"Conv %": "Conv %", "Purchases": "Purchases", "Revenue": "Revenue", "Visitors": "Visitors", "Rev/Visitor": "Rev/Visitor"}
 
