@@ -891,6 +891,9 @@ def dashboard_page():
     # ── Session state defaults ──
     if 'metric_choice' not in st.session_state:
         st.session_state.metric_choice = 'Revenue Per Visitor'
+    # Migrate old key name if saved in session state
+    if st.session_state.metric_choice == 'Conversion Percent':
+        st.session_state.metric_choice = 'Conversion Rate'
     if 'sort_asc' not in st.session_state:
         st.session_state.sort_asc = False
     if 'date_range' not in st.session_state:
@@ -1354,33 +1357,93 @@ def dashboard_page():
     # MULTI-VARIABLE COMBINATION MATRIX
     # =====================================================
     st.markdown('<p class="section-title">Multi-Variable Combination Matrix</p>', unsafe_allow_html=True)
-    with st.expander("🎛️ Combination Filters", expanded=True):
-        selected_filters, included_types = {}, []
-        f_cols = st.columns(3)
-        valid_matrix_configs = [c for c in configs if c[1] != 'state']
-        for i, (label, col_name) in enumerate(valid_matrix_configs):
-            with f_cols[i % 3]:
-                c_title, c_inc = st.columns([3, 1])
-                c_title.markdown(f'**{label}**')
-                if c_inc.checkbox("Inc", key=f"inc_{col_name}"):
-                    included_types.append(col_name)
-                opts = sorted([str(x) for x in st.session_state.df_demo_cube[col_name].unique()
-                               if str(x) not in EXCLUDE_LIST])
-                val = st.multiselect(f"Filter {label}", opts, key=f"f_{col_name}", label_visibility="collapsed")
-                if val:
-                    selected_filters[col_name] = val
+
+    # Session state for matrix
+    if 'matrix_vars' not in st.session_state:
+        st.session_state.matrix_vars = []
+    if 'matrix_filters' not in st.session_state:
+        st.session_state.matrix_filters = {}
+
+    valid_matrix_configs = [c for c in configs if c[1] != 'state']
+
+    # ── VARIABLE CHIP ROW ──
+    st.markdown('<p class="ctrl-label" style="margin-bottom:8px;">Include Variables</p>', unsafe_allow_html=True)
+    n_mx  = len(valid_matrix_configs)
+    mx_cols = st.columns([1] * n_mx + [n_mx])
+    for i, (label, col_name) in enumerate(valid_matrix_configs):
+        is_active = col_name in st.session_state.matrix_vars
+        if mx_cols[i].button(label, key=f"mx_chip_{col_name}",
+                             type="primary" if is_active else "secondary",
+                             use_container_width=True):
+            if is_active:
+                st.session_state.matrix_vars = [v for v in st.session_state.matrix_vars if v != col_name]
+            else:
+                st.session_state.matrix_vars.append(col_name)
+                if col_name not in st.session_state.matrix_filters:
+                    st.session_state.matrix_filters[col_name] = []
+            st.rerun()
+
+    # ── FILTER PANELS ──
+    _MX_NORM     = {'Homeowner': 'Yes', 'Renter': 'No', 'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female'}
+    included_types   = [col for col in st.session_state.matrix_vars
+                        if col in [c[1] for c in valid_matrix_configs]]
+    selected_filters = {}
+
+    for label, col_name in valid_matrix_configs:
+        if col_name not in included_types:
+            continue
+
+        raw_opts = sorted([str(x) for x in st.session_state.df_demo_cube[col_name].unique()
+                           if str(x) not in EXCLUDE_LIST])
+        opts    = list(dict.fromkeys([_MX_NORM.get(o, o) for o in raw_opts]))
+        current = st.session_state.matrix_filters.get(col_name, [])
+        is_all  = (current == [])
+
+        st.markdown(
+            f'<div style="background:#FAFAFC;border:1px solid #EBE4F4;border-radius:10px;'
+            f'padding:14px 16px;margin-top:10px;">'
+            f'<p style="font-family:Outfit,sans-serif;font-size:0.62rem;font-weight:700;'
+            f'text-transform:uppercase;letter-spacing:0.1em;color:#94A3B8;margin-bottom:10px;">'
+            f'{label} — filter</p></div>',
+            unsafe_allow_html=True
+        )
+
+        n_opts   = len(opts)
+        opt_cols = st.columns([1] + [1] * n_opts + [max(1, n_opts)])
+
+        if opt_cols[0].button("All", key=f"mx_all_{col_name}",
+                              type="primary" if is_all else "secondary",
+                              use_container_width=True):
+            st.session_state.matrix_filters[col_name] = []
+            st.rerun()
+
+        new_sel = list(current)
+        changed = False
+        for j, opt in enumerate(opts):
+            is_sel = opt in current
+            if opt_cols[j + 1].button(opt, key=f"mx_opt_{col_name}_{j}",
+                                      type="primary" if is_sel else "secondary",
+                                      use_container_width=True):
+                new_sel = [v for v in new_sel if v != opt] if is_sel else new_sel + [opt]
+                changed = True
+
+        if changed:
+            st.session_state.matrix_filters[col_name] = new_sel
+            st.rerun()
+
+        if not is_all and current:
+            selected_filters[col_name] = current
 
     if included_types:
         combos       = []
         filtered_cols   = list(selected_filters.keys())
         unfiltered_cols = [c for c in included_types if c not in filtered_cols]
-        _VALUE_NORM = {'Homeowner': 'Yes', 'Renter': 'No', 'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female'}
         base_v = st.session_state.df_demo_cube.copy()
         base_p = df_p_filtered.copy()
         # Normalize all included columns in both datasets so they merge correctly
         for _nc in included_types:
-            if _nc in base_v.columns: base_v[_nc] = base_v[_nc].replace(_VALUE_NORM)
-            if not base_p.empty and _nc in base_p.columns: base_p[_nc] = base_p[_nc].replace(_VALUE_NORM)
+            if _nc in base_v.columns: base_v[_nc] = base_v[_nc].replace(_MX_NORM)
+            if not base_p.empty and _nc in base_p.columns: base_p[_nc] = base_p[_nc].replace(_MX_NORM)
 
         for col, vals in selected_filters.items():
             base_v = base_v[base_v[col].isin(vals)]
