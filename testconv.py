@@ -1241,12 +1241,14 @@ def dashboard_page():
         v_ts[selected_col] = v_ts[selected_col].replace(_TS_NORM)
     v_ts = v_ts[~v_ts[selected_col].isin(EXCLUDE_LIST)]
     v_ts['ts_date'] = pd.to_datetime(v_ts['ts_date'])
+    if v_ts['ts_date'].dt.tz is not None:
+        v_ts['ts_date'] = v_ts['ts_date'].dt.tz_convert(None)
     v_agg = v_ts.groupby([pd.Grouper(key='ts_date', freq=freq), selected_col])['Visitors'].sum().reset_index()
 
     # Order time series
     if not df_p_filtered.empty and selected_col in df_p_filtered.columns:
         p_ts = df_p_filtered.copy()
-        p_ts['ts_date'] = pd.to_datetime(p_ts['order_date']).dt.normalize()
+        p_ts['ts_date'] = pd.to_datetime(p_ts['order_date']).dt.tz_convert(None).dt.normalize() if pd.to_datetime(p_ts['order_date']).dt.tz is not None else pd.to_datetime(p_ts['order_date']).dt.normalize()
         if selected_col in p_ts.columns:
             p_ts[selected_col] = p_ts[selected_col].replace(_TS_NORM)
         p_ts = p_ts[~p_ts[selected_col].isin(EXCLUDE_LIST)]
@@ -1256,6 +1258,11 @@ def dashboard_page():
         ).reset_index()
     else:
         p_agg = pd.DataFrame(columns=['ts_date', selected_col, 'Purchases', 'Revenue'])
+
+    # Normalize ts_date to timezone-naive on both sides before merging
+    v_agg['ts_date'] = pd.to_datetime(v_agg['ts_date']).dt.tz_localize(None) if pd.to_datetime(v_agg['ts_date']).dt.tz is not None else pd.to_datetime(v_agg['ts_date'])
+    if not p_agg.empty:
+        p_agg['ts_date'] = pd.to_datetime(p_agg['ts_date']).dt.tz_localize(None) if pd.to_datetime(p_agg['ts_date']).dt.tz is not None else pd.to_datetime(p_agg['ts_date'])
 
     # Merge and compute metrics
     ts_df = pd.merge(v_agg, p_agg, on=['ts_date', selected_col], how='outer').fillna(0)
