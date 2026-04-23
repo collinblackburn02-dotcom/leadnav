@@ -4,7 +4,6 @@ import numpy as np
 from google.cloud import bigquery
 from google.oauth2 import service_account
 import matplotlib.colors as mcolors
-import plotly.graph_objects as go
 import itertools
 import re
 import requests
@@ -1267,61 +1266,47 @@ def dashboard_page():
     ts_metric_col = metric_map[metric_choice]  # e.g. 'Rev/Visitor'
 
     if not ts_df.empty:
+        import matplotlib.pyplot as plt
+        import matplotlib.ticker as mticker
+
         segments = sorted([s for s in ts_df[selected_col].unique() if str(s) not in EXCLUDE_LIST])
         CHART_COLORS = ['#4D148C', '#7C3AED', '#20B2AA', '#F59E0B', '#E11D48', '#059669', '#A78BFA', '#0EA5E9']
 
-        y_tickformat = {
-            'Rev/Visitor': '$,.2f',
-            'Conv %':      '.2f',
-            'Revenue':     '$,.0f',
-            'Purchases':   ',.0f',
-            'Visitors':    ',.0f',
-        }.get(ts_metric_col, '')
+        fig, ax = plt.subplots(figsize=(12, 3.4))
+        fig.patch.set_facecolor('#FAFAFC')
+        ax.set_facecolor('#FFFFFF')
 
-        y_suffix = '%' if ts_metric_col == 'Conv %' else ''
-
-        fig = go.Figure()
+        plotted = False
         for i, seg in enumerate(segments):
             seg_data = ts_df[ts_df[selected_col] == seg].sort_values('ts_date')
             if seg_data[ts_metric_col].sum() == 0:
                 continue
-            fig.add_trace(go.Scatter(
-                x=seg_data['ts_date'],
-                y=seg_data[ts_metric_col],
-                name=str(seg),
-                mode='lines+markers',
-                line=dict(color=CHART_COLORS[i % len(CHART_COLORS)], width=2.5),
-                marker=dict(size=5),
-                hovertemplate=f'<b>%{{x|%b %d, %Y}}</b><br>{seg}: %{{y:{y_tickformat}}}{y_suffix}<extra></extra>',
-            ))
+            ax.plot(seg_data['ts_date'], seg_data[ts_metric_col],
+                    label=str(seg), color=CHART_COLORS[i % len(CHART_COLORS)],
+                    linewidth=2.2, marker='o', markersize=4)
+            plotted = True
 
-        fig.update_layout(
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='#FFFFFF',
-            font=dict(family='Outfit', size=12, color='#0F172A'),
-            legend=dict(
-                orientation='h', yanchor='bottom', y=1.02,
-                xanchor='left', x=0,
-                font=dict(size=12, color='#0F172A'),
-                bgcolor='rgba(0,0,0,0)',
-            ),
-            margin=dict(l=0, r=10, t=40, b=0),
-            xaxis=dict(
-                showgrid=False, zeroline=False,
-                tickfont=dict(size=11, color='#94A3B8'),
-                linecolor='#EBE4F4', showline=True,
-            ),
-            yaxis=dict(
-                showgrid=True, gridcolor='#F1F5F9', zeroline=False,
-                tickfont=dict(size=11, color='#94A3B8'),
-                tickformat=y_tickformat,
-                ticksuffix=y_suffix,
-            ),
-            hovermode='x unified',
-            height=340,
-        )
+        if plotted:
+            # Y-axis formatting
+            if ts_metric_col in ('Rev/Visitor', 'Revenue'):
+                ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f'${x:,.0f}'))
+            elif ts_metric_col == 'Conv %':
+                ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f'{x:.1f}%'))
+            else:
+                ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f'{x:,.0f}'))
 
-        st.plotly_chart(fig, use_container_width=True)
+            ax.tick_params(colors='#94A3B8', labelsize=9)
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.spines['left'].set_color('#EBE4F4')
+            ax.spines['bottom'].set_color('#EBE4F4')
+            ax.yaxis.grid(True, color='#F1F5F9', linewidth=0.8)
+            ax.set_axisbelow(True)
+            ax.legend(loc='upper left', fontsize=9, frameon=False,
+                      labelcolor='#0F172A', ncol=len(segments))
+            plt.tight_layout()
+            st.pyplot(fig, use_container_width=True)
+        plt.close(fig)
 
     st.divider()
 
