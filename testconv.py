@@ -713,18 +713,18 @@ def login_page():
         """, unsafe_allow_html=True)
 
     with right:
-        st.markdown("<br><br>", unsafe_allow_html=True)
+        st.markdown("<br><br><br>", unsafe_allow_html=True)
         st.markdown(
-            f'<div style="text-align:center;margin-bottom:6px;">'
-            f'<span class="serif-gradient-centerpiece" style="font-size:2rem;">Welcome to {PITCH_COMPANY_NAME}</span></div>',
+            f'<div style="text-align:center;margin-bottom:6px;line-height:1.15;">'
+            f'<span class="serif-gradient-centerpiece" style="font-size:2.4rem;">Welcome to<br>{PITCH_COMPANY_NAME}</span></div>',
             unsafe_allow_html=True
         )
         st.markdown(
-            '<p style="text-align:center;font-size:0.85rem;font-weight:500;color:#64748B;margin-bottom:28px;">'
+            '<p style="text-align:center;font-size:0.9rem;font-weight:500;color:#64748B;margin-bottom:32px;letter-spacing:0.02em;">'
             'Conversion Insights Dashboard</p>',
             unsafe_allow_html=True
         )
-        _, fc, _ = st.columns([0.4, 1, 0.4])
+        _, fc, _ = st.columns([1, 1.4, 1])
         with fc:
             username = st.text_input("Username", key="login_username")
             password = st.text_input("Password", type="password", key="login_password")
@@ -755,6 +755,11 @@ def login_page():
                         st.rerun()
                 else:
                     st.error("Invalid username or password")
+            st.markdown(
+                '<p style="text-align:center;font-size:0.72rem;color:#94A3B8;margin-top:14px;">'
+                'Secure &middot; Private &middot; Encrypted</p>',
+                unsafe_allow_html=True
+            )
 
 # ================ 6. ONBOARDING PAGE =================
 def onboarding_page():
