@@ -999,6 +999,10 @@ def dashboard_page():
     else:
         df_p_filtered = orders_in_range.copy()
 
+    # Exclude $0 orders — a purchase only counts if revenue > 0
+    if not df_p_filtered.empty and 'Total' in df_p_filtered.columns:
+        df_p_filtered = df_p_filtered[pd.to_numeric(df_p_filtered['Total'], errors='coerce').fillna(0) > 0]
+
 
     # =====================================================
     # DASHBOARD TITLE
