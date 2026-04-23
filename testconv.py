@@ -715,13 +715,8 @@ def login_page():
     with right:
         st.markdown("<br><br><br><br><br>", unsafe_allow_html=True)
         st.markdown(
-            f'<div style="text-align:center;margin-bottom:6px;line-height:1.15;">'
+            f'<div style="text-align:center;margin-bottom:28px;line-height:1.15;">'
             f'<span class="serif-gradient-centerpiece" style="font-size:2.4rem;">Welcome to<br>{PITCH_COMPANY_NAME}</span></div>',
-            unsafe_allow_html=True
-        )
-        st.markdown(
-            '<p style="text-align:center;font-size:0.9rem;font-weight:500;color:#64748B;margin-bottom:32px;letter-spacing:0.02em;">'
-            'Conversion Insights Dashboard</p>',
             unsafe_allow_html=True
         )
         _, fc, _ = st.columns([1, 1.4, 1])
