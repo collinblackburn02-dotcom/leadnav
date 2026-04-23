@@ -1279,63 +1279,64 @@ def dashboard_page():
 
         CHART_COLORS = ['#4D148C', '#7C3AED', '#20B2AA', '#F59E0B', '#E11D48', '#059669', '#A78BFA', '#0EA5E9']
         segments = sorted([s for s in ts_df[selected_col].unique() if str(s) not in EXCLUDE_LIST])
-
-        # Drop segments with all-zero metric values
         active_segs = [s for s in segments if ts_df[ts_df[selected_col] == s][ts_metric_col].sum() > 0]
-        chart_df = ts_df[ts_df[selected_col].isin(active_segs)].copy()
-        chart_df = chart_df.rename(columns={selected_col: 'Segment', ts_metric_col: 'Value'})
-        chart_df['ts_date'] = pd.to_datetime(chart_df['ts_date'])
 
-        # Y-axis format string for Altair
-        y_fmt = {
-            'Rev/Visitor': '$,.2f',
-            'Revenue':     '$,.0f',
-            'Conv %':      '.2f',
-            'Purchases':   ',.0f',
-            'Visitors':    ',.0f',
-        }.get(ts_metric_col, ',.2f')
+        if active_segs:
+            chart_df = ts_df[ts_df[selected_col].isin(active_segs)].copy()
+            chart_df = chart_df.rename(columns={selected_col: 'Segment', ts_metric_col: 'Value'})
+            chart_df['ts_date'] = pd.to_datetime(chart_df['ts_date'])
 
-        y_suffix = '%' if ts_metric_col == 'Conv %' else ''
+            # d3 format — never use '%' multiplier; Conv % is stored as e.g. 5.0 not 0.05
+            axis_fmt = {
+                'Rev/Visitor': '$,.2f',
+                'Revenue':     '$,.0f',
+                'Conv %':      '.1f',
+                'Purchases':   ',.0f',
+                'Visitors':    ',.0f',
+            }.get(ts_metric_col, ',.2f')
 
-        color_scale = alt.Scale(domain=active_segs, range=CHART_COLORS[:len(active_segs)])
+            axis_suffix = '%' if ts_metric_col == 'Conv %' else ''
+            tt_title    = metric_choice + (' (%)' if ts_metric_col == 'Conv %' else '')
 
-        line = alt.Chart(chart_df).mark_line(strokeWidth=2.5).encode(
-            x=alt.X('ts_date:T',
-                    axis=alt.Axis(format='%b %d', labelColor='#94A3B8', tickColor='#EBE4F4',
-                                  domainColor='#EBE4F4', gridColor='transparent', labelFontSize=11)),
-            y=alt.Y('Value:Q',
-                    axis=alt.Axis(format=y_fmt + y_suffix, labelColor='#94A3B8',
-                                  gridColor='#F1F5F9', domainColor='transparent',
-                                  tickColor='transparent', labelFontSize=11),
-                    title=''),
-            color=alt.Color('Segment:N', scale=color_scale,
-                            legend=alt.Legend(orient='top', titleFontSize=0, labelFontSize=12,
-                                              labelColor='#0F172A', symbolStrokeWidth=2.5,
-                                              symbolSize=100, padding=4)),
-        )
+            color_scale = alt.Scale(domain=active_segs, range=CHART_COLORS[:len(active_segs)])
 
-        points = alt.Chart(chart_df).mark_circle(size=45).encode(
-            x='ts_date:T',
-            y='Value:Q',
-            color=alt.Color('Segment:N', scale=color_scale, legend=None),
-            tooltip=[
-                alt.Tooltip('ts_date:T', title='Date', format='%b %d, %Y'),
-                alt.Tooltip('Segment:N', title=active_var),
-                alt.Tooltip('Value:Q', title=metric_choice, format=y_fmt + y_suffix),
-            ]
-        )
+            x_enc = alt.X('ts_date:T', axis=alt.Axis(
+                format='%b %d', labelColor='#94A3B8', tickColor='#EBE4F4',
+                domainColor='#EBE4F4', gridOpacity=0, labelFontSize=11, labelFont='Outfit',
+                title=None,
+            ))
+            y_enc = alt.Y('Value:Q', title='', axis=alt.Axis(
+                format=axis_fmt, labelSuffix=axis_suffix,
+                labelColor='#94A3B8', gridColor='#F1F5F9',
+                domainOpacity=0, tickOpacity=0,
+                labelFontSize=11, labelFont='Outfit',
+            ))
+            color_enc = alt.Color('Segment:N', scale=color_scale,
+                legend=alt.Legend(
+                    orient='top', title=None,
+                    labelFontSize=12, labelFont='Outfit', labelColor='#0F172A',
+                    symbolStrokeWidth=3, symbolSize=120, padding=6,
+                ))
 
-        chart = (line + points).properties(
-            height=320,
-            background='white',
-        ).configure_view(
-            strokeWidth=0,
-        ).configure_axis(
-            labelFont='Outfit',
-            titleFont='Outfit',
-        )
+            line = alt.Chart(chart_df).mark_line(
+                strokeWidth=2.5, interpolate='monotone', opacity=0.9
+            ).encode(x=x_enc, y=y_enc, color=color_enc)
 
-        st.altair_chart(chart, use_container_width=True)
+            points = alt.Chart(chart_df).mark_circle(size=55, opacity=1).encode(
+                x=x_enc,
+                y=y_enc,
+                color=alt.Color('Segment:N', scale=color_scale, legend=None),
+                tooltip=[
+                    alt.Tooltip('ts_date:T',  title='Date',     format='%b %d, %Y'),
+                    alt.Tooltip('Segment:N',  title=active_var),
+                    alt.Tooltip('Value:Q',    title=tt_title,   format=axis_fmt),
+                ]
+            )
+
+            st.altair_chart(
+                (line + points).properties(height=320, background='transparent'),
+                use_container_width=True
+            )
 
     st.divider()
 
