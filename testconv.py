@@ -84,34 +84,48 @@ def apply_custom_theme(primary_color):
         [data-testid="stSidebar"] .stNumberInput > div {{
             min-height: 0 !important;
         }}
-        /* Number input — cover both baseweb variants */
-        [data-testid="stSidebar"] .stNumberInput [data-baseweb="input"],
-        [data-testid="stSidebar"] .stNumberInput [data-baseweb="base-input"],
-        [data-testid="stSidebar"] .stNumberInput > div > div {{
+        /* Number input — single pill, one border on the outer row container */
+        [data-testid="stSidebar"] .stNumberInput > div:last-child {{
             background: rgba(255,255,255,0.05) !important;
             border: 1.5px solid rgba(196,181,253,0.45) !important;
             border-radius: 999px !important;
+            overflow: hidden !important;
+            display: flex !important;
+            align-items: center !important;
+            height: 34px !important;
+        }}
+        /* Strip inner borders from all children */
+        [data-testid="stSidebar"] .stNumberInput [data-baseweb="input"],
+        [data-testid="stSidebar"] .stNumberInput [data-baseweb="base-input"],
+        [data-testid="stSidebar"] .stNumberInput > div > div {{
+            background: transparent !important;
+            border: none !important;
+            outline: none !important;
+            box-shadow: none !important;
         }}
         [data-testid="stSidebar"] .stNumberInput input {{
             background: transparent !important;
+            border: none !important;
+            outline: none !important;
+            box-shadow: none !important;
             color: {SIDEBAR_TEXT} !important;
             font-size: 0.88rem !important;
             text-align: center !important;
-            padding: 3px 6px !important;
-            height: 30px !important;
-            min-height: 0 !important;
+            padding: 0 6px !important;
+            height: 100% !important;
         }}
+        /* +/- buttons: no individual border, just a subtle left separator */
         [data-testid="stSidebar"] .stNumberInput button {{
-            background: rgba(255,255,255,0.05) !important;
-            border: 1.5px solid rgba(196,181,253,0.45) !important;
+            background: rgba(255,255,255,0.08) !important;
+            border: none !important;
+            border-left: 1px solid rgba(196,181,253,0.25) !important;
+            border-radius: 0 !important;
+            outline: none !important;
+            box-shadow: none !important;
             color: {SIDEBAR_TEXT} !important;
-            height: 30px !important;
-            min-height: 0 !important;
-            padding: 0 8px !important;
-            font-size: 0.88rem !important;
-        }}
-        [data-testid="stSidebar"] .stNumberInput button:last-child {{
-            border-radius: 0 999px 999px 0 !important;
+            height: 100% !important;
+            padding: 0 10px !important;
+            font-size: 0.95rem !important;
         }}
 
         /* Sidebar file uploader — match secondary button scheme */
