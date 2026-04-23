@@ -1027,7 +1027,9 @@ def dashboard_page():
     if "active_single_var" not in st.session_state:
         st.session_state.active_single_var = configs[0][0]
 
-    v_cols = st.columns(len(configs))
+    n = len(configs)
+    # Small equal button columns + large spacer so buttons don't stretch across screen
+    v_cols = st.columns([1] * n + [n])
     for i, (label, col_name) in enumerate(configs):
         if v_cols[i].button(label, key=f"btn_{label}",
                             type="primary" if st.session_state.active_single_var == label else "secondary",
