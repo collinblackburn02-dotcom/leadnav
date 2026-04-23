@@ -869,31 +869,31 @@ def dashboard_page():
         )
         st.markdown("---")
 
-        # ── UPLOAD ORDERS (top of sidebar) ──
-        st.markdown('<p class="sidebar-section-label">Upload Orders</p>', unsafe_allow_html=True)
-        uploaded_file = st.file_uploader(
-            "Upload CSV", type=['csv'],
-            label_visibility="collapsed",
-            key="sidebar_upload"
-        )
-        if uploaded_file is not None:
-            upload_btn    = st.button("Upload & Enrich", type="primary", use_container_width=True, key="upload_btn")
-            upload_status = st.empty()
-            if upload_btn:
-                upload_status.markdown(
-                    '<div style="background: rgba(124,58,237,0.15); border: 1px solid rgba(196,181,253,0.3); '
-                    'border-radius: 8px; padding: 10px 8px; color: #C4B5FD; font-size: 0.75rem; text-align: center;">'
-                    '⏳ <b>Uploading & enriching...</b><br>'
-                    '<span style="font-size: 0.68rem; opacity: 0.8;">This can take up to 3 minutes</span>'
-                    '</div>',
-                    unsafe_allow_html=True
-                )
-                success, message = run_enrichment(uploaded_file, pixel_id, tenant_type)
-                if success:
-                    upload_status.success(message)
-                    st.rerun()
-                else:
-                    upload_status.error(message)
+        # ── UPLOAD ORDERS (collapsible) ──
+        with st.expander("Upload Orders", expanded=False):
+            uploaded_file = st.file_uploader(
+                "Upload CSV", type=['csv'],
+                label_visibility="collapsed",
+                key="sidebar_upload"
+            )
+            if uploaded_file is not None:
+                upload_btn    = st.button("Upload & Enrich", type="primary", use_container_width=True, key="upload_btn")
+                upload_status = st.empty()
+                if upload_btn:
+                    upload_status.markdown(
+                        '<div style="background: rgba(124,58,237,0.15); border: 1px solid rgba(196,181,253,0.3); '
+                        'border-radius: 8px; padding: 10px 8px; color: #C4B5FD; font-size: 0.75rem; text-align: center;">'
+                        '⏳ <b>Uploading & enriching...</b><br>'
+                        '<span style="font-size: 0.68rem; opacity: 0.8;">This can take up to 3 minutes</span>'
+                        '</div>',
+                        unsafe_allow_html=True
+                    )
+                    success, message = run_enrichment(uploaded_file, pixel_id, tenant_type)
+                    if success:
+                        upload_status.success(message)
+                        st.rerun()
+                    else:
+                        upload_status.error(message)
 
         # ── DATE RANGE ──
         with st.expander("Date Range", expanded=False):
@@ -1141,6 +1141,9 @@ def dashboard_page():
         df_merged = df_merged[df_merged['Purchases'] >= min_purchasers].sort_values(sort_col, ascending=is_ascending)
 
         if not df_merged.empty:
+            # Display-level cleanup: map raw Y/N codes to readable labels
+            _display_map = {'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female'}
+            df_merged[selected_col] = df_merged[selected_col].replace(_display_map)
             df_merged.insert(0, 'Rank', range(1, len(df_merged) + 1))
             display_df   = df_merged.rename(columns={selected_col: st.session_state.active_single_var})
             display_cols = ['Rank', st.session_state.active_single_var, 'Revenue', 'Visitors', 'Purchases', 'Conv %', 'Rev/Visitor']
@@ -1216,6 +1219,11 @@ def dashboard_page():
             sort_col   = metric_map[metric_choice]
             final_res  = res[res['Purchases'] >= min_purchasers].sort_values(sort_col, ascending=is_ascending)
             if not final_res.empty:
+                # Display-level cleanup for raw Y/N codes
+                _display_map = {'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female'}
+                for _col in included_types:
+                    if _col in final_res.columns:
+                        final_res[_col] = final_res[_col].replace(_display_map)
                 st.metric("Total Segments Found", f"{len(final_res):,}")
                 final_res.insert(0, 'Rank', range(1, len(final_res) + 1))
                 rename_dict  = {c[1]: c[0] for c in configs}
