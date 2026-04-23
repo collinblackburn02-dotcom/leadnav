@@ -310,7 +310,7 @@ def apply_custom_theme(primary_color):
         .section-title {{
             font-family: 'Outfit', sans-serif;
             font-weight: 700;
-            font-size: 1.1rem;
+            font-size: 1.65rem;
             text-transform: uppercase;
             letter-spacing: 0.1em;
             color: #0F172A;
@@ -323,12 +323,12 @@ def apply_custom_theme(primary_color):
         .premium-table-container table {{ width: 100% !important; border-collapse: collapse !important; border: none !important; }}
         .premium-table-container th {{
             font-family: 'Outfit', sans-serif !important;
-            background-color: {primary_color} !important;
-            color: #FFFFFF !important;
+            background-color: #F8F6FA !important;
+            color: {primary_color} !important;
             font-weight: 700 !important;
             text-align: center !important;
             padding: 13px 12px !important;
-            border-bottom: none !important;
+            border-bottom: 2px solid {primary_color} !important;
             font-size: 0.72rem !important;
             text-transform: uppercase !important;
             letter-spacing: 0.1em !important;
@@ -339,7 +339,7 @@ def apply_custom_theme(primary_color):
             padding: 11px 12px !important;
             border-bottom: 1px solid #F1F5F9 !important;
             font-size: 0.82rem !important;
-            font-weight: 800 !important;
+            font-weight: 500 !important;
             color: #0F172A !important;
         }}
         .premium-table-container td:first-child {{ color: {primary_color} !important; font-size: 0.9rem !important; font-weight: 700 !important; }}
@@ -537,6 +537,13 @@ def load_order_base(pixel_id, tenant_type):
             parsed_dates = parsed_dates.dt.tz_convert(None)
         df['order_date'] = parsed_dates
         df = df.rename(columns={'order_id': 'Order_ID', 'revenue': 'Total'})
+
+        # Clean demographic fields that may have raw Y/N values from BQ
+        if 'homeowner'      in df.columns: df['homeowner']      = df['homeowner'].apply(clean_homeowner)
+        if 'children'       in df.columns: df['children']       = df['children'].apply(clean_boolean)
+        if 'marital_status' in df.columns: df['marital_status'] = df['marital_status'].apply(clean_marital)
+        if 'gender'         in df.columns: df['gender']         = df['gender'].apply(clean_gender)
+
         return df, None
     except Exception as e:
         return pd.DataFrame(), str(e)
@@ -1023,8 +1030,7 @@ def dashboard_page():
     v_cols = st.columns(len(configs))
     for i, (label, col_name) in enumerate(configs):
         if v_cols[i].button(label, key=f"btn_{label}",
-                            type="primary" if st.session_state.active_single_var == label else "secondary",
-                            use_container_width=True):
+                            type="primary" if st.session_state.active_single_var == label else "secondary"):
             st.session_state.active_single_var = label
             st.rerun()
 
@@ -1064,8 +1070,9 @@ def dashboard_page():
             df_merged.insert(0, 'Rank', range(1, len(df_merged) + 1))
             display_df   = df_merged.rename(columns={selected_col: st.session_state.active_single_var})
             display_cols = ['Rank', st.session_state.active_single_var, 'Revenue', 'Visitors', 'Purchases', 'Conv %', 'Rev/Visitor']
+            bold_col = metric_map[metric_choice]  # the active rank-by column
             styler = display_df[display_cols].style\
-                .set_properties(**{'font-weight': 'bold'}, subset=['Rank'])\
+                .set_properties(**{'font-weight': '800'}, subset=[bold_col])\
                 .format({'Visitors': '{:,.0f}', 'Purchases': '{:,.0f}', 'Revenue': '${:,.2f}',
                          'Conv %': '{:.2f}%', 'Rev/Visitor': '${:,.2f}'})\
                 .background_gradient(subset=['Rev/Visitor', 'Conv %'], cmap=brand_gradient)
@@ -1140,10 +1147,12 @@ def dashboard_page():
                 rename_dict  = {c[1]: c[0] for c in configs}
                 display_cols = ['Rank'] + [rename_dict.get(c, c) for c in included_types] + ['Revenue', 'Visitors', 'Purchases', 'Conv %', 'Rev/Visitor']
                 display_df   = final_res.head(50).rename(columns=rename_dict)[display_cols]
-                render_premium_table(display_df.style.format({
-                    'Rank': '{:.0f}', 'Visitors': '{:,.0f}', 'Purchases': '{:,.0f}',
-                    'Revenue': '${:,.2f}', 'Conv %': '{:.2f}%', 'Rev/Visitor': '${:,.2f}'
-                }).background_gradient(subset=['Rev/Visitor', 'Conv %'], cmap=brand_gradient))
+                render_premium_table(display_df.style\
+                    .set_properties(**{'font-weight': '800'}, subset=[metric_map[metric_choice]])\
+                    .format({
+                        'Rank': '{:.0f}', 'Visitors': '{:,.0f}', 'Purchases': '{:,.0f}',
+                        'Revenue': '${:,.2f}', 'Conv %': '{:.2f}%', 'Rev/Visitor': '${:,.2f}'
+                    }).background_gradient(subset=['Rev/Visitor', 'Conv %'], cmap=brand_gradient))
 
 # ================ 9. MAIN APP FLOW =================
 def main():
