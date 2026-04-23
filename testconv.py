@@ -912,7 +912,7 @@ def dashboard_page():
     # Display name → dataframe column name
     metric_map = {
         "Revenue Per Visitor": "Rev/Visitor",
-        "Conversion Percent":  "Conv %",
+        "Conversion Rate":  "Conv %",
         "Revenue":             "Revenue",
         "Purchases":           "Purchases",
         "Visitors":            "Visitors",
