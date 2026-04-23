@@ -84,13 +84,15 @@ def apply_custom_theme(primary_color):
         [data-testid="stSidebar"] .stNumberInput > div {{
             min-height: 0 !important;
         }}
-        /* Number input — target baseweb container */
-        [data-testid="stSidebar"] .stNumberInput [data-baseweb="input"] {{
+        /* Number input — cover both baseweb variants */
+        [data-testid="stSidebar"] .stNumberInput [data-baseweb="input"],
+        [data-testid="stSidebar"] .stNumberInput [data-baseweb="base-input"],
+        [data-testid="stSidebar"] .stNumberInput > div > div {{
             background: rgba(255,255,255,0.05) !important;
             border: 1.5px solid rgba(196,181,253,0.45) !important;
             border-radius: 999px !important;
         }}
-        [data-testid="stSidebar"] .stNumberInput [data-baseweb="input"] input {{
+        [data-testid="stSidebar"] .stNumberInput input {{
             background: transparent !important;
             color: {SIDEBAR_TEXT} !important;
             font-size: 0.88rem !important;
@@ -115,12 +117,29 @@ def apply_custom_theme(primary_color):
         /* Sidebar file uploader — match secondary button scheme */
         [data-testid="stSidebar"] [data-testid="stFileUploader"] {{
             background: rgba(255,255,255,0.05) !important;
-            border: 1px solid rgba(196,181,253,0.22) !important;
-            border-radius: 8px !important;
+            border: 1.5px solid rgba(196,181,253,0.45) !important;
+            border-radius: 12px !important;
         }}
         [data-testid="stSidebar"] [data-testid="stFileUploader"] * {{
             color: {SIDEBAR_TEXT} !important;
             font-size: 0.72rem !important;
+        }}
+        /* Drop zone */
+        [data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] {{
+            background: rgba(255,255,255,0.05) !important;
+            border: 1.5px solid rgba(196,181,253,0.45) !important;
+            border-radius: 12px !important;
+        }}
+        /* Uploaded file card */
+        [data-testid="stSidebar"] [data-testid="stFileUploader"] section {{
+            background: rgba(255,255,255,0.05) !important;
+            border: 1.5px solid rgba(196,181,253,0.45) !important;
+            border-radius: 12px !important;
+        }}
+        [data-testid="stSidebar"] [data-testid="stFileUploader"] section > div,
+        [data-testid="stSidebar"] [data-testid="stFileUploader"] section li {{
+            background: transparent !important;
+            border: none !important;
         }}
         [data-testid="stSidebar"] [data-testid="stFileUploader"] button {{
             background: rgba(255,255,255,0.05) !important;
