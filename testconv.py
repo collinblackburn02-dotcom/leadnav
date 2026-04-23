@@ -308,14 +308,15 @@ def apply_custom_theme(primary_color):
 
         /* ── SECTION TITLES ── */
         .section-title {{
-            font-family: 'Outfit', sans-serif;
-            font-weight: 700;
-            font-size: 2.475rem;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: #0F172A;
-            margin: 0 0 12px 0;
-            padding: 0;
+            font-family: 'Outfit', sans-serif !important;
+            font-weight: 700 !important;
+            font-size: 2.475rem !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.1em !important;
+            color: #0F172A !important;
+            margin: 0 0 12px 0 !important;
+            padding: 0 !important;
+            line-height: 1.2 !important;
         }}
 
         /* ── PREMIUM TABLE ── */
@@ -418,7 +419,7 @@ def apply_custom_theme(primary_color):
         /* Label text */
         [data-testid="stMain"] .stRadio [data-baseweb="radio"] > div:last-child,
         [data-testid="stMain"] .stRadio [data-baseweb="radio"] > div:last-child p {{
-            font-size: 1.05rem !important;
+            font-size: 0.85rem !important;
             font-weight: 700 !important;
             text-transform: uppercase !important;
             letter-spacing: 0.09em !important;
