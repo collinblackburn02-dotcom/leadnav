@@ -1209,8 +1209,9 @@ def dashboard_page():
     # =====================================================
     # TIME SERIES CHART
     # =====================================================
+    st.markdown("<br><br>", unsafe_allow_html=True)
     st.markdown(
-        f'<p class="section-title" style="margin-top:2.8rem;">Performance Over Time</p>'
+        f'<p class="section-title">Performance Over Time</p>'
         f'<p style="font-family:Outfit,sans-serif;font-size:0.82rem;font-weight:500;color:#64748B;margin:-8px 0 10px 0;">'
         f'{active_var} &nbsp;·&nbsp; {metric_choice}</p>',
         unsafe_allow_html=True
