@@ -60,11 +60,11 @@ def apply_custom_theme(primary_color):
         /* Sidebar date pickers — match secondary button scheme */
         [data-testid="stSidebar"] .stDateInput input {{
             background: rgba(255,255,255,0.05) !important;
-            border: 1px solid rgba(196,181,253,0.22) !important;
-            border-radius: 8px !important;
+            border: 1.5px solid rgba(196,181,253,0.45) !important;
+            border-radius: 999px !important;
             color: {SIDEBAR_TEXT} !important;
             font-size: 0.88rem !important;
-            padding: 5px 9px !important;
+            padding: 5px 14px !important;
         }}
         [data-testid="stSidebar"] .stDateInput label {{
             color: {SIDEBAR_MUTED} !important;
@@ -83,8 +83,9 @@ def apply_custom_theme(primary_color):
         }}
         [data-testid="stSidebar"] .stNumberInput input {{
             background: rgba(255,255,255,0.05) !important;
-            border: 1px solid rgba(196,181,253,0.22) !important;
-            border-radius: 8px 0 0 8px !important;
+            border: 1.5px solid rgba(196,181,253,0.45) !important;
+            border-right: none !important;
+            border-radius: 999px 0 0 999px !important;
             color: {SIDEBAR_TEXT} !important;
             font-size: 0.88rem !important;
             text-align: center !important;
@@ -94,13 +95,15 @@ def apply_custom_theme(primary_color):
         }}
         [data-testid="stSidebar"] .stNumberInput button {{
             background: rgba(255,255,255,0.05) !important;
-            border: 1px solid rgba(196,181,253,0.22) !important;
+            border: 1.5px solid rgba(196,181,253,0.45) !important;
             color: {SIDEBAR_TEXT} !important;
             height: 30px !important;
             min-height: 0 !important;
             padding: 0 8px !important;
-            border-radius: 0 !important;
             font-size: 0.88rem !important;
+        }}
+        [data-testid="stSidebar"] .stNumberInput button:last-child {{
+            border-radius: 0 999px 999px 0 !important;
         }}
 
         /* Sidebar file uploader — match secondary button scheme */
