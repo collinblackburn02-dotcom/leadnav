@@ -1286,17 +1286,19 @@ def dashboard_page():
             chart_df = chart_df.rename(columns={selected_col: 'Segment', ts_metric_col: 'Value'})
             chart_df['ts_date'] = pd.to_datetime(chart_df['ts_date'])
 
-            # d3 format — never use '%' multiplier; Conv % is stored as e.g. 5.0 not 0.05
-            axis_fmt = {
-                'Rev/Visitor': '$,.2f',
-                'Revenue':     '$,.0f',
-                'Conv %':      '.1f',
-                'Purchases':   ',.0f',
-                'Visitors':    ',.0f',
-            }.get(ts_metric_col, ',.2f')
+            # Vega labelExpr for axis tick labels (avoids d3 % multiplier issue)
+            label_expr = {
+                'Rev/Visitor': "'$' + format(datum.value, ',.2f')",
+                'Revenue':     "'$' + format(datum.value, ',.0f')",
+                'Conv %':      "format(datum.value, '.1f') + '%'",
+                'Purchases':   "format(datum.value, ',.0f')",
+                'Visitors':    "format(datum.value, ',.0f')",
+            }.get(ts_metric_col, "format(datum.value, ',.2f')")
 
-            axis_suffix = '%' if ts_metric_col == 'Conv %' else ''
-            tt_title    = metric_choice + (' (%)' if ts_metric_col == 'Conv %' else '')
+            # d3 format for tooltip (no % needed — title carries it)
+            tt_fmt   = {'Rev/Visitor': '$,.2f', 'Revenue': '$,.0f',
+                        'Conv %': '.1f', 'Purchases': ',.0f', 'Visitors': ',.0f'}.get(ts_metric_col, ',.2f')
+            tt_title = metric_choice + (' (%)' if ts_metric_col == 'Conv %' else '')
 
             color_scale = alt.Scale(domain=active_segs, range=CHART_COLORS[:len(active_segs)])
 
@@ -1306,7 +1308,7 @@ def dashboard_page():
                 title=None,
             ))
             y_enc = alt.Y('Value:Q', title='', axis=alt.Axis(
-                format=axis_fmt, labelSuffix=axis_suffix,
+                labelExpr=label_expr,
                 labelColor='#94A3B8', gridColor='#F1F5F9',
                 domainOpacity=0, tickOpacity=0,
                 labelFontSize=11, labelFont='Outfit',
@@ -1329,7 +1331,7 @@ def dashboard_page():
                 tooltip=[
                     alt.Tooltip('ts_date:T',  title='Date',     format='%b %d, %Y'),
                     alt.Tooltip('Segment:N',  title=active_var),
-                    alt.Tooltip('Value:Q',    title=tt_title,   format=axis_fmt),
+                    alt.Tooltip('Value:Q',    title=tt_title,   format=tt_fmt),
                 ]
             )
 
