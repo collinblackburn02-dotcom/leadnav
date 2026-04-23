@@ -57,11 +57,14 @@ def apply_custom_theme(primary_color):
             color: {SIDEBAR_TEXT} !important;
         }}
 
-        /* Sidebar date pickers — match secondary button scheme */
-        [data-testid="stSidebar"] .stDateInput input {{
+        /* Sidebar date pickers — target baseweb container */
+        [data-testid="stSidebar"] .stDateInput [data-baseweb="input"] {{
             background: rgba(255,255,255,0.05) !important;
             border: 1.5px solid rgba(196,181,253,0.45) !important;
             border-radius: 999px !important;
+        }}
+        [data-testid="stSidebar"] .stDateInput [data-baseweb="input"] input {{
+            background: transparent !important;
             color: {SIDEBAR_TEXT} !important;
             font-size: 0.88rem !important;
             padding: 5px 14px !important;
@@ -81,11 +84,14 @@ def apply_custom_theme(primary_color):
         [data-testid="stSidebar"] .stNumberInput > div {{
             min-height: 0 !important;
         }}
-        [data-testid="stSidebar"] .stNumberInput input {{
+        /* Number input — target baseweb container */
+        [data-testid="stSidebar"] .stNumberInput [data-baseweb="input"] {{
             background: rgba(255,255,255,0.05) !important;
             border: 1.5px solid rgba(196,181,253,0.45) !important;
-            border-right: none !important;
-            border-radius: 999px 0 0 999px !important;
+            border-radius: 999px !important;
+        }}
+        [data-testid="stSidebar"] .stNumberInput [data-baseweb="input"] input {{
+            background: transparent !important;
             color: {SIDEBAR_TEXT} !important;
             font-size: 0.88rem !important;
             text-align: center !important;
