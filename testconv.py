@@ -653,7 +653,6 @@ def login_page():
         '[data-testid="stVerticalBlock"]{gap:0!important;}'
         '[data-testid="stHorizontalBlock"]{gap:0!important;height:100vh!important;align-items:stretch!important;}'
         '[data-testid="stHorizontalBlock"]>[data-testid="stVerticalBlockBorderWrapper"]{height:100vh!important;}'
-        '[data-testid="stHorizontalBlock"]>div:last-child>[data-testid="stVerticalBlockBorderWrapper"]>[data-testid="stVerticalBlock"]{display:flex!important;flex-direction:column!important;justify-content:center!important;height:100vh!important;padding:0 !important;}'
         '</style>',
         unsafe_allow_html=True
     )
@@ -714,6 +713,7 @@ def login_page():
         """, unsafe_allow_html=True)
 
     with right:
+        st.markdown("<br><br><br><br><br>", unsafe_allow_html=True)
         st.markdown(
             f'<div style="text-align:center;margin-bottom:6px;line-height:1.15;">'
             f'<span class="serif-gradient-centerpiece" style="font-size:2.4rem;">Welcome to<br>{PITCH_COMPANY_NAME}</span></div>',
