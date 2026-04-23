@@ -1227,7 +1227,7 @@ def dashboard_page():
 
     st.markdown(
         f'<p style="font-family:Outfit,sans-serif;font-size:1.64rem;font-weight:600;'
-        f'color:{PITCH_BRAND_COLOR};text-align:center;margin:8px 0 4px 0;text-transform:uppercase;letter-spacing:0.08em;">'
+        f'color:{PITCH_BRAND_COLOR};text-align:center;margin:8px 0 4px 0;text-transform:uppercase;letter-spacing:0.08em;font-size:1.35rem!important;">'
         f'{active_var} &nbsp;·&nbsp; {metric_choice}</p>',
         unsafe_allow_html=True
     )
@@ -1311,13 +1311,13 @@ def dashboard_page():
             color_scale = alt.Scale(domain=active_segs, range=CHART_COLORS[:len(active_segs)])
 
             x_enc = alt.X('ts_date:T', axis=alt.Axis(
-                format='%b %d', labelColor='#94A3B8', tickColor='#EBE4F4',
+                format='%b %d', labelColor='#0F172A', tickColor='#EBE4F4',
                 domainColor='#EBE4F4', gridOpacity=0, labelFontSize=11, labelFont='Outfit',
                 title=None,
             ))
             y_enc = alt.Y('Value:Q', title='', axis=alt.Axis(
                 labelExpr=label_expr,
-                labelColor='#94A3B8', gridColor='#F1F5F9',
+                labelColor='#0F172A', gridColor='#F1F5F9',
                 domainOpacity=0, tickOpacity=0,
                 labelFontSize=11, labelFont='Outfit',
             ))
