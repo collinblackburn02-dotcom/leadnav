@@ -424,17 +424,6 @@ def apply_custom_theme(primary_color):
             letter-spacing: 0.09em !important;
             font-family: 'Outfit', sans-serif !important;
         }}
-        /* Filter option chips inside bordered containers — smaller (higher specificity) */
-        [data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"] .stButton > button {{
-            font-size: 0.58rem !important;
-            padding: 2px 8px !important;
-            font-weight: 600 !important;
-            letter-spacing: 0.05em !important;
-            line-height: 1.2 !important;
-        }}
-        [data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"] .stButton > button p {{
-            font-size: 0.58rem !important;
-        }}
         /* Sidebar buttons — explicitly no uppercase so nothing bleeds through */
         [data-testid="stSidebar"] .stButton > button {{
             text-transform: none !important;
@@ -1423,37 +1412,21 @@ def dashboard_page():
         with st.container(border=True):
             st.markdown(
                 f'<p style="font-family:Outfit,sans-serif;font-size:0.62rem;font-weight:700;'
-                f'text-transform:uppercase;letter-spacing:0.1em;color:#94A3B8;margin-bottom:6px;">'
-                f'{label} — filter</p>',
+                f'text-transform:uppercase;letter-spacing:0.1em;color:#94A3B8;margin-bottom:4px;">'
+                f'{label} — filter <span style="font-weight:400;text-transform:none;letter-spacing:0;">'
+                f'(empty = all)</span></p>',
                 unsafe_allow_html=True
             )
+            new_val = st.multiselect(
+                label, options=opts, default=current,
+                key=f"mx_ms_{col_name}",
+                label_visibility="collapsed",
+                placeholder="All values included"
+            )
+            st.session_state.matrix_filters[col_name] = new_val
 
-            opt_widths = [0.8] + [max(1.0, len(o) * 0.13) for o in opts]
-            spacer_o   = sum(opt_widths) * 0.3
-            opt_cols   = st.columns(opt_widths + [spacer_o])
-
-            if opt_cols[0].button("All", key=f"mx_all_{col_name}",
-                                  type="primary" if is_all else "secondary",
-                                  use_container_width=True):
-                st.session_state.matrix_filters[col_name] = []
-                st.rerun()
-
-            new_sel = list(current)
-            changed = False
-            for j, opt in enumerate(opts):
-                is_sel = opt in current
-                if opt_cols[j + 1].button(opt, key=f"mx_opt_{col_name}_{j}",
-                                          type="primary" if is_sel else "secondary",
-                                          use_container_width=True):
-                    new_sel = [v for v in new_sel if v != opt] if is_sel else new_sel + [opt]
-                    changed = True
-
-            if changed:
-                st.session_state.matrix_filters[col_name] = new_sel
-                st.rerun()
-
-        if not is_all and current:
-            selected_filters[col_name] = current
+        if new_val:
+            selected_filters[col_name] = new_val
 
     if included_types:
         combos       = []
