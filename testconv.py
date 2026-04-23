@@ -63,7 +63,7 @@ def apply_custom_theme(primary_color):
             border: 1px solid rgba(196,181,253,0.3) !important;
             border-radius: 8px !important;
             color: #0F172A !important;
-            font-size: 0.78rem !important;
+            font-size: 0.88rem !important;
             padding: 5px 9px !important;
         }}
         [data-testid="stSidebar"] .stDateInput label {{
@@ -80,7 +80,7 @@ def apply_custom_theme(primary_color):
             border: 1px solid rgba(196,181,253,0.3) !important;
             border-radius: 8px !important;
             color: #0F172A !important;
-            font-size: 0.7rem !important;
+            font-size: 0.88rem !important;
             text-align: center !important;
         }}
         [data-testid="stSidebar"] .stNumberInput button {{
@@ -127,15 +127,15 @@ def apply_custom_theme(primary_color):
         /* Sidebar pill buttons — compact */
         [data-testid="stSidebar"] .stButton > button {{
             border-radius: 999px !important;
-            font-size: 0.63rem !important;
+            font-size: 0.55rem !important;
             font-weight: 600 !important;
-            padding: 3px 10px !important;
+            padding: 2px 8px !important;
             white-space: nowrap !important;
             width: 100% !important;
-            margin-bottom: 2px !important;
-            line-height: 1.4 !important;
+            margin-bottom: 1px !important;
+            line-height: 1.3 !important;
             transition: all 0.15s ease !important;
-            border-width: 1.5px !important;
+            border-width: 1px !important;
         }}
         [data-testid="stSidebar"] .stButton > button[kind="primary"] {{
             background: {SIDEBAR_ACCENT} !important;
@@ -733,6 +733,19 @@ def dashboard_page():
         # ── FILTER BY PRODUCT ──
         st.markdown('<p class="sidebar-section-label">Filter by Product</p>', unsafe_allow_html=True)
         sku_toggle = st.toggle("Enable", value=False, key="sku_toggle")
+        if sku_toggle:
+            _orders_ref = st.session_state.get('df_orders', pd.DataFrame())
+            if not _orders_ref.empty and 'lineitem_name' in _orders_ref.columns:
+                sku_opts = sorted([str(x) for x in _orders_ref['lineitem_name'].dropna().unique()
+                                   if str(x) not in EXCLUDE_LIST])
+            else:
+                sku_opts = []
+            selected_skus = st.multiselect(
+                "Select products", options=sku_opts,
+                label_visibility="collapsed", key="sku_select"
+            )
+        else:
+            selected_skus = []
 
         # Spacer to push logout/refresh to bottom
         st.markdown("<br><br><br><br><br>", unsafe_allow_html=True)
@@ -803,22 +816,9 @@ def dashboard_page():
     else:
         df_p_filtered = orders_in_range.copy()
 
-    # Product filter (sidebar toggle)
-    if sku_toggle and not orders_in_range.empty:
-        sku_opts = []
-        if 'lineitem_name' in orders_in_range.columns:
-            sku_opts = sorted([str(x) for x in orders_in_range['lineitem_name'].dropna().unique()
-                               if str(x) not in EXCLUDE_LIST])
-        selected_skus = st.sidebar.multiselect(
-            "Select products", options=sku_opts,
-            label_visibility="collapsed", key="sku_select"
-        )
-        if selected_skus:
-            df_p_filtered = df_p_filtered[df_p_filtered['lineitem_name'].isin(selected_skus)]
-        else:
-            df_p_filtered = df_p_filtered.iloc[0:0]
-    else:
-        selected_skus = []
+    # Product filter — apply selected SKUs from sidebar
+    if sku_toggle and selected_skus:
+        df_p_filtered = df_p_filtered[df_p_filtered['lineitem_name'].isin(selected_skus)]
 
     # =====================================================
     # DASHBOARD TITLE
