@@ -1210,12 +1210,7 @@ def dashboard_page():
     # TIME SERIES CHART
     # =====================================================
     st.markdown("<br><br>", unsafe_allow_html=True)
-    st.markdown(
-        f'<p class="section-title">Performance Over Time</p>'
-        f'<p style="font-family:Outfit,sans-serif;font-size:0.82rem;font-weight:500;color:#64748B;margin:-8px 0 10px 0;">'
-        f'{active_var} &nbsp;·&nbsp; {metric_choice}</p>',
-        unsafe_allow_html=True
-    )
+    st.markdown('<p class="section-title">Performance Over Time</p>', unsafe_allow_html=True)
 
     if 'time_gran' not in st.session_state:
         st.session_state.time_gran = 'Daily'
@@ -1229,6 +1224,13 @@ def dashboard_page():
         label_visibility='collapsed'
     )
     st.session_state.time_gran = gran_choice
+
+    st.markdown(
+        f'<p style="font-family:Outfit,sans-serif;font-size:1.64rem;font-weight:600;'
+        f'color:{PITCH_BRAND_COLOR};text-align:center;margin:8px 0 4px 0;">'
+        f'{active_var} &nbsp;·&nbsp; {metric_choice}</p>',
+        unsafe_allow_html=True
+    )
 
     freq_map = {'Daily': 'D', 'Weekly': 'W', 'Monthly': 'MS'}
     freq = freq_map[gran_choice]
