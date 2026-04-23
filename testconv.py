@@ -74,19 +74,33 @@ def apply_custom_theme(primary_color):
             letter-spacing: 0.09em !important;
         }}
 
-        /* Sidebar number input — black text */
+        /* Sidebar number input — black text, compact */
+        [data-testid="stSidebar"] .stNumberInput {{
+            margin-bottom: 0 !important;
+        }}
+        [data-testid="stSidebar"] .stNumberInput > div {{
+            min-height: 0 !important;
+        }}
         [data-testid="stSidebar"] .stNumberInput input {{
             background: rgba(255,255,255,0.9) !important;
             border: 1px solid rgba(196,181,253,0.3) !important;
-            border-radius: 8px !important;
+            border-radius: 8px 0 0 8px !important;
             color: #0F172A !important;
             font-size: 0.88rem !important;
             text-align: center !important;
+            padding: 3px 6px !important;
+            height: 30px !important;
+            min-height: 0 !important;
         }}
         [data-testid="stSidebar"] .stNumberInput button {{
             background: rgba(255,255,255,0.15) !important;
             border: 1px solid rgba(196,181,253,0.2) !important;
             color: {SIDEBAR_TEXT} !important;
+            height: 30px !important;
+            min-height: 0 !important;
+            padding: 0 8px !important;
+            border-radius: 0 !important;
+            font-size: 0.88rem !important;
         }}
 
         /* Sidebar file uploader */
@@ -124,16 +138,15 @@ def apply_custom_theme(primary_color):
             font-size: 0.73rem !important;
         }}
 
-        /* Sidebar pill buttons — compact */
+        /* Sidebar pill buttons — compact, natural width */
         [data-testid="stSidebar"] .stButton > button {{
             border-radius: 999px !important;
             font-size: 0.88rem !important;
             font-weight: 600 !important;
-            padding: 2px 6px !important;
+            padding: 3px 14px !important;
             white-space: nowrap !important;
-            width: 100% !important;
-            margin-bottom: 2px !important;
-            line-height: 1.2 !important;
+            margin-bottom: 3px !important;
+            line-height: 1.3 !important;
             transition: all 0.15s ease !important;
             border-width: 1px !important;
             min-height: 0 !important;
@@ -144,7 +157,7 @@ def apply_custom_theme(primary_color):
             font-size: 0.88rem !important;
             font-weight: 600 !important;
             margin: 0 !important;
-            line-height: 1.2 !important;
+            line-height: 1.3 !important;
         }}
         [data-testid="stSidebar"] .stButton > button[kind="primary"] {{
             background: {SIDEBAR_ACCENT} !important;
@@ -721,31 +734,23 @@ def dashboard_page():
 
         # ── RANK BY ──
         st.markdown('<p class="sidebar-section-label">Rank By</p>', unsafe_allow_html=True)
-        # 2-column grid so buttons are half-width and actually small
-        rb_rows = [metrics[i:i+2] for i in range(0, len(metrics), 2)]
-        for row in rb_rows:
-            cols = st.columns(len(row))
-            for col, m in zip(cols, row):
-                is_active = (st.session_state.metric_choice == m)
-                if col.button(m, key=f"metric_{m}",
-                              type="primary" if is_active else "secondary",
-                              use_container_width=True):
-                    st.session_state.metric_choice = m
-                    st.rerun()
+        for m in metrics:
+            is_active = (st.session_state.metric_choice == m)
+            if st.button(m, key=f"metric_{m}",
+                         type="primary" if is_active else "secondary"):
+                st.session_state.metric_choice = m
+                st.rerun()
 
         st.markdown("---")
 
         # ── SORT BY ──
         st.markdown('<p class="sidebar-section-label">Sort By</p>', unsafe_allow_html=True)
-        sb_col1, sb_col2 = st.columns(2)
-        if sb_col1.button("High→Low", key="sort_htl",
-                          type="primary" if not st.session_state.sort_asc else "secondary",
-                          use_container_width=True):
+        if st.button("High→Low", key="sort_htl",
+                     type="primary" if not st.session_state.sort_asc else "secondary"):
             st.session_state.sort_asc = False
             st.rerun()
-        if sb_col2.button("Low→High", key="sort_lth",
-                          type="primary" if st.session_state.sort_asc else "secondary",
-                          use_container_width=True):
+        if st.button("Low→High", key="sort_lth",
+                     type="primary" if st.session_state.sort_asc else "secondary"):
             st.session_state.sort_asc = True
             st.rerun()
 
