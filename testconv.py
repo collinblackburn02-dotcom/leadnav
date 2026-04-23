@@ -339,7 +339,7 @@ def apply_custom_theme(primary_color):
             padding: 11px 12px !important;
             border-bottom: 1px solid #F1F5F9 !important;
             font-size: 0.82rem !important;
-            font-weight: 500 !important;
+            font-weight: 500;
             color: #0F172A !important;
         }}
         .premium-table-container td:first-child {{ color: {primary_color} !important; font-size: 0.9rem !important; font-weight: 700 !important; }}
@@ -1030,7 +1030,8 @@ def dashboard_page():
     v_cols = st.columns(len(configs))
     for i, (label, col_name) in enumerate(configs):
         if v_cols[i].button(label, key=f"btn_{label}",
-                            type="primary" if st.session_state.active_single_var == label else "secondary"):
+                            type="primary" if st.session_state.active_single_var == label else "secondary",
+                            use_container_width=True):
             st.session_state.active_single_var = label
             st.rerun()
 
