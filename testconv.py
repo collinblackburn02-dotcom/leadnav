@@ -85,7 +85,7 @@ def apply_custom_theme(primary_color):
             min-height: 0 !important;
         }}
         /* Number input — single pill, one border on the outer row container */
-        [data-testid="stSidebar"] .stNumberInput > div:last-child {{
+        [data-testid="stSidebar"] .stNumberInput > div > div:first-child {{
             background: rgba(255,255,255,0.05) !important;
             border: 1.5px solid rgba(196,181,253,0.45) !important;
             border-radius: 999px !important;
@@ -93,6 +93,10 @@ def apply_custom_theme(primary_color):
             display: flex !important;
             align-items: center !important;
             height: 34px !important;
+        }}
+        /* Hide any extra divs Streamlit injects on focus */
+        [data-testid="stSidebar"] .stNumberInput > div > div:not(:first-child) {{
+            display: none !important;
         }}
         /* Strip inner borders from all children */
         [data-testid="stSidebar"] .stNumberInput [data-baseweb="input"],
@@ -1373,8 +1377,7 @@ def dashboard_page():
     for i, (label, col_name) in enumerate(valid_matrix_configs):
         is_active = col_name in st.session_state.matrix_vars
         if mx_cols[i].button(label, key=f"mx_chip_{col_name}",
-                             type="primary" if is_active else "secondary",
-                             use_container_width=True):
+                             type="primary" if is_active else "secondary"):
             if is_active:
                 st.session_state.matrix_vars = [v for v in st.session_state.matrix_vars if v != col_name]
             else:
