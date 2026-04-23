@@ -430,6 +430,32 @@ def apply_custom_theme(primary_color):
             letter-spacing: normal !important;
         }}
 
+        /* ── ST.PILLS — match single variable radio style ── */
+        [data-testid="stMain"] [data-testid="stPillsInput"] button {{
+            border-radius: 8px !important;
+            font-size: 0.85rem !important;
+            font-weight: 500 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.09em !important;
+            font-family: 'Outfit', sans-serif !important;
+            padding: 5px 13px !important;
+            border: 1.5px solid #D8C8F5 !important;
+            background: #FFFFFF !important;
+            color: {primary_color} !important;
+        }}
+        [data-testid="stMain"] [data-testid="stPillsInput"] button[aria-pressed="true"] {{
+            background: {primary_color} !important;
+            border-color: {primary_color} !important;
+            color: #FFFFFF !important;
+        }}
+        [data-testid="stMain"] [data-testid="stPillsInput"] button p,
+        [data-testid="stMain"] [data-testid="stPillsInput"] button span {{
+            font-size: 0.85rem !important;
+            font-weight: 500 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.09em !important;
+        }}
+
         /* ── VARIABLE SELECTOR RADIO-AS-PILLS ── */
         [data-testid="stMain"] .stRadio > label {{
             display: none !important;
@@ -1375,7 +1401,7 @@ def dashboard_page():
     valid_matrix_configs = [c for c in configs if c[1] != 'state']
 
     # ── VARIABLE CHIP ROW — st.pills naturally sizes to text, supports multi-select ──
-    st.markdown('<p class="ctrl-label" style="margin-bottom:8px;">Include Variables</p>', unsafe_allow_html=True)
+    st.markdown('<p class="ctrl-label" style="margin-bottom:8px;text-transform:uppercase;font-size:0.72rem;font-weight:700;letter-spacing:0.09em;color:#94A3B8;">Select Variables</p>', unsafe_allow_html=True)
 
     var_labels   = [label for label, _ in valid_matrix_configs]
     label_to_col = {label: col for label, col in valid_matrix_configs}
