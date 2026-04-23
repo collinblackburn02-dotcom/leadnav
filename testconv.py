@@ -310,7 +310,7 @@ def apply_custom_theme(primary_color):
         .section-title {{
             font-family: 'Outfit', sans-serif !important;
             font-weight: 700 !important;
-            font-size: 2.475rem !important;
+            font-size: 1.8rem !important;
             text-transform: uppercase !important;
             letter-spacing: 0.1em !important;
             color: #0F172A !important;
@@ -420,7 +420,7 @@ def apply_custom_theme(primary_color):
         [data-testid="stMain"] .stRadio [data-baseweb="radio"] > div:last-child,
         [data-testid="stMain"] .stRadio [data-baseweb="radio"] > div:last-child p {{
             font-size: 0.85rem !important;
-            font-weight: 700 !important;
+            font-weight: 500 !important;
             text-transform: uppercase !important;
             letter-spacing: 0.09em !important;
             color: {primary_color} !important;
