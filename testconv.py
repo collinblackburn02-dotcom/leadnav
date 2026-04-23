@@ -227,7 +227,7 @@ def apply_custom_theme(primary_color):
             margin: 0.5rem 0 !important;
         }}
 
-        /* Sidebar expanders - dark themed collapsible sections */
+        /* Sidebar expanders - dark themed */
         [data-testid="stSidebar"] [data-testid="stExpander"] {{
             background: transparent !important;
             border: none !important;
@@ -235,22 +235,21 @@ def apply_custom_theme(primary_color):
             border-radius: 0 !important;
             margin: 0 !important;
         }}
-        [data-testid="stSidebar"] [data-testid="stExpander"] summary {{
+        [data-testid="stSidebar"] [data-testid="stExpander"] details {{
+            background: transparent !important;
+        }}
+        [data-testid="stSidebar"] [data-testid="stExpander"] details summary {{
             background: transparent !important;
             padding: 7px 0 !important;
-        }}
-        [data-testid="stSidebar"] [data-testid="stExpander"] summary p,
-        [data-testid="stSidebar"] [data-testid="stExpander"] summary span {{
+            color: {SIDEBAR_MUTED} !important;
             font-family: 'Outfit', sans-serif !important;
             font-size: 0.61rem !important;
             font-weight: 700 !important;
             text-transform: uppercase !important;
             letter-spacing: 0.1em !important;
-            color: {SIDEBAR_MUTED} !important;
+            list-style: none !important;
         }}
-        [data-testid="stSidebar"] [data-testid="stExpander"] summary svg {{
-            color: {SIDEBAR_MUTED} !important;
-            fill: {SIDEBAR_MUTED} !important;
+        [data-testid="stSidebar"] [data-testid="stExpander"] details summary svg {{
             stroke: {SIDEBAR_MUTED} !important;
         }}
         [data-testid="stSidebar"] [data-testid="stExpanderDetails"] {{
