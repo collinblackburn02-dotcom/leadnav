@@ -927,22 +927,8 @@ def dashboard_page():
                 "Minimum Purchases", value=1, min_value=0, label_visibility="collapsed"
             )
 
-        # ── FILTER BY PRODUCT ──
-        with st.expander("Filter by Product", expanded=False):
-            sku_toggle = st.toggle("Enable", value=False, key="sku_toggle")
-            if sku_toggle:
-                _orders_ref = st.session_state.get('df_orders', pd.DataFrame())
-                if not _orders_ref.empty and 'lineitem_name' in _orders_ref.columns:
-                    sku_opts = sorted([str(x) for x in _orders_ref['lineitem_name'].dropna().unique()
-                                       if str(x) not in EXCLUDE_LIST])
-                else:
-                    sku_opts = []
-                selected_skus = st.multiselect(
-                    "Select products", options=sku_opts,
-                    label_visibility="collapsed", key="sku_select"
-                )
-            else:
-                selected_skus = []
+        selected_skus = []
+        sku_toggle = False
 
         # Spacer to push logout/refresh to bottom
         st.markdown("<br><br><br><br><br>", unsafe_allow_html=True)
@@ -1013,9 +999,6 @@ def dashboard_page():
     else:
         df_p_filtered = orders_in_range.copy()
 
-    # Product filter — apply selected SKUs from sidebar
-    if sku_toggle and selected_skus:
-        df_p_filtered = df_p_filtered[df_p_filtered['lineitem_name'].isin(selected_skus)]
 
     # =====================================================
     # DASHBOARD TITLE
@@ -1076,13 +1059,6 @@ def dashboard_page():
     pills_html += f'<span class="filter-pill">↕ {sort_label}</span>'
     if min_purchasers > 0:
         pills_html += f'<span class="filter-pill">≥ {min_purchasers} purchases</span>'
-    if sku_toggle and selected_skus:
-        for sku in selected_skus[:3]:
-            pills_html += f'<span class="filter-pill">🏷 {sku}</span>'
-        if len(selected_skus) > 3:
-            pills_html += f'<span class="filter-pill">+{len(selected_skus)-3} more</span>'
-    elif sku_toggle:
-        pills_html += '<span class="filter-pill">🏷 Product filter: all</span>'
     pills_html += '</div>'
     st.markdown(pills_html, unsafe_allow_html=True)
 
@@ -1110,18 +1086,27 @@ def dashboard_page():
     st.session_state.active_single_var = active_var
     selected_col = dict(configs)[active_var]
 
+    # Normalize values so visitor data and order data use the same labels before merging
+    _VALUE_NORM = {'Homeowner': 'Yes', 'Renter': 'No', 'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female'}
+    _demo_cube = st.session_state.df_demo_cube.copy()
+    if selected_col in _demo_cube.columns:
+        _demo_cube[selected_col] = _demo_cube[selected_col].replace(_VALUE_NORM)
+    _p_filt = df_p_filtered.copy()
+    if not _p_filt.empty and selected_col in _p_filt.columns:
+        _p_filt[selected_col] = _p_filt[selected_col].replace(_VALUE_NORM)
+
     if selected_col == 'state' and tenant_type == 'B2C':
         df_v_grp = st.session_state.df_state_map[
             ~st.session_state.df_state_map['state'].isin(EXCLUDE_LIST)
         ].groupby('state', as_index=False)['total_visitors'].sum().rename(columns={'total_visitors': 'Visitors'})
     else:
-        df_v_grp = st.session_state.df_demo_cube[
-            ~st.session_state.df_demo_cube[selected_col].isin(EXCLUDE_LIST)
+        df_v_grp = _demo_cube[
+            ~_demo_cube[selected_col].isin(EXCLUDE_LIST)
         ].groupby(selected_col, as_index=False)['total_visitors'].sum().rename(columns={'total_visitors': 'Visitors'})
 
     df_p_grp = pd.DataFrame()
-    if not df_p_filtered.empty and selected_col in df_p_filtered.columns:
-        df_p_grp = df_p_filtered[~df_p_filtered[selected_col].isin(EXCLUDE_LIST)].groupby(selected_col).agg(
+    if not _p_filt.empty and selected_col in _p_filt.columns:
+        df_p_grp = _p_filt[~_p_filt[selected_col].isin(EXCLUDE_LIST)].groupby(selected_col).agg(
             Purchases=('Order_ID', 'nunique'), Revenue=('Total', 'sum')
         ).reset_index()
 
@@ -1181,8 +1166,13 @@ def dashboard_page():
         combos       = []
         filtered_cols   = list(selected_filters.keys())
         unfiltered_cols = [c for c in included_types if c not in filtered_cols]
+        _VALUE_NORM = {'Homeowner': 'Yes', 'Renter': 'No', 'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female'}
         base_v = st.session_state.df_demo_cube.copy()
         base_p = df_p_filtered.copy()
+        # Normalize all included columns in both datasets so they merge correctly
+        for _nc in included_types:
+            if _nc in base_v.columns: base_v[_nc] = base_v[_nc].replace(_VALUE_NORM)
+            if not base_p.empty and _nc in base_p.columns: base_p[_nc] = base_p[_nc].replace(_VALUE_NORM)
 
         for col, vals in selected_filters.items():
             base_v = base_v[base_v[col].isin(vals)]
