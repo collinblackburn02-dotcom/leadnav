@@ -127,15 +127,24 @@ def apply_custom_theme(primary_color):
         /* Sidebar pill buttons — compact */
         [data-testid="stSidebar"] .stButton > button {{
             border-radius: 999px !important;
-            font-size: 0.55rem !important;
+            font-size: 0.88rem !important;
             font-weight: 600 !important;
-            padding: 2px 8px !important;
+            padding: 2px 6px !important;
             white-space: nowrap !important;
             width: 100% !important;
-            margin-bottom: 1px !important;
-            line-height: 1.3 !important;
+            margin-bottom: 2px !important;
+            line-height: 1.2 !important;
             transition: all 0.15s ease !important;
             border-width: 1px !important;
+            min-height: 0 !important;
+            height: auto !important;
+        }}
+        /* Target the inner <p> Streamlit wraps button text in */
+        [data-testid="stSidebar"] .stButton > button p {{
+            font-size: 0.88rem !important;
+            font-weight: 600 !important;
+            margin: 0 !important;
+            line-height: 1.2 !important;
         }}
         [data-testid="stSidebar"] .stButton > button[kind="primary"] {{
             background: {SIDEBAR_ACCENT} !important;
@@ -529,7 +538,8 @@ def run_enrichment(uploaded_file, pixel_id, tenant_type):
         if not email_col:
             return False, "No email column found in your CSV."
 
-        revenue_col = next((c for c in raw_df.columns if any(x in c for x in ['total', 'revenue', 'amount'])), None)
+        revenue_col  = next((c for c in raw_df.columns if any(x in c for x in ['total', 'revenue', 'amount'])), None)
+        lineitem_col = next((c for c in raw_df.columns if any(x in c for x in ['lineitem_name', 'line_item', 'product_title', 'product', 'sku', 'item_name', 'variant'])), None)
         unique_emails = raw_df[email_col].dropna().astype(str).str.lower().str.strip()
         unique_emails = unique_emails[unique_emails.str.contains('@', na=False)].unique().tolist()
 
@@ -578,8 +588,9 @@ def run_enrichment(uploaded_file, pixel_id, tenant_type):
         date_col = next((c for c in orders_join.columns if any(x in c for x in ['created', 'date', 'ordered'])), None)
 
         join_cols = ['email_match']
-        if revenue_col: join_cols.append(revenue_col)
-        if date_col:    join_cols.append(date_col)
+        if revenue_col:  join_cols.append(revenue_col)
+        if date_col:     join_cols.append(date_col)
+        if lineitem_col: join_cols.append(lineitem_col)
 
         joined_df = pd.merge(orders_join[join_cols], enriched_df, on='email_match', how='left')
         if revenue_col:
@@ -601,7 +612,11 @@ def run_enrichment(uploaded_file, pixel_id, tenant_type):
             temp_orders[col] = joined_df[col] if col in joined_df.columns else 'Unknown'
 
         temp_orders['customer_email'] = joined_df['email_match']
-        temp_orders['lineitem_name']   = 'Enriched Import'
+        temp_orders['lineitem_name']   = (
+            joined_df[lineitem_col].astype(str).str.strip()
+            if lineitem_col and lineitem_col in joined_df.columns
+            else 'Enriched Import'
+        )
         temp_orders['pixel_id']        = pixel_id
 
         if tenant_type == 'B2B':
@@ -676,14 +691,23 @@ def dashboard_page():
             key="sidebar_upload"
         )
         if uploaded_file is not None:
-            if st.button("Upload & Enrich", type="primary", use_container_width=True, key="upload_btn"):
-                with st.spinner("Uploading & enriching order data. This can take up to 3 minutes."):
-                    success, message = run_enrichment(uploaded_file, pixel_id, tenant_type)
+            upload_btn    = st.button("Upload & Enrich", type="primary", use_container_width=True, key="upload_btn")
+            upload_status = st.empty()
+            if upload_btn:
+                upload_status.markdown(
+                    '<div style="background: rgba(124,58,237,0.15); border: 1px solid rgba(196,181,253,0.3); '
+                    'border-radius: 8px; padding: 10px 8px; color: #C4B5FD; font-size: 0.75rem; text-align: center;">'
+                    '⏳ <b>Uploading & enriching...</b><br>'
+                    '<span style="font-size: 0.68rem; opacity: 0.8;">This can take up to 3 minutes</span>'
+                    '</div>',
+                    unsafe_allow_html=True
+                )
+                success, message = run_enrichment(uploaded_file, pixel_id, tenant_type)
                 if success:
-                    st.success(message)
+                    upload_status.success(message)
                     st.rerun()
                 else:
-                    st.error(message)
+                    upload_status.error(message)
 
         st.markdown("---")
 
@@ -697,26 +721,31 @@ def dashboard_page():
 
         # ── RANK BY ──
         st.markdown('<p class="sidebar-section-label">Rank By</p>', unsafe_allow_html=True)
-        for m in metrics:
-            is_active = (st.session_state.metric_choice == m)
-            if st.button(m, key=f"metric_{m}",
-                         type="primary" if is_active else "secondary",
-                         use_container_width=True):
-                st.session_state.metric_choice = m
-                st.rerun()
+        # 2-column grid so buttons are half-width and actually small
+        rb_rows = [metrics[i:i+2] for i in range(0, len(metrics), 2)]
+        for row in rb_rows:
+            cols = st.columns(len(row))
+            for col, m in zip(cols, row):
+                is_active = (st.session_state.metric_choice == m)
+                if col.button(m, key=f"metric_{m}",
+                              type="primary" if is_active else "secondary",
+                              use_container_width=True):
+                    st.session_state.metric_choice = m
+                    st.rerun()
 
         st.markdown("---")
 
         # ── SORT BY ──
         st.markdown('<p class="sidebar-section-label">Sort By</p>', unsafe_allow_html=True)
-        if st.button("High to Low", key="sort_htl",
-                     type="primary" if not st.session_state.sort_asc else "secondary",
-                     use_container_width=True):
+        sb_col1, sb_col2 = st.columns(2)
+        if sb_col1.button("High→Low", key="sort_htl",
+                          type="primary" if not st.session_state.sort_asc else "secondary",
+                          use_container_width=True):
             st.session_state.sort_asc = False
             st.rerun()
-        if st.button("Low to High", key="sort_lth",
-                     type="primary" if st.session_state.sort_asc else "secondary",
-                     use_container_width=True):
+        if sb_col2.button("Low→High", key="sort_lth",
+                          type="primary" if st.session_state.sort_asc else "secondary",
+                          use_container_width=True):
             st.session_state.sort_asc = True
             st.rerun()
 
@@ -770,7 +799,7 @@ def dashboard_page():
     # ── Resolve control values ──
     metric_choice = st.session_state.metric_choice
     is_ascending  = st.session_state.sort_asc
-    sort_label    = "Low → High" if is_ascending else "High → Low"
+    sort_label    = "Low→High" if is_ascending else "High→Low"
 
     # =====================================================
     # MAIN AREA — data filtering
