@@ -15,17 +15,16 @@ PITCH_COMPANY_NAME = "LeadNavigator"
 PITCH_BRAND_COLOR = "#4D148C"
 N8N_WEBHOOK_URL = "https://n8n.srv1144572.hstgr.cloud/webhook/669d6ef0-1393-479e-81c5-5b0bea4262b7"
 
-# BigQuery table references
 BQ_B2C_VISITOR_TABLE = "leadnav-hhs.leadnav_platform.b2c_visitor_summary"
 BQ_B2B_VISITOR_TABLE = "leadnav-hhs.leadnav_platform.b2b_visitor_summary"
-BQ_ORDERS_TABLE = "leadnav-hhs.leadnav_platform.platform_order_data"
+BQ_ORDERS_TABLE      = "leadnav-hhs.leadnav_platform.platform_order_data"
 
 EXCLUDE_LIST = ['Unknown', 'UNKNOWN', 'U', '', 'None', 'NONE', 'nan', 'NaN', 'null', 'NULL', '<NA>', 'ALL']
 
-SIDEBAR_BG = "#160A2E"
+SIDEBAR_BG     = "#160A2E"
 SIDEBAR_ACCENT = "#7C3AED"
-SIDEBAR_TEXT = "#C4B5FD"
-SIDEBAR_MUTED = "#6D5A8E"
+SIDEBAR_TEXT   = "#C4B5FD"
+SIDEBAR_MUTED  = "#6D5A8E"
 
 st.set_page_config(
     page_title=f"{PITCH_COMPANY_NAME} | Conversion Engine",
@@ -58,42 +57,57 @@ def apply_custom_theme(primary_color):
             color: {SIDEBAR_TEXT} !important;
         }}
 
-        /* Sidebar text inputs (date pickers) */
+        /* Sidebar date pickers — black text so it's readable */
         [data-testid="stSidebar"] .stDateInput input {{
-            background: rgba(255,255,255,0.07) !important;
-            border: 1px solid rgba(196,181,253,0.2) !important;
+            background: rgba(255,255,255,0.9) !important;
+            border: 1px solid rgba(196,181,253,0.3) !important;
             border-radius: 8px !important;
-            color: #E2D9F3 !important;
-            font-size: 0.8rem !important;
-            padding: 6px 10px !important;
+            color: #0F172A !important;
+            font-size: 0.78rem !important;
+            padding: 5px 9px !important;
         }}
         [data-testid="stSidebar"] .stDateInput label {{
             color: {SIDEBAR_MUTED} !important;
-            font-size: 0.65rem !important;
+            font-size: 0.63rem !important;
             font-weight: 700 !important;
             text-transform: uppercase !important;
             letter-spacing: 0.09em !important;
         }}
 
-        /* Sidebar number input */
+        /* Sidebar number input — black text */
         [data-testid="stSidebar"] .stNumberInput input {{
-            background: rgba(255,255,255,0.07) !important;
-            border: 1px solid rgba(196,181,253,0.2) !important;
+            background: rgba(255,255,255,0.9) !important;
+            border: 1px solid rgba(196,181,253,0.3) !important;
             border-radius: 8px !important;
-            color: #E2D9F3 !important;
+            color: #0F172A !important;
             font-size: 0.7rem !important;
             text-align: center !important;
         }}
         [data-testid="stSidebar"] .stNumberInput button {{
-            background: rgba(255,255,255,0.07) !important;
+            background: rgba(255,255,255,0.15) !important;
             border: 1px solid rgba(196,181,253,0.2) !important;
             color: {SIDEBAR_TEXT} !important;
+        }}
+
+        /* Sidebar file uploader */
+        [data-testid="stSidebar"] [data-testid="stFileUploader"] {{
+            background: rgba(255,255,255,0.05) !important;
+            border: 1.5px dashed rgba(196,181,253,0.3) !important;
+            border-radius: 8px !important;
+        }}
+        [data-testid="stSidebar"] [data-testid="stFileUploader"] * {{
+            color: {SIDEBAR_TEXT} !important;
+            font-size: 0.72rem !important;
+        }}
+        [data-testid="stSidebar"] [data-testid="stFileUploader"] button {{
+            font-size: 0.68rem !important;
+            padding: 3px 8px !important;
         }}
 
         /* Sidebar toggle */
         [data-testid="stSidebar"] .stToggle label {{
             color: {SIDEBAR_TEXT} !important;
-            font-size: 0.75rem !important;
+            font-size: 0.73rem !important;
         }}
 
         /* Sidebar multiselect */
@@ -107,17 +121,19 @@ def apply_custom_theme(primary_color):
         }}
         [data-testid="stSidebar"] .stMultiSelect input {{
             color: #E2D9F3 !important;
-            font-size: 0.75rem !important;
+            font-size: 0.73rem !important;
         }}
 
-        /* Sidebar pill buttons */
+        /* Sidebar pill buttons — compact */
         [data-testid="stSidebar"] .stButton > button {{
             border-radius: 999px !important;
-            font-size: 0.7rem !important;
+            font-size: 0.63rem !important;
             font-weight: 600 !important;
-            padding: 5px 12px !important;
+            padding: 3px 10px !important;
             white-space: nowrap !important;
             width: 100% !important;
+            margin-bottom: 2px !important;
+            line-height: 1.4 !important;
             transition: all 0.15s ease !important;
             border-width: 1.5px !important;
         }}
@@ -128,7 +144,7 @@ def apply_custom_theme(primary_color):
         }}
         [data-testid="stSidebar"] .stButton > button[kind="secondary"] {{
             background: rgba(255,255,255,0.05) !important;
-            border-color: rgba(196,181,253,0.25) !important;
+            border-color: rgba(196,181,253,0.22) !important;
             color: {SIDEBAR_TEXT} !important;
         }}
         [data-testid="stSidebar"] .stButton > button[kind="secondary"]:hover {{
@@ -140,18 +156,18 @@ def apply_custom_theme(primary_color):
         /* Sidebar divider */
         [data-testid="stSidebar"] hr {{
             border-color: rgba(196,181,253,0.15) !important;
-            margin: 0.6rem 0 !important;
+            margin: 0.5rem 0 !important;
         }}
 
         /* Sidebar section labels */
         .sidebar-section-label {{
             font-family: 'Outfit', sans-serif;
-            font-size: 0.63rem;
+            font-size: 0.61rem;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.1em;
             color: {SIDEBAR_MUTED};
-            margin: 0 0 5px 0;
+            margin: 0 0 4px 0;
             padding: 0;
         }}
 
@@ -165,19 +181,24 @@ def apply_custom_theme(primary_color):
             white-space: nowrap;
         }}
 
-        /* ── KPI CARDS ── */
-        .kpi-row {{ display: flex; gap: 14px; margin-bottom: 1.4rem; }}
-        .kpi-card {{
+        /* Sidebar spacer to push logout to bottom */
+        .sidebar-spacer {{
             flex: 1;
+            min-height: 40px;
+        }}
+
+        /* ── KPI CARDS ── */
+        .kpi-card {{
             background: #FFFFFF;
             border-radius: 12px;
-            padding: 16px 18px;
+            padding: 14px 16px;
             border: 1px solid #EBE4F4;
             box-shadow: 0 2px 8px rgba(77,20,140,0.05);
+            height: 100%;
         }}
         .kpi-label {{
             font-family: 'Outfit', sans-serif;
-            font-size: 0.68rem;
+            font-size: 0.66rem;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.09em;
@@ -186,13 +207,13 @@ def apply_custom_theme(primary_color):
         }}
         .kpi-value {{
             font-family: 'Outfit', sans-serif;
-            font-size: 1.55rem;
+            font-size: 1.5rem;
             font-weight: 800;
             color: #0F172A;
             line-height: 1.1;
         }}
         .kpi-sub {{
-            font-size: 0.72rem;
+            font-size: 0.7rem;
             color: #64748B;
             margin-top: 2px;
         }}
@@ -202,7 +223,9 @@ def apply_custom_theme(primary_color):
             display: flex;
             flex-wrap: wrap;
             gap: 6px;
-            margin-bottom: 1rem;
+            padding-top: 1rem;
+            padding-bottom: 0.2rem;
+            margin-bottom: 0.2rem;
         }}
         .filter-pill {{
             background: #F0EBFA;
@@ -215,40 +238,19 @@ def apply_custom_theme(primary_color):
             white-space: nowrap;
         }}
 
-        /* ── MAIN AREA ── */
+        /* ── PREMIUM TABLE ── */
         .premium-table-container {{ width: 100% !important; border-radius: 12px; border: 1px solid {primary_color}; background: #FFFFFF; overflow: hidden; margin-top: 1rem; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }}
         .premium-table-container table {{ width: 100% !important; border-collapse: collapse !important; border: none !important; }}
         .premium-table-container th {{ font-family: 'Outfit', sans-serif !important; background-color: #F8F6FA !important; color: {primary_color} !important; font-weight: 700 !important; text-align: center !important; padding: 15px 12px !important; border-bottom: 2px solid {primary_color} !important; font-size: 0.95rem !important; }}
         .premium-table-container td {{ font-family: 'Outfit', sans-serif !important; text-align: center !important; padding: 12px !important; border-bottom: 1px solid #EBE4F4 !important; font-size: 0.9rem !important; color: #1e293b !important; }}
         .premium-table-container td:first-child {{ font-weight: 700 !important; color: #0F172A !important; }}
 
+        /* ── MISC ── */
         .serif-gradient-centerpiece {{ font-family: 'Playfair Display', serif !important; background: linear-gradient(90deg, #4D148C 0%, #20B2AA 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block; font-weight: 700 !important; letter-spacing: -0.5px; }}
         .modern-serif-title {{ font-family: 'Playfair Display', serif !important; color: #0F172A !important; font-weight: 700 !important; }}
-
-        .header-bar {{ display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; margin-bottom: 1.4rem; border-bottom: 1px solid #EBE4F4; }}
         .header-logo {{ font-family: 'Playfair Display', serif !important; font-size: 1.8rem; font-weight: 700; color: #0F172A; line-height: 1.1; white-space: nowrap; }}
 
-        /* Date inputs (main area, login) */
-        .stDateInput input {{
-            border: 1.5px solid #EBE4F4 !important;
-            border-radius: 10px !important;
-            padding: 10px 16px !important;
-            font-family: 'Outfit', sans-serif !important;
-            font-size: 0.95rem !important;
-            font-weight: 500 !important;
-            background: #FFFFFF !important;
-            box-shadow: 0 2px 8px rgba(77,20,140,0.05) !important;
-            color: #0F172A !important;
-        }}
-        .stDateInput label {{
-            font-weight: 700 !important;
-            font-size: 0.72rem !important;
-            text-transform: uppercase !important;
-            letter-spacing: 0.09em !important;
-            color: #94A3B8 !important;
-        }}
-
-        /* Text input labels (login) */
+        /* Login form */
         .stTextInput label {{
             font-family: 'Outfit', sans-serif !important;
             font-weight: 700 !important;
@@ -271,18 +273,18 @@ def apply_custom_theme(primary_color):
             outline: none !important;
         }}
 
-        /* Multiselect tags (main area) */
-        .stMultiSelect [data-baseweb="tag"] {{
-            background-color: {primary_color} !important;
-            border-radius: 6px !important;
-        }}
-
-        /* Main area buttons (variable selector tabs, etc.) */
+        /* Main area buttons */
         .stButton > button {{
             white-space: nowrap !important;
             font-size: 0.78rem !important;
             padding: 6px 10px !important;
             font-weight: 600 !important;
+        }}
+
+        /* Multiselect tags (main area) */
+        .stMultiSelect [data-baseweb="tag"] {{
+            background-color: {primary_color} !important;
+            border-radius: 6px !important;
         }}
     </style>
 """, unsafe_allow_html=True)
@@ -299,10 +301,14 @@ def render_premium_table(styler_obj):
 @st.cache_resource
 def get_bq_client():
     creds_dict = dict(st.secrets["gcp_service_account"])
-    if "private_key" in creds_dict: creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
-    return bigquery.Client(credentials=service_account.Credentials.from_service_account_info(creds_dict), project=creds_dict["project_id"])
+    if "private_key" in creds_dict:
+        creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+    return bigquery.Client(
+        credentials=service_account.Credentials.from_service_account_info(creds_dict),
+        project=creds_dict["project_id"]
+    )
 
-# ================ 3. DATA LOADING FUNCTIONS =================
+# ================ 3. DATA LOADING =================
 @st.cache_data(ttl=3600)
 def load_visitor_base(pixel_id, tenant_type):
     try:
@@ -341,7 +347,7 @@ def load_visitor_base(pixel_id, tenant_type):
     except Exception as e:
         return pd.DataFrame(), pd.DataFrame(), str(e)
 
-# ================ 3B. BUCKETING & CLEANING FUNCTIONS =================
+# ================ 3B. BUCKETING & CLEANING =================
 def get_real_number(v):
     if pd.isna(v): return None
     v_str = str(v).lower().replace(',', '')
@@ -426,7 +432,7 @@ def load_order_base(pixel_id, tenant_type):
     except Exception as e:
         return pd.DataFrame(), str(e)
 
-# ================ 4. SESSION STATE INITIALIZATION =================
+# ================ 4. SESSION STATE =================
 if 'app_state' not in st.session_state:
     st.session_state.app_state = 'login'
 if 'pixel_id' not in st.session_state:
@@ -438,25 +444,7 @@ if 'username' not in st.session_state:
 if 'client_name' not in st.session_state:
     st.session_state.client_name = None
 
-# ================ 5. HEADER =================
-def render_header():
-    col1, col2 = st.columns([10, 1])
-    with col1:
-        st.markdown(f'<div class="header-logo">Lead<span style="color: {PITCH_BRAND_COLOR};">Navigator</span></div>', unsafe_allow_html=True)
-    with col2:
-        if st.button("Logout", key="logout_btn", use_container_width=True):
-            st.session_state.app_state = 'login'
-            st.session_state.pixel_id = None
-            st.session_state.tenant_type = None
-            st.session_state.username = None
-            st.rerun()
-        if st.button("↺ Refresh", key="header_refresh_btn", use_container_width=True):
-            load_order_base.clear()
-            load_visitor_base.clear()
-            st.session_state.app_state = "onboarding"
-            st.rerun()
-
-# ================ 6. LOGIN PAGE =================
+# ================ 5. LOGIN PAGE =================
 def login_page():
     st.markdown(
         f'<div style="padding: 1.5rem 0 0 0;">'
@@ -511,9 +499,8 @@ def login_page():
                 else:
                     st.error("Invalid username or password")
 
-# ================ 7. ONBOARDING PAGE =================
+# ================ 6. ONBOARDING PAGE =================
 def onboarding_page():
-    render_header()
     st.markdown(f'<h2 class="modern-serif-title">🔄 Sync Database</h2>', unsafe_allow_html=True)
     st.markdown("Click the button below to load your data from BigQuery and proceed to the dashboard.")
     if st.button("Load Data & Enter Dashboard"):
@@ -531,10 +518,112 @@ def onboarding_page():
                 st.session_state.app_state = 'dashboard'
                 st.rerun()
 
+# ================ 7. ENRICHMENT HELPER =================
+def run_enrichment(uploaded_file, pixel_id, tenant_type):
+    """Run the full enrichment pipeline. Returns (success, message)."""
+    try:
+        raw_df = pd.read_csv(io.BytesIO(uploaded_file.getvalue()), encoding='latin1', on_bad_lines='skip')
+        raw_df.columns = [str(c).strip().lower() for c in raw_df.columns]
+
+        email_col = next((c for c in raw_df.columns if 'email' in c), None)
+        if not email_col:
+            return False, "No email column found in your CSV."
+
+        revenue_col = next((c for c in raw_df.columns if any(x in c for x in ['total', 'revenue', 'amount'])), None)
+        unique_emails = raw_df[email_col].dropna().astype(str).str.lower().str.strip()
+        unique_emails = unique_emails[unique_emails.str.contains('@', na=False)].unique().tolist()
+
+        response = requests.post(N8N_WEBHOOK_URL, json={"emails": unique_emails}, timeout=180)
+
+        if response.status_code != 200:
+            return False, f"Webhook failed with status {response.status_code}: {response.text}"
+
+        try:
+            enriched_df = pd.read_csv(io.StringIO(response.text), on_bad_lines='skip', engine='python')
+        except Exception:
+            return False, "Could not parse enriched response as CSV."
+
+        enriched_df.columns = [str(c).strip().lower() for c in enriched_df.columns]
+
+        STANDARD_EMAIL_COLS = ['personal_emails', 'business_email', 'email_match', 'deep_verified_emails']
+        enriched_email_col = next((c for c in STANDARD_EMAIL_COLS if c in enriched_df.columns), None)
+        if enriched_email_col is None:
+            return False, f"Could not find email column in enriched response. Got: {list(enriched_df.columns[:15])}"
+
+        enriched_df = enriched_df.rename(columns={enriched_email_col: 'email_match'})
+        enriched_df['email_match'] = enriched_df['email_match'].astype(str).str.split(',')
+        enriched_df = enriched_df.explode('email_match')
+        enriched_df['email_match'] = enriched_df['email_match'].str.strip().str.lower()
+        enriched_df = enriched_df[enriched_df['email_match'].str.contains('@', na=False)].drop_duplicates('email_match')
+
+        N8N_COLUMN_MAPPER = {
+            "gender": "gender", "married": "marital_status", "age_range": "age_range",
+            "income_range": "income_bucket", "personal_state": "state",
+            "homeowner": "homeowner", "children": "children", "net_worth": "net_worth_bucket",
+        }
+        for src_col, dst_col in N8N_COLUMN_MAPPER.items():
+            if src_col in enriched_df.columns:
+                enriched_df[dst_col] = enriched_df[src_col]
+
+        if 'income_bucket'    in enriched_df.columns: enriched_df['income_bucket']    = enriched_df['income_bucket'].apply(bucket_income)
+        if 'net_worth_bucket' in enriched_df.columns: enriched_df['net_worth_bucket'] = enriched_df['net_worth_bucket'].apply(bucket_net_worth)
+        if 'gender'           in enriched_df.columns: enriched_df['gender']           = enriched_df['gender'].apply(clean_gender)
+        if 'children'         in enriched_df.columns: enriched_df['children']         = enriched_df['children'].apply(clean_boolean)
+        if 'marital_status'   in enriched_df.columns: enriched_df['marital_status']   = enriched_df['marital_status'].apply(clean_marital)
+        if 'homeowner'        in enriched_df.columns: enriched_df['homeowner']        = enriched_df['homeowner'].apply(clean_homeowner)
+        if 'state'            in enriched_df.columns: enriched_df['state']            = enriched_df['state'].apply(clean_state)
+
+        orders_join = raw_df.copy()
+        orders_join['email_match'] = orders_join[email_col].astype(str).str.lower().str.strip()
+        date_col = next((c for c in orders_join.columns if any(x in c for x in ['created', 'date', 'ordered'])), None)
+
+        join_cols = ['email_match']
+        if revenue_col: join_cols.append(revenue_col)
+        if date_col:    join_cols.append(date_col)
+
+        joined_df = pd.merge(orders_join[join_cols], enriched_df, on='email_match', how='left')
+        if revenue_col:
+            joined_df = joined_df.rename(columns={revenue_col: 'Total'})
+        else:
+            joined_df['Total'] = 0.0
+        joined_df['Total'] = pd.to_numeric(joined_df['Total'], errors='coerce').fillna(0.0)
+
+        temp_orders = pd.DataFrame()
+        temp_orders['Order_ID'] = 'TEMP_' + joined_df.index.astype(str)
+        temp_orders['Total']    = joined_df['Total']
+
+        if date_col and date_col in joined_df.columns:
+            temp_orders['order_date'] = pd.to_datetime(joined_df[date_col], errors='coerce').fillna(datetime.now())
+        else:
+            temp_orders['order_date'] = datetime.now()
+
+        for col in ['gender', 'age_range', 'income_bucket', 'net_worth_bucket', 'homeowner', 'marital_status', 'children', 'state']:
+            temp_orders[col] = joined_df[col] if col in joined_df.columns else 'Unknown'
+
+        temp_orders['customer_email'] = joined_df['email_match']
+        temp_orders['lineitem_name']   = 'Enriched Import'
+        temp_orders['pixel_id']        = pixel_id
+
+        if tenant_type == 'B2B':
+            for b2b_col in ['company_name', 'company_industry', 'employee_count_range', 'job_title', 'seniority', 'company_revenue']:
+                temp_orders[b2b_col] = joined_df[b2b_col] if b2b_col in joined_df.columns else 'Unknown'
+
+        if not st.session_state.df_orders.empty:
+            st.session_state.df_orders = pd.concat([st.session_state.df_orders, temp_orders], ignore_index=True)
+        else:
+            st.session_state.df_orders = temp_orders
+
+        num_enriched = len(temp_orders)
+        num_matched  = int(temp_orders[['gender', 'age_range', 'income_bucket']].ne('Unknown').any(axis=1).sum())
+        return True, f"✅ {num_enriched:,} orders enriched, {num_matched:,} matched with identity data."
+
+    except Exception as e:
+        return False, f"Error during enrichment: {e}"
+
 # ================ 8. DASHBOARD PAGE =================
 def dashboard_page():
     tenant_type = st.session_state.tenant_type
-    pixel_id = st.session_state.pixel_id
+    pixel_id    = st.session_state.pixel_id
 
     # ── Session state defaults ──
     if 'metric_choice' not in st.session_state:
@@ -544,78 +633,69 @@ def dashboard_page():
     if 'date_range' not in st.session_state:
         st.session_state.date_range = (datetime.now() - timedelta(days=30), datetime.now())
 
-    # ── Set configs ──
+    # ── Configs ──
     if tenant_type == "B2C":
         configs = [
-            ("Gender", "gender"),
-            ("Age", "age_range"),
-            ("Income", "income_bucket"),
-            ("State", "state"),
-            ("Net Worth", "net_worth_bucket"),
-            ("Children", "children"),
-            ("Marital Status", "marital_status"),
-            ("Homeowner", "homeowner"),
+            ("Gender", "gender"), ("Age", "age_range"), ("Income", "income_bucket"),
+            ("State", "state"), ("Net Worth", "net_worth_bucket"),
+            ("Children", "children"), ("Marital Status", "marital_status"), ("Homeowner", "homeowner"),
         ]
-        DEMO_COLS = ['gender', 'age_range', 'marital_status', 'children', 'homeowner', 'income_bucket', 'net_worth_bucket']
     else:
         configs = [
-            ("Industry", "industry"),
-            ("Company Size", "employee_count_range"),
-            ("Job Title", "job_title"),
-            ("Seniority", "seniority"),
-            ("Revenue", "company_revenue"),
+            ("Industry", "industry"), ("Company Size", "employee_count_range"),
+            ("Job Title", "job_title"), ("Seniority", "seniority"), ("Revenue", "company_revenue"),
         ]
-        DEMO_COLS = ['industry', 'employee_count_range', 'job_title', 'seniority', 'company_revenue']
 
-    # ── Internal metric column mapping ──
     # Display name → dataframe column name
     metric_map = {
         "Revenue Per Visitor": "Rev/Visitor",
-        "Conversion Percent": "Conv %",
-        "Revenue": "Revenue",
-        "Purchases": "Purchases",
-        "Visitors": "Visitors",
+        "Conversion Percent":  "Conv %",
+        "Revenue":             "Revenue",
+        "Purchases":           "Purchases",
+        "Visitors":            "Visitors",
     }
     metrics = list(metric_map.keys())
 
-    # ===================================================
+    # =====================================================
     # SIDEBAR
-    # ===================================================
+    # =====================================================
     with st.sidebar:
+
         # Logo
         st.markdown(
-            f'<div class="sidebar-logo">Lead<span style="color: {SIDEBAR_ACCENT};">Navigator</span></div>',
+            f'<div class="sidebar-logo">Lead<span style="color:{SIDEBAR_ACCENT};">Navigator</span></div>',
             unsafe_allow_html=True
         )
         st.markdown("---")
 
-        # Logout / Refresh in sidebar
-        sb_c1, sb_c2 = st.columns(2)
-        with sb_c1:
-            if st.button("Logout", key="logout_btn", use_container_width=True):
-                st.session_state.app_state = 'login'
-                st.session_state.pixel_id = None
-                st.session_state.tenant_type = None
-                st.session_state.username = None
-                st.rerun()
-        with sb_c2:
-            if st.button("↺ Refresh", key="header_refresh_btn", use_container_width=True):
-                load_order_base.clear()
-                load_visitor_base.clear()
-                st.session_state.app_state = "onboarding"
-                st.rerun()
+        # ── UPLOAD ORDERS (top of sidebar) ──
+        st.markdown('<p class="sidebar-section-label">Upload Orders</p>', unsafe_allow_html=True)
+        uploaded_file = st.file_uploader(
+            "Upload CSV", type=['csv'],
+            label_visibility="collapsed",
+            key="sidebar_upload"
+        )
+        if uploaded_file is not None:
+            if st.button("Upload & Enrich", type="primary", use_container_width=True, key="upload_btn"):
+                with st.spinner("Uploading & enriching order data. This can take up to 3 minutes."):
+                    success, message = run_enrichment(uploaded_file, pixel_id, tenant_type)
+                if success:
+                    st.success(message)
+                    st.rerun()
+                else:
+                    st.error(message)
 
         st.markdown("---")
 
-        # Date Range
+        # ── DATE RANGE ──
         st.markdown('<p class="sidebar-section-label">Date Range</p>', unsafe_allow_html=True)
         start_date = st.date_input("Start Date", st.session_state.date_range[0], key="sb_start")
-        end_date = st.date_input("End Date", st.session_state.date_range[1], key="sb_end")
+        end_date   = st.date_input("End Date",   st.session_state.date_range[1], key="sb_end")
         st.session_state.date_range = (start_date, end_date)
 
         st.markdown("---")
 
-        # Rank By
+        # ── RANK BY ──
         st.markdown('<p class="sidebar-section-label">Rank By</p>', unsafe_allow_html=True)
         for m in metrics:
             is_active = (st.session_state.metric_choice == m)
@@ -627,7 +707,7 @@ def dashboard_page():
 
         st.markdown("---")
 
-        # Sort By
+        # ── SORT BY ──
         st.markdown('<p class="sidebar-section-label">Sort By</p>', unsafe_allow_html=True)
         if st.button("High to Low", key="sort_htl",
                      type="primary" if not st.session_state.sort_asc else "secondary",
@@ -642,26 +722,48 @@ def dashboard_page():
 
         st.markdown("---")
 
-        # Min Purchases
+        # ── MIN PURCHASES ──
         st.markdown('<p class="sidebar-section-label">Min Purchases</p>', unsafe_allow_html=True)
-        min_purchasers = st.number_input("Minimum Purchases", value=1, min_value=0, label_visibility="collapsed")
+        min_purchasers = st.number_input(
+            "Minimum Purchases", value=1, min_value=0, label_visibility="collapsed"
+        )
 
         st.markdown("---")
 
-        # Filter by Product
+        # ── FILTER BY PRODUCT ──
         st.markdown('<p class="sidebar-section-label">Filter by Product</p>', unsafe_allow_html=True)
         sku_toggle = st.toggle("Enable", value=False, key="sku_toggle")
 
-    # Pull selected values from session state
-    metric_choice = st.session_state.metric_choice
-    is_ascending = st.session_state.sort_asc
-    sort_label = "Low → High" if is_ascending else "High → Low"
+        # Spacer to push logout/refresh to bottom
+        st.markdown("<br><br><br><br><br>", unsafe_allow_html=True)
+        st.markdown("---")
 
-    # ===================================================
+        # ── LOGOUT / REFRESH (bottom) ──
+        sb_c1, sb_c2 = st.columns(2)
+        with sb_c1:
+            if st.button("Logout", key="logout_btn", use_container_width=True):
+                st.session_state.app_state = 'login'
+                st.session_state.pixel_id  = None
+                st.session_state.tenant_type = None
+                st.session_state.username  = None
+                st.rerun()
+        with sb_c2:
+            if st.button("Refresh", key="header_refresh_btn", use_container_width=True):
+                load_order_base.clear()
+                load_visitor_base.clear()
+                st.session_state.app_state = "onboarding"
+                st.rerun()
+
+    # ── Resolve control values ──
+    metric_choice = st.session_state.metric_choice
+    is_ascending  = st.session_state.sort_asc
+    sort_label    = "Low → High" if is_ascending else "High → Low"
+
+    # =====================================================
     # MAIN AREA — data filtering
-    # ===================================================
-    df_demo = st.session_state.df_demo
-    df_state = st.session_state.df_state if tenant_type == "B2C" else pd.DataFrame()
+    # =====================================================
+    df_demo   = st.session_state.df_demo
+    df_state  = st.session_state.df_state if tenant_type == "B2C" else pd.DataFrame()
     df_orders = st.session_state.df_orders
 
     if not df_demo.empty:
@@ -701,13 +803,16 @@ def dashboard_page():
     else:
         df_p_filtered = orders_in_range.copy()
 
-    # Product filter (from sidebar toggle)
+    # Product filter (sidebar toggle)
     if sku_toggle and not orders_in_range.empty:
+        sku_opts = []
         if 'lineitem_name' in orders_in_range.columns:
-            sku_opts = sorted([str(x) for x in orders_in_range['lineitem_name'].dropna().unique() if str(x) not in EXCLUDE_LIST])
-        else:
-            sku_opts = []
-        selected_skus = st.sidebar.multiselect("Select products", options=sku_opts, label_visibility="collapsed", key="sku_select")
+            sku_opts = sorted([str(x) for x in orders_in_range['lineitem_name'].dropna().unique()
+                               if str(x) not in EXCLUDE_LIST])
+        selected_skus = st.sidebar.multiselect(
+            "Select products", options=sku_opts,
+            label_visibility="collapsed", key="sku_select"
+        )
         if selected_skus:
             df_p_filtered = df_p_filtered[df_p_filtered['lineitem_name'].isin(selected_skus)]
         else:
@@ -715,63 +820,59 @@ def dashboard_page():
     else:
         selected_skus = []
 
-    # ===================================================
+    # =====================================================
     # DASHBOARD TITLE
-    # ===================================================
+    # =====================================================
     client_name = st.session_state.get('client_name') or st.session_state.get('username', '')
     st.markdown(
-        f'<div style="text-align:center; margin-bottom: 1.2rem;">'
-        f'<span class="serif-gradient-centerpiece" style="font-size: 2rem;">'
+        f'<div style="text-align:center; margin-bottom: 0.8rem;">'
+        f'<span class="serif-gradient-centerpiece" style="font-size: 2.6rem;">'
         f'{client_name} Conversion Dashboard</span></div>',
         unsafe_allow_html=True
     )
 
-    # ===================================================
+    # =====================================================
     # KPI CARDS
-    # ===================================================
-    total_visitors = int(df_demo_filtered['total_visitors'].sum()) if not df_demo_filtered.empty else 0
-    total_revenue = float(df_p_filtered['Total'].sum()) if not df_p_filtered.empty and 'Total' in df_p_filtered.columns else 0.0
+    # =====================================================
+    total_visitors  = int(df_demo_filtered['total_visitors'].sum()) if not df_demo_filtered.empty else 0
+    total_revenue   = float(df_p_filtered['Total'].sum()) if not df_p_filtered.empty and 'Total' in df_p_filtered.columns else 0.0
     total_purchases = int(df_p_filtered['Order_ID'].nunique()) if not df_p_filtered.empty and 'Order_ID' in df_p_filtered.columns else 0
-    conv_rate = (total_purchases / total_visitors * 100) if total_visitors > 0 else 0.0
+    conv_rate       = (total_purchases / total_visitors * 100) if total_visitors > 0 else 0.0
     rev_per_visitor = (total_revenue / total_visitors) if total_visitors > 0 else 0.0
 
     k1, k2, k3, k4 = st.columns(4)
     with k1:
         st.markdown(
-            f'<div class="kpi-card">'
-            f'<div class="kpi-label">Total Visitors</div>'
+            f'<div class="kpi-card"><div class="kpi-label">Total Visitors</div>'
             f'<div class="kpi-value">{total_visitors:,.0f}</div>'
-            f'<div class="kpi-sub">{start_date} – {end_date}</div>'
-            f'</div>', unsafe_allow_html=True
+            f'<div class="kpi-sub">{start_date} – {end_date}</div></div>',
+            unsafe_allow_html=True
         )
     with k2:
         st.markdown(
-            f'<div class="kpi-card">'
-            f'<div class="kpi-label">Total Revenue</div>'
+            f'<div class="kpi-card"><div class="kpi-label">Total Revenue</div>'
             f'<div class="kpi-value">${total_revenue:,.0f}</div>'
-            f'<div class="kpi-sub">{total_purchases:,} orders</div>'
-            f'</div>', unsafe_allow_html=True
+            f'<div class="kpi-sub">{total_purchases:,} orders</div></div>',
+            unsafe_allow_html=True
         )
     with k3:
         st.markdown(
-            f'<div class="kpi-card">'
-            f'<div class="kpi-label">Conversion Rate</div>'
+            f'<div class="kpi-card"><div class="kpi-label">Conversion Rate</div>'
             f'<div class="kpi-value">{conv_rate:.2f}%</div>'
-            f'<div class="kpi-sub">of visitors purchased</div>'
-            f'</div>', unsafe_allow_html=True
+            f'<div class="kpi-sub">of visitors purchased</div></div>',
+            unsafe_allow_html=True
         )
     with k4:
         st.markdown(
-            f'<div class="kpi-card">'
-            f'<div class="kpi-label">Revenue Per Visitor</div>'
+            f'<div class="kpi-card"><div class="kpi-label">Revenue Per Visitor</div>'
             f'<div class="kpi-value">${rev_per_visitor:,.2f}</div>'
-            f'<div class="kpi-sub">avg across date range</div>'
-            f'</div>', unsafe_allow_html=True
+            f'<div class="kpi-sub">avg across date range</div></div>',
+            unsafe_allow_html=True
         )
 
-    # ===================================================
+    # =====================================================
     # ACTIVE FILTER PILLS
-    # ===================================================
+    # =====================================================
     pills_html = '<div class="filter-pills-row">'
     pills_html += f'<span class="filter-pill">📅 {start_date} → {end_date}</span>'
     pills_html += f'<span class="filter-pill">🏅 {metric_choice}</span>'
@@ -790,9 +891,9 @@ def dashboard_page():
 
     st.divider()
 
-    # ===================================================
+    # =====================================================
     # SINGLE VARIABLE DEEP DIVE
-    # ===================================================
+    # =====================================================
     st.subheader("🎯 Single Variable Deep Dive")
 
     if "active_single_var" not in st.session_state:
@@ -801,8 +902,8 @@ def dashboard_page():
     v_cols = st.columns(len(configs))
     for i, (label, col_name) in enumerate(configs):
         if v_cols[i].button(label, key=f"btn_{label}",
-                           type="primary" if st.session_state.active_single_var == label else "secondary",
-                           use_container_width=True):
+                            type="primary" if st.session_state.active_single_var == label else "secondary",
+                            use_container_width=True):
             st.session_state.active_single_var = label
             st.rerun()
 
@@ -828,35 +929,32 @@ def dashboard_page():
     else:
         df_merged = df_v_grp.copy()
         df_merged['Purchases'] = 0
-        df_merged['Revenue'] = 0.0
+        df_merged['Revenue']   = 0.0
 
     if not df_merged.empty:
-        df_merged['Visitors'] = df_merged.get('Visitors', 0) + df_merged['Purchases']
-        df_merged['Conv %'] = (df_merged['Purchases'] / df_merged['Visitors'].replace(0, 1) * 100).round(2)
-        df_merged['Rev/Visitor'] = (df_merged['Revenue'] / df_merged['Visitors'].replace(0, 1)).round(2)
+        df_merged['Visitors']    = df_merged.get('Visitors', 0) + df_merged['Purchases']
+        df_merged['Conv %']      = (df_merged['Purchases'] / df_merged['Visitors'].replace(0, 1) * 100).round(2)
+        df_merged['Rev/Visitor'] = (df_merged['Revenue']   / df_merged['Visitors'].replace(0, 1)).round(2)
 
-        sort_col = metric_map[metric_choice]
+        sort_col  = metric_map[metric_choice]
         df_merged = df_merged[df_merged['Purchases'] >= min_purchasers].sort_values(sort_col, ascending=is_ascending)
 
         if not df_merged.empty:
             df_merged.insert(0, 'Rank', range(1, len(df_merged) + 1))
-            display_df = df_merged.rename(columns={
-                selected_col: st.session_state.active_single_var,
-                'Conv %': 'Conv %',
-                'Rev/Visitor': 'Rev/Visitor'
-            })
+            display_df   = df_merged.rename(columns={selected_col: st.session_state.active_single_var})
             display_cols = ['Rank', st.session_state.active_single_var, 'Revenue', 'Visitors', 'Purchases', 'Conv %', 'Rev/Visitor']
             styler = display_df[display_cols].style\
                 .set_properties(**{'font-weight': 'bold'}, subset=['Rank'])\
-                .format({'Visitors': '{:,.0f}', 'Purchases': '{:,.0f}', 'Revenue': '${:,.2f}', 'Conv %': '{:.2f}%', 'Rev/Visitor': '${:,.2f}'})\
+                .format({'Visitors': '{:,.0f}', 'Purchases': '{:,.0f}', 'Revenue': '${:,.2f}',
+                         'Conv %': '{:.2f}%', 'Rev/Visitor': '${:,.2f}'})\
                 .background_gradient(subset=['Rev/Visitor', 'Conv %'], cmap=brand_gradient)
             render_premium_table(styler)
 
     st.divider()
 
-    # ===================================================
+    # =====================================================
     # MULTI-VARIABLE COMBINATION MATRIX
-    # ===================================================
+    # =====================================================
     st.subheader("📊 Multi-Variable Combination Matrix")
     with st.expander("🎛️ Combination Filters", expanded=True):
         selected_filters, included_types = {}, []
@@ -868,14 +966,15 @@ def dashboard_page():
                 c_title.markdown(f'**{label}**')
                 if c_inc.checkbox("Inc", key=f"inc_{col_name}"):
                     included_types.append(col_name)
-                opts = sorted([str(x) for x in st.session_state.df_demo_cube[col_name].unique() if str(x) not in EXCLUDE_LIST])
+                opts = sorted([str(x) for x in st.session_state.df_demo_cube[col_name].unique()
+                               if str(x) not in EXCLUDE_LIST])
                 val = st.multiselect(f"Filter {label}", opts, key=f"f_{col_name}", label_visibility="collapsed")
                 if val:
                     selected_filters[col_name] = val
 
     if included_types:
-        combos = []
-        filtered_cols = list(selected_filters.keys())
+        combos       = []
+        filtered_cols   = list(selected_filters.keys())
         unfiltered_cols = [c for c in included_types if c not in filtered_cols]
         base_v = st.session_state.df_demo_cube.copy()
         base_p = df_p_filtered.copy()
@@ -910,153 +1009,20 @@ def dashboard_page():
 
         if combos:
             res = pd.concat(combos, ignore_index=True).drop_duplicates(subset=included_types)
-            res['Conv %'] = (res['Purchases'] / res['Visitors'].replace(0, 1) * 100).round(2)
-            res['Rev/Visitor'] = (res['Revenue'] / res['Visitors'].replace(0, 1)).round(2)
-            sort_col = metric_map[metric_choice]
-            final_res = res[res['Purchases'] >= min_purchasers].sort_values(sort_col, ascending=is_ascending)
+            res['Conv %']      = (res['Purchases'] / res['Visitors'].replace(0, 1) * 100).round(2)
+            res['Rev/Visitor'] = (res['Revenue']   / res['Visitors'].replace(0, 1)).round(2)
+            sort_col   = metric_map[metric_choice]
+            final_res  = res[res['Purchases'] >= min_purchasers].sort_values(sort_col, ascending=is_ascending)
             if not final_res.empty:
                 st.metric("Total Segments Found", f"{len(final_res):,}")
                 final_res.insert(0, 'Rank', range(1, len(final_res) + 1))
-                rename_dict = {c[1]: c[0] for c in configs}
+                rename_dict  = {c[1]: c[0] for c in configs}
                 display_cols = ['Rank'] + [rename_dict.get(c, c) for c in included_types] + ['Revenue', 'Visitors', 'Purchases', 'Conv %', 'Rev/Visitor']
-                display_df = final_res.head(50).rename(columns=rename_dict)[display_cols]
+                display_df   = final_res.head(50).rename(columns=rename_dict)[display_cols]
                 render_premium_table(display_df.style.format({
                     'Rank': '{:.0f}', 'Visitors': '{:,.0f}', 'Purchases': '{:,.0f}',
                     'Revenue': '${:,.2f}', 'Conv %': '{:.2f}%', 'Rev/Visitor': '${:,.2f}'
                 }).background_gradient(subset=['Rev/Visitor', 'Conv %'], cmap=brand_gradient))
-
-    st.divider()
-
-    # ===================================================
-    # FILE UPLOAD SECTION
-    # ===================================================
-    st.subheader("📁 Upload Order Export for Enrichment")
-    st.markdown("Upload your Shopify order export CSV. Must include an **Email** column and a **Total** or **Revenue** column.")
-    uploaded_file = st.file_uploader("Choose a CSV file", type=['csv'])
-    if uploaded_file is not None:
-        if st.button("🚀 Run Enrichment", type="primary"):
-            with st.status("Running enrichment...", expanded=True) as status:
-                try:
-                    st.write("📂 Reading order file...")
-                    raw_df = pd.read_csv(io.BytesIO(uploaded_file.getvalue()), encoding='latin1', on_bad_lines='skip')
-                    raw_df.columns = [str(c).strip().lower() for c in raw_df.columns]
-
-                    email_col = next((c for c in raw_df.columns if 'email' in c), None)
-                    if not email_col:
-                        st.error("No email column found in your CSV. Please check the file.")
-                        st.stop()
-
-                    revenue_col = next((c for c in raw_df.columns if any(x in c for x in ['total', 'revenue', 'amount'])), None)
-                    unique_emails = raw_df[email_col].dropna().astype(str).str.lower().str.strip()
-                    unique_emails = unique_emails[unique_emails.str.contains('@', na=False)].unique().tolist()
-
-                    st.write(f"📧 Sending {len(unique_emails):,} unique emails to identity graph...")
-                    response = requests.post(N8N_WEBHOOK_URL, json={"emails": unique_emails}, timeout=180)
-                    st.write("✅ Identity graph responded — parsing results...")
-
-                    if response.status_code == 200:
-                        try:
-                            enriched_df = pd.read_csv(io.StringIO(response.text), on_bad_lines='skip', engine='python')
-                        except Exception:
-                            st.error("Could not parse enriched response as CSV.")
-                            st.stop()
-
-                        enriched_df.columns = [str(c).strip().lower() for c in enriched_df.columns]
-
-                        STANDARD_EMAIL_COLS = ['personal_emails', 'business_email', 'email_match', 'deep_verified_emails']
-                        enriched_email_col = next((c for c in STANDARD_EMAIL_COLS if c in enriched_df.columns), None)
-                        if enriched_email_col is None:
-                            st.error(f"Could not find email column in enriched response. Got columns: {list(enriched_df.columns[:15])}")
-                            st.stop()
-
-                        enriched_df = enriched_df.rename(columns={enriched_email_col: 'email_match'})
-                        enriched_df['email_match'] = enriched_df['email_match'].astype(str).str.split(',')
-                        enriched_df = enriched_df.explode('email_match')
-                        enriched_df['email_match'] = enriched_df['email_match'].str.strip().str.lower()
-                        enriched_df = enriched_df[enriched_df['email_match'].str.contains('@', na=False)].drop_duplicates('email_match')
-
-                        N8N_COLUMN_MAPPER = {
-                            "gender": "gender",
-                            "married": "marital_status",
-                            "age_range": "age_range",
-                            "income_range": "income_bucket",
-                            "personal_state": "state",
-                            "homeowner": "homeowner",
-                            "children": "children",
-                            "net_worth": "net_worth_bucket",
-                        }
-                        for src_col, dst_col in N8N_COLUMN_MAPPER.items():
-                            if src_col in enriched_df.columns:
-                                enriched_df[dst_col] = enriched_df[src_col]
-
-                        if 'income_bucket' in enriched_df.columns:
-                            enriched_df['income_bucket'] = enriched_df['income_bucket'].apply(bucket_income)
-                        if 'net_worth_bucket' in enriched_df.columns:
-                            enriched_df['net_worth_bucket'] = enriched_df['net_worth_bucket'].apply(bucket_net_worth)
-                        if 'gender' in enriched_df.columns:
-                            enriched_df['gender'] = enriched_df['gender'].apply(clean_gender)
-                        if 'children' in enriched_df.columns:
-                            enriched_df['children'] = enriched_df['children'].apply(clean_boolean)
-                        if 'marital_status' in enriched_df.columns:
-                            enriched_df['marital_status'] = enriched_df['marital_status'].apply(clean_marital)
-                        if 'homeowner' in enriched_df.columns:
-                            enriched_df['homeowner'] = enriched_df['homeowner'].apply(clean_homeowner)
-                        if 'state' in enriched_df.columns:
-                            enriched_df['state'] = enriched_df['state'].apply(clean_state)
-
-                        orders_join = raw_df.copy()
-                        orders_join['email_match'] = orders_join[email_col].astype(str).str.lower().str.strip()
-                        date_col = next((c for c in orders_join.columns if any(x in c for x in ['created', 'date', 'ordered'])), None)
-
-                        join_cols = ['email_match']
-                        if revenue_col:
-                            join_cols.append(revenue_col)
-                        if date_col:
-                            join_cols.append(date_col)
-
-                        joined_df = pd.merge(orders_join[join_cols], enriched_df, on='email_match', how='left')
-
-                        if revenue_col:
-                            joined_df = joined_df.rename(columns={revenue_col: 'Total'})
-                        else:
-                            joined_df['Total'] = 0.0
-                        joined_df['Total'] = pd.to_numeric(joined_df['Total'], errors='coerce').fillna(0.0)
-
-                        temp_orders = pd.DataFrame()
-                        temp_orders['Order_ID'] = 'TEMP_' + joined_df.index.astype(str)
-                        temp_orders['Total'] = joined_df['Total']
-                        if date_col and date_col in joined_df.columns:
-                            temp_orders['order_date'] = pd.to_datetime(joined_df[date_col], errors='coerce').fillna(datetime.now())
-                        else:
-                            temp_orders['order_date'] = datetime.now()
-
-                        for col in ['gender', 'age_range', 'income_bucket', 'net_worth_bucket', 'homeowner', 'marital_status', 'children', 'state']:
-                            temp_orders[col] = joined_df[col] if col in joined_df.columns else 'Unknown'
-
-                        temp_orders['customer_email'] = joined_df['email_match']
-                        temp_orders['lineitem_name'] = 'Enriched Import'
-                        temp_orders['pixel_id'] = pixel_id
-
-                        if tenant_type == 'B2B':
-                            for b2b_col in ['company_name', 'company_industry', 'employee_count_range', 'job_title', 'seniority', 'company_revenue']:
-                                temp_orders[b2b_col] = joined_df[b2b_col] if b2b_col in joined_df.columns else 'Unknown'
-
-                        if not st.session_state.df_orders.empty:
-                            st.session_state.df_orders = pd.concat(
-                                [st.session_state.df_orders, temp_orders], ignore_index=True
-                            )
-                        else:
-                            st.session_state.df_orders = temp_orders
-
-                        num_enriched = len(temp_orders)
-                        num_matched = int(temp_orders[['gender', 'age_range', 'income_bucket']].ne('Unknown').any(axis=1).sum())
-                        status.update(label=f"✅ Done — {num_enriched} orders enriched, {num_matched} matched with identity data", state="complete", expanded=False)
-                        st.success("📊 Dashboard now includes your enriched orders. Temporary only — not saved to database.")
-                        st.rerun()
-                    else:
-                        st.error(f"Webhook failed with status {response.status_code}: {response.text}")
-                except Exception as e:
-                    st.error(f"Error enriching data: {e}")
 
 # ================ 9. MAIN APP FLOW =================
 def main():
