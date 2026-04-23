@@ -227,6 +227,38 @@ def apply_custom_theme(primary_color):
             margin: 0.5rem 0 !important;
         }}
 
+        /* Sidebar expanders - dark themed collapsible sections */
+        [data-testid="stSidebar"] [data-testid="stExpander"] {{
+            background: transparent !important;
+            border: none !important;
+            border-bottom: 1px solid rgba(196,181,253,0.15) !important;
+            border-radius: 0 !important;
+            margin: 0 !important;
+        }}
+        [data-testid="stSidebar"] [data-testid="stExpander"] summary {{
+            background: transparent !important;
+            padding: 7px 0 !important;
+        }}
+        [data-testid="stSidebar"] [data-testid="stExpander"] summary p,
+        [data-testid="stSidebar"] [data-testid="stExpander"] summary span {{
+            font-family: 'Outfit', sans-serif !important;
+            font-size: 0.61rem !important;
+            font-weight: 700 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.1em !important;
+            color: {SIDEBAR_MUTED} !important;
+        }}
+        [data-testid="stSidebar"] [data-testid="stExpander"] summary svg {{
+            color: {SIDEBAR_MUTED} !important;
+            fill: {SIDEBAR_MUTED} !important;
+            stroke: {SIDEBAR_MUTED} !important;
+        }}
+        [data-testid="stSidebar"] [data-testid="stExpanderDetails"] {{
+            background: transparent !important;
+            border: none !important;
+            padding: 6px 0 8px 0 !important;
+        }}
+
         /* Sidebar section labels */
         .sidebar-section-label {{
             font-family: 'Outfit', sans-serif;
@@ -554,9 +586,9 @@ def clean_marital(val):
 
 def clean_homeowner(val):
     if pd.isna(val): return 'Unknown'
-    val_str = str(val).strip().lower()
-    if 'homeowner' in val_str or val_str == 'yes': return 'Homeowner'
-    elif 'renter' in val_str: return 'Renter'
+    val_str = str(val).strip().upper()
+    if val_str in ['Y', 'YES', 'HOMEOWNER', 'OWNER']: return 'Yes'
+    elif val_str in ['N', 'NO', 'RENTER']: return 'No'
     return str(val)
 
 def clean_state(val):
@@ -864,64 +896,54 @@ def dashboard_page():
                 else:
                     upload_status.error(message)
 
-        st.markdown("---")
-
         # ── DATE RANGE ──
-        st.markdown('<p class="sidebar-section-label">Date Range</p>', unsafe_allow_html=True)
-        start_date = st.date_input("Start Date", st.session_state.date_range[0], key="sb_start")
-        end_date   = st.date_input("End Date",   st.session_state.date_range[1], key="sb_end")
-        st.session_state.date_range = (start_date, end_date)
-
-        st.markdown("---")
+        with st.expander("Date Range", expanded=False):
+            start_date = st.date_input("Start Date", st.session_state.date_range[0], key="sb_start")
+            end_date   = st.date_input("End Date",   st.session_state.date_range[1], key="sb_end")
+            st.session_state.date_range = (start_date, end_date)
 
         # ── RANK BY ──
-        st.markdown('<p class="sidebar-section-label">Rank By</p>', unsafe_allow_html=True)
-        for m in metrics:
-            is_active = (st.session_state.metric_choice == m)
-            if st.button(m, key=f"metric_{m}",
-                         type="primary" if is_active else "secondary"):
-                st.session_state.metric_choice = m
-                st.rerun()
-
-        st.markdown("---")
+        with st.expander("Rank By", expanded=False):
+            for m in metrics:
+                is_active = (st.session_state.metric_choice == m)
+                if st.button(m, key=f"metric_{m}",
+                             type="primary" if is_active else "secondary"):
+                    st.session_state.metric_choice = m
+                    st.rerun()
 
         # ── SORT BY ──
-        st.markdown('<p class="sidebar-section-label">Sort By</p>', unsafe_allow_html=True)
-        if st.button("High → Low", key="sort_htl",
-                     type="primary" if not st.session_state.sort_asc else "secondary"):
-            st.session_state.sort_asc = False
-            st.rerun()
-        if st.button("Low → High", key="sort_lth",
-                     type="primary" if st.session_state.sort_asc else "secondary"):
-            st.session_state.sort_asc = True
-            st.rerun()
-
-        st.markdown("---")
+        with st.expander("Sort By", expanded=False):
+            if st.button("High → Low", key="sort_htl",
+                         type="primary" if not st.session_state.sort_asc else "secondary"):
+                st.session_state.sort_asc = False
+                st.rerun()
+            if st.button("Low → High", key="sort_lth",
+                         type="primary" if st.session_state.sort_asc else "secondary"):
+                st.session_state.sort_asc = True
+                st.rerun()
 
         # ── MIN PURCHASES ──
-        st.markdown('<p class="sidebar-section-label">Min Purchases</p>', unsafe_allow_html=True)
-        min_purchasers = st.number_input(
-            "Minimum Purchases", value=1, min_value=0, label_visibility="collapsed"
-        )
-
-        st.markdown("---")
+        with st.expander("Min Purchases", expanded=False):
+            min_purchasers = st.number_input(
+                "Minimum Purchases", value=1, min_value=0, label_visibility="collapsed"
+            )
 
         # ── FILTER BY PRODUCT ──
-        st.markdown('<p class="sidebar-section-label">Filter by Product</p>', unsafe_allow_html=True)
-        sku_toggle = st.toggle("Enable", value=False, key="sku_toggle")
-        if sku_toggle:
-            _orders_ref = st.session_state.get('df_orders', pd.DataFrame())
-            if not _orders_ref.empty and 'lineitem_name' in _orders_ref.columns:
-                sku_opts = sorted([str(x) for x in _orders_ref['lineitem_name'].dropna().unique()
-                                   if str(x) not in EXCLUDE_LIST])
+        with st.expander("Filter by Product", expanded=False):
+            sku_toggle = st.toggle("Enable", value=False, key="sku_toggle")
+            if sku_toggle:
+                _orders_ref = st.session_state.get('df_orders', pd.DataFrame())
+                if not _orders_ref.empty and 'lineitem_name' in _orders_ref.columns:
+                    sku_opts = sorted([str(x) for x in _orders_ref['lineitem_name'].dropna().unique()
+                                       if str(x) not in EXCLUDE_LIST])
+                else:
+                    sku_opts = []
+                selected_skus = st.multiselect(
+                    "Select products", options=sku_opts,
+                    label_visibility="collapsed", key="sku_select"
+                )
             else:
-                sku_opts = []
-            selected_skus = st.multiselect(
-                "Select products", options=sku_opts,
-                label_visibility="collapsed", key="sku_select"
-            )
-        else:
-            selected_skus = []
+                selected_skus = []
 
         # Spacer to push logout/refresh to bottom
         st.markdown("<br><br><br><br><br>", unsafe_allow_html=True)
