@@ -390,6 +390,53 @@ def apply_custom_theme(primary_color):
             letter-spacing: normal !important;
         }}
 
+        /* ── VARIABLE SELECTOR RADIO-AS-PILLS ── */
+        [data-testid="stMain"] .stRadio > label {{
+            display: none !important;
+        }}
+        [data-testid="stMain"] .stRadio > div[role="radiogroup"],
+        [data-testid="stMain"] .stRadio > div {{
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: wrap !important;
+            gap: 6px !important;
+            align-items: center !important;
+        }}
+        [data-testid="stMain"] .stRadio [data-baseweb="radio"] {{
+            background: #FFFFFF !important;
+            border: 1.5px solid #D8C8F5 !important;
+            border-radius: 8px !important;
+            padding: 5px 13px !important;
+            margin: 0 !important;
+            cursor: pointer !important;
+            transition: background 0.15s ease !important;
+        }}
+        /* Hide the radio circle dot */
+        [data-testid="stMain"] .stRadio [data-baseweb="radio"] > div:first-child {{
+            display: none !important;
+        }}
+        /* Label text */
+        [data-testid="stMain"] .stRadio [data-baseweb="radio"] > div:last-child,
+        [data-testid="stMain"] .stRadio [data-baseweb="radio"] > div:last-child p {{
+            font-size: 0.7rem !important;
+            font-weight: 700 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.09em !important;
+            color: {primary_color} !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            line-height: 1.3 !important;
+        }}
+        /* Selected pill */
+        [data-testid="stMain"] .stRadio [data-baseweb="radio"]:has(input:checked) {{
+            background: {primary_color} !important;
+            border-color: {primary_color} !important;
+        }}
+        [data-testid="stMain"] .stRadio [data-baseweb="radio"]:has(input:checked) > div:last-child,
+        [data-testid="stMain"] .stRadio [data-baseweb="radio"]:has(input:checked) > div:last-child p {{
+            color: #FFFFFF !important;
+        }}
+
         /* Multiselect tags (main area) */
         .stMultiSelect [data-baseweb="tag"] {{
             background-color: {primary_color} !important;
@@ -1027,17 +1074,19 @@ def dashboard_page():
     if "active_single_var" not in st.session_state:
         st.session_state.active_single_var = configs[0][0]
 
-    n = len(configs)
-    # Small equal button columns + large spacer so buttons don't stretch across screen
-    v_cols = st.columns([1] * n + [n])
-    for i, (label, col_name) in enumerate(configs):
-        if v_cols[i].button(label, key=f"btn_{label}",
-                            type="primary" if st.session_state.active_single_var == label else "secondary",
-                            use_container_width=True):
-            st.session_state.active_single_var = label
-            st.rerun()
+    labels = [label for label, _ in configs]
+    current_idx = labels.index(st.session_state.active_single_var) if st.session_state.active_single_var in labels else 0
 
-    selected_col = dict(configs)[st.session_state.active_single_var]
+    active_var = st.radio(
+        "Select variable",
+        options=labels,
+        index=current_idx,
+        horizontal=True,
+        label_visibility="collapsed",
+        key="var_selector_radio"
+    )
+    st.session_state.active_single_var = active_var
+    selected_col = dict(configs)[active_var]
 
     if selected_col == 'state' and tenant_type == 'B2C':
         df_v_grp = st.session_state.df_state_map[
