@@ -94,10 +94,13 @@ def apply_custom_theme(primary_color):
             align-items: center !important;
             height: 34px !important;
         }}
-        /* Suppress focus ghost box on number input */
+        /* Suppress focus ghost box — hide any 3rd+ child divs Streamlit injects */
         [data-testid="stSidebar"] .stNumberInput input:focus {{
             outline: none !important;
             box-shadow: none !important;
+        }}
+        [data-testid="stSidebar"] .stNumberInput > div:nth-child(n+3) {{
+            display: none !important;
         }}
         /* Strip inner borders from all children */
         [data-testid="stSidebar"] .stNumberInput [data-baseweb="input"],
