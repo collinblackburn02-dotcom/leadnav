@@ -310,7 +310,7 @@ def apply_custom_theme(primary_color):
         .section-title {{
             font-family: 'Outfit', sans-serif;
             font-weight: 700;
-            font-size: 1.65rem;
+            font-size: 2.475rem;
             text-transform: uppercase;
             letter-spacing: 0.1em;
             color: #0F172A;
@@ -418,7 +418,7 @@ def apply_custom_theme(primary_color):
         /* Label text */
         [data-testid="stMain"] .stRadio [data-baseweb="radio"] > div:last-child,
         [data-testid="stMain"] .stRadio [data-baseweb="radio"] > div:last-child p {{
-            font-size: 0.7rem !important;
+            font-size: 1.05rem !important;
             font-weight: 700 !important;
             text-transform: uppercase !important;
             letter-spacing: 0.09em !important;
