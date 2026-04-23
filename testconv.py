@@ -657,52 +657,52 @@ def login_page():
         unsafe_allow_html=True
     )
 
-    left, right = st.columns([1, 1])
+    left, right = st.columns([4, 7])
 
     with left:
         st.markdown(f"""
-        <div style="background:#160A2E;padding:40px 28px;
+        <div style="background:#160A2E;padding:56px 44px;
                     min-height:100vh;display:flex;flex-direction:column;justify-content:space-between;
                     box-sizing:border-box;">
           <div>
-            <div style="font-family:'Playfair Display',serif;font-size:2rem;font-weight:700;color:#fff;">
+            <div style="font-family:'Playfair Display',serif;font-size:2.4rem;font-weight:700;color:#fff;line-height:1.1;">
               Lead<span style="color:#7C3AED;">Navigator</span>
             </div>
-            <div style="font-size:0.85rem;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;
-                        color:#6D5A8E;margin-top:10px;">Conversion Intelligence</div>
-            <div style="width:48px;height:1.5px;background:rgba(196,181,253,0.2);margin:28px 0;"></div>
-            <div style="margin-bottom:28px;">
-              <div style="font-size:2.4rem;font-weight:800;color:#C4B5FD;line-height:1;">308M+</div>
-              <div style="font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;
-                          color:#6D5A8E;margin-top:5px;">Consumer profiles</div>
+            <div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.13em;
+                        color:#6D5A8E;margin-top:12px;">Conversion Intelligence</div>
+            <div style="width:48px;height:1.5px;background:rgba(196,181,253,0.2);margin:32px 0;"></div>
+            <div style="margin-bottom:32px;">
+              <div style="font-size:3rem;font-weight:800;color:#C4B5FD;line-height:1;">308M+</div>
+              <div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;
+                          color:#6D5A8E;margin-top:6px;">Consumer profiles</div>
             </div>
-            <div style="margin-bottom:28px;">
-              <div style="font-size:2.4rem;font-weight:800;color:#C4B5FD;line-height:1;">41%</div>
-              <div style="font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;
-                          color:#6D5A8E;margin-top:5px;">Avg enrichment rate</div>
+            <div style="margin-bottom:32px;">
+              <div style="font-size:3rem;font-weight:800;color:#C4B5FD;line-height:1;">41%</div>
+              <div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;
+                          color:#6D5A8E;margin-top:6px;">Avg enrichment rate</div>
             </div>
-            <div style="margin-bottom:28px;">
-              <div style="font-size:2.4rem;font-weight:800;color:#C4B5FD;line-height:1;">8.3x</div>
-              <div style="font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;
-                          color:#6D5A8E;margin-top:5px;">Avg client ROI</div>
+            <div style="margin-bottom:32px;">
+              <div style="font-size:3rem;font-weight:800;color:#C4B5FD;line-height:1;">8.3x</div>
+              <div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;
+                          color:#6D5A8E;margin-top:6px;">Avg client ROI</div>
             </div>
-            <div style="width:48px;height:1.5px;background:rgba(196,181,253,0.2);margin:28px 0;"></div>
+            <div style="width:48px;height:1.5px;background:rgba(196,181,253,0.2);margin:32px 0;"></div>
             <div style="display:flex;flex-direction:column;gap:10px;">
               <div style="display:inline-flex;align-items:center;gap:9px;background:rgba(124,58,237,0.15);
-                          border:1px solid rgba(196,181,253,0.2);border-radius:999px;padding:7px 16px;
-                          font-size:0.85rem;font-weight:600;color:#C4B5FD;width:fit-content;">
+                          border:1px solid rgba(196,181,253,0.2);border-radius:999px;padding:8px 18px;
+                          font-size:0.88rem;font-weight:600;color:#C4B5FD;width:fit-content;">
                 <div style="width:8px;height:8px;border-radius:50%;background:#7C3AED;flex-shrink:0;"></div>
                 SuperPixel&#8482; On-Site Intelligence
               </div>
               <div style="display:inline-flex;align-items:center;gap:9px;background:rgba(124,58,237,0.15);
-                          border:1px solid rgba(196,181,253,0.2);border-radius:999px;padding:7px 16px;
-                          font-size:0.85rem;font-weight:600;color:#C4B5FD;width:fit-content;">
+                          border:1px solid rgba(196,181,253,0.2);border-radius:999px;padding:8px 18px;
+                          font-size:0.88rem;font-weight:600;color:#C4B5FD;width:fit-content;">
                 <div style="width:8px;height:8px;border-radius:50%;background:#7C3AED;flex-shrink:0;"></div>
                 In-Market Audiences
               </div>
               <div style="display:inline-flex;align-items:center;gap:9px;background:rgba(124,58,237,0.15);
-                          border:1px solid rgba(196,181,253,0.2);border-radius:999px;padding:7px 16px;
-                          font-size:0.85rem;font-weight:600;color:#C4B5FD;width:fit-content;">
+                          border:1px solid rgba(196,181,253,0.2);border-radius:999px;padding:8px 18px;
+                          font-size:0.88rem;font-weight:600;color:#C4B5FD;width:fit-content;">
                 <div style="width:8px;height:8px;border-radius:50%;background:#7C3AED;flex-shrink:0;"></div>
                 Multi-Channel Activation
               </div>
