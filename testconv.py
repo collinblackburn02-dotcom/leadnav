@@ -424,12 +424,16 @@ def apply_custom_theme(primary_color):
             letter-spacing: 0.09em !important;
             font-family: 'Outfit', sans-serif !important;
         }}
-        /* Filter option chips inside bordered containers — smaller */
-        [data-testid="stVerticalBlockBorderWrapper"] .stButton > button {{
-            font-size: 0.62rem !important;
-            padding: 3px 10px !important;
+        /* Filter option chips inside bordered containers — smaller (higher specificity) */
+        [data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"] .stButton > button {{
+            font-size: 0.58rem !important;
+            padding: 2px 8px !important;
             font-weight: 600 !important;
-            letter-spacing: 0.06em !important;
+            letter-spacing: 0.05em !important;
+            line-height: 1.2 !important;
+        }}
+        [data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"] .stButton > button p {{
+            font-size: 0.58rem !important;
         }}
         /* Sidebar buttons — explicitly no uppercase so nothing bleeds through */
         [data-testid="stSidebar"] .stButton > button {{
