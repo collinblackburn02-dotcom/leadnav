@@ -430,8 +430,8 @@ def apply_custom_theme(primary_color):
             letter-spacing: normal !important;
         }}
 
-        /* ── ST.PILLS — match single variable radio style ── */
-        [data-testid="stMain"] [data-testid="stPillsInput"] button {{
+        /* ── ST.PILLS — match single variable radio style exactly ── */
+        [data-testid="stBaseButton-pills"] {{
             border-radius: 8px !important;
             font-size: 0.85rem !important;
             font-weight: 500 !important;
@@ -443,17 +443,18 @@ def apply_custom_theme(primary_color):
             background: #FFFFFF !important;
             color: {primary_color} !important;
         }}
-        [data-testid="stMain"] [data-testid="stPillsInput"] button[aria-pressed="true"] {{
+        [data-testid="stBaseButton-pills"][aria-pressed="true"] {{
             background: {primary_color} !important;
             border-color: {primary_color} !important;
             color: #FFFFFF !important;
         }}
-        [data-testid="stMain"] [data-testid="stPillsInput"] button p,
-        [data-testid="stMain"] [data-testid="stPillsInput"] button span {{
+        [data-testid="stBaseButton-pills"] p,
+        [data-testid="stBaseButton-pills"] span {{
             font-size: 0.85rem !important;
             font-weight: 500 !important;
             text-transform: uppercase !important;
             letter-spacing: 0.09em !important;
+            color: inherit !important;
         }}
 
         /* ── VARIABLE SELECTOR RADIO-AS-PILLS ── */
