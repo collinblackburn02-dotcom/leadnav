@@ -341,7 +341,7 @@ def apply_custom_theme(primary_color):
         .section-title {{
             font-family: 'Outfit', sans-serif !important;
             font-weight: 700 !important;
-            font-size: 1.8rem !important;
+            font-size: 1.35rem !important;
             text-transform: uppercase !important;
             letter-spacing: 0.1em !important;
             color: #0F172A !important;
@@ -641,24 +641,80 @@ if 'client_name' not in st.session_state:
 
 # ================ 5. LOGIN PAGE =================
 def login_page():
+    # Hide sidebar on login page — prevents flash of sidebar content
     st.markdown(
-        f'<div style="padding: 1.5rem 0 0 0;">'
-        f'<span style="font-family: \'Playfair Display\', serif; font-size: 1.8rem; font-weight: 700; color: #0F172A; white-space: nowrap;">'
-        f'Lead<span style="color: {PITCH_BRAND_COLOR};">Navigator</span></span></div>',
+        '<style>'
+        '[data-testid="stSidebar"]{display:none!important;}'
+        '[data-testid="collapsedControl"]{display:none!important;}'
+        '.stHorizontalBlock{gap:0!important;}'
+        '</style>',
         unsafe_allow_html=True
     )
-    st.markdown("<br><br>", unsafe_allow_html=True)
-    _, center, _ = st.columns([0.4, 2, 0.4])
-    with center:
+
+    left, right = st.columns([5, 7])
+
+    with left:
+        st.markdown(f"""
+        <div style="background:#160A2E;border-radius:14px 0 0 14px;padding:40px 28px;
+                    min-height:580px;display:flex;flex-direction:column;justify-content:space-between;
+                    box-sizing:border-box;">
+          <div>
+            <div style="font-family:'Playfair Display',serif;font-size:1.35rem;font-weight:700;color:#fff;">
+              Lead<span style="color:#7C3AED;">Navigator</span>
+            </div>
+            <div style="font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;
+                        color:#6D5A8E;margin-top:8px;">Conversion Intelligence</div>
+            <div style="width:32px;height:1.5px;background:rgba(196,181,253,0.2);margin:20px 0;"></div>
+            <div style="margin-bottom:20px;">
+              <div style="font-size:1.5rem;font-weight:800;color:#C4B5FD;line-height:1;">308M+</div>
+              <div style="font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;
+                          color:#6D5A8E;margin-top:3px;">Consumer profiles</div>
+            </div>
+            <div style="margin-bottom:20px;">
+              <div style="font-size:1.5rem;font-weight:800;color:#C4B5FD;line-height:1;">41%</div>
+              <div style="font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;
+                          color:#6D5A8E;margin-top:3px;">Avg enrichment rate</div>
+            </div>
+            <div style="margin-bottom:20px;">
+              <div style="font-size:1.5rem;font-weight:800;color:#C4B5FD;line-height:1;">8.3x</div>
+              <div style="font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;
+                          color:#6D5A8E;margin-top:3px;">Avg client ROI</div>
+            </div>
+            <div style="width:32px;height:1.5px;background:rgba(196,181,253,0.2);margin:20px 0;"></div>
+            <div style="display:flex;flex-direction:column;gap:7px;">
+              <div style="display:inline-flex;align-items:center;gap:7px;background:rgba(124,58,237,0.15);
+                          border:1px solid rgba(196,181,253,0.2);border-radius:999px;padding:4px 11px;
+                          font-size:0.62rem;font-weight:600;color:#C4B5FD;width:fit-content;">
+                <div style="width:6px;height:6px;border-radius:50%;background:#7C3AED;flex-shrink:0;"></div>
+                SuperPixel&#8482; On-Site Intelligence
+              </div>
+              <div style="display:inline-flex;align-items:center;gap:7px;background:rgba(124,58,237,0.15);
+                          border:1px solid rgba(196,181,253,0.2);border-radius:999px;padding:4px 11px;
+                          font-size:0.62rem;font-weight:600;color:#C4B5FD;width:fit-content;">
+                <div style="width:6px;height:6px;border-radius:50%;background:#7C3AED;flex-shrink:0;"></div>
+                In-Market Audiences
+              </div>
+              <div style="display:inline-flex;align-items:center;gap:7px;background:rgba(124,58,237,0.15);
+                          border:1px solid rgba(196,181,253,0.2);border-radius:999px;padding:4px 11px;
+                          font-size:0.62rem;font-weight:600;color:#C4B5FD;width:fit-content;">
+                <div style="width:6px;height:6px;border-radius:50%;background:#7C3AED;flex-shrink:0;"></div>
+                Multi-Channel Activation
+              </div>
+            </div>
+          </div>
+          <div style="font-size:0.58rem;color:#3D2A5E;font-weight:500;">Powered by LeadNavigator HHS</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with right:
+        st.markdown("<br><br>", unsafe_allow_html=True)
         st.markdown(
-            f'<div style="text-align: center; margin-bottom: 0.25rem; white-space: nowrap;">'
-            f'<span class="serif-gradient-centerpiece" style="font-size: 2.6rem;">'
-            f'Welcome to {PITCH_COMPANY_NAME}</span></div>',
+            f'<div style="text-align:center;margin-bottom:6px;">'
+            f'<span class="serif-gradient-centerpiece" style="font-size:2rem;">Welcome to {PITCH_COMPANY_NAME}</span></div>',
             unsafe_allow_html=True
         )
         st.markdown(
-            '<p style="text-align: center; color: #0F172A; font-size: 1.55rem; '
-            'font-weight: 600; letter-spacing: 0.02em; margin-top: 0.4rem; margin-bottom: 2rem;">'
+            '<p style="text-align:center;font-size:0.85rem;font-weight:500;color:#64748B;margin-bottom:28px;">'
             'Conversion Insights Dashboard</p>',
             unsafe_allow_html=True
         )
@@ -667,7 +723,7 @@ def login_page():
             username = st.text_input("Username", key="login_username")
             password = st.text_input("Password", type="password", key="login_password")
             st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("Login", use_container_width=True, type="primary"):
+            if st.button("Sign In", use_container_width=True, type="primary"):
                 users = dict(st.secrets.get("users", {}))
                 if username in users and users[username].get("password") == password:
                     st.session_state.username = username
