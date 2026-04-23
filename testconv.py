@@ -641,21 +641,23 @@ if 'client_name' not in st.session_state:
 
 # ================ 5. LOGIN PAGE =================
 def login_page():
-    # Hide sidebar, strip padding, go full viewport height
+    # Full-screen login — no scroll, no padding
     st.markdown(
         '<style>'
+        'html,body{overflow:hidden!important;height:100vh!important;}'
+        '.stApp{height:100vh!important;overflow:hidden!important;}'
         '[data-testid="stSidebar"]{display:none!important;}'
         '[data-testid="collapsedControl"]{display:none!important;}'
-        '[data-testid="stMain"]{padding:0!important;}'
-        '[data-testid="stMainBlockContainer"]{padding:0!important;max-width:100%!important;}'
-        '[data-testid="stHorizontalBlock"]{gap:0!important;min-height:100vh!important;align-items:stretch!important;}'
-        '[data-testid="stHorizontalBlock"]>[data-testid="stVerticalBlockBorderWrapper"]{min-height:100vh!important;}'
-        '[data-testid="stHorizontalBlock"] [data-testid="stVerticalBlock"]{min-height:100vh!important;}'
+        '[data-testid="stMain"]{padding:0!important;height:100vh!important;overflow:hidden!important;}'
+        '[data-testid="stMainBlockContainer"]{padding:0!important;max-width:100%!important;height:100vh!important;overflow:hidden!important;}'
+        '[data-testid="stVerticalBlock"]{gap:0!important;}'
+        '[data-testid="stHorizontalBlock"]{gap:0!important;height:100vh!important;align-items:stretch!important;}'
+        '[data-testid="stHorizontalBlock"]>[data-testid="stVerticalBlockBorderWrapper"]{height:100vh!important;}'
         '</style>',
         unsafe_allow_html=True
     )
 
-    left, right = st.columns([5, 7])
+    left, right = st.columns([1, 1])
 
     with left:
         st.markdown(f"""
@@ -663,55 +665,55 @@ def login_page():
                     min-height:100vh;display:flex;flex-direction:column;justify-content:space-between;
                     box-sizing:border-box;">
           <div>
-            <div style="font-family:'Playfair Display',serif;font-size:1.35rem;font-weight:700;color:#fff;">
+            <div style="font-family:'Playfair Display',serif;font-size:2rem;font-weight:700;color:#fff;">
               Lead<span style="color:#7C3AED;">Navigator</span>
             </div>
-            <div style="font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;
-                        color:#6D5A8E;margin-top:8px;">Conversion Intelligence</div>
-            <div style="width:32px;height:1.5px;background:rgba(196,181,253,0.2);margin:20px 0;"></div>
-            <div style="margin-bottom:20px;">
-              <div style="font-size:1.5rem;font-weight:800;color:#C4B5FD;line-height:1;">308M+</div>
-              <div style="font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;
-                          color:#6D5A8E;margin-top:3px;">Consumer profiles</div>
+            <div style="font-size:0.85rem;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;
+                        color:#6D5A8E;margin-top:10px;">Conversion Intelligence</div>
+            <div style="width:48px;height:1.5px;background:rgba(196,181,253,0.2);margin:28px 0;"></div>
+            <div style="margin-bottom:28px;">
+              <div style="font-size:2.4rem;font-weight:800;color:#C4B5FD;line-height:1;">308M+</div>
+              <div style="font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;
+                          color:#6D5A8E;margin-top:5px;">Consumer profiles</div>
             </div>
-            <div style="margin-bottom:20px;">
-              <div style="font-size:1.5rem;font-weight:800;color:#C4B5FD;line-height:1;">41%</div>
-              <div style="font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;
-                          color:#6D5A8E;margin-top:3px;">Avg enrichment rate</div>
+            <div style="margin-bottom:28px;">
+              <div style="font-size:2.4rem;font-weight:800;color:#C4B5FD;line-height:1;">41%</div>
+              <div style="font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;
+                          color:#6D5A8E;margin-top:5px;">Avg enrichment rate</div>
             </div>
-            <div style="margin-bottom:20px;">
-              <div style="font-size:1.5rem;font-weight:800;color:#C4B5FD;line-height:1;">8.3x</div>
-              <div style="font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;
-                          color:#6D5A8E;margin-top:3px;">Avg client ROI</div>
+            <div style="margin-bottom:28px;">
+              <div style="font-size:2.4rem;font-weight:800;color:#C4B5FD;line-height:1;">8.3x</div>
+              <div style="font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;
+                          color:#6D5A8E;margin-top:5px;">Avg client ROI</div>
             </div>
-            <div style="width:32px;height:1.5px;background:rgba(196,181,253,0.2);margin:20px 0;"></div>
-            <div style="display:flex;flex-direction:column;gap:7px;">
-              <div style="display:inline-flex;align-items:center;gap:7px;background:rgba(124,58,237,0.15);
-                          border:1px solid rgba(196,181,253,0.2);border-radius:999px;padding:4px 11px;
-                          font-size:0.62rem;font-weight:600;color:#C4B5FD;width:fit-content;">
-                <div style="width:6px;height:6px;border-radius:50%;background:#7C3AED;flex-shrink:0;"></div>
+            <div style="width:48px;height:1.5px;background:rgba(196,181,253,0.2);margin:28px 0;"></div>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              <div style="display:inline-flex;align-items:center;gap:9px;background:rgba(124,58,237,0.15);
+                          border:1px solid rgba(196,181,253,0.2);border-radius:999px;padding:7px 16px;
+                          font-size:0.85rem;font-weight:600;color:#C4B5FD;width:fit-content;">
+                <div style="width:8px;height:8px;border-radius:50%;background:#7C3AED;flex-shrink:0;"></div>
                 SuperPixel&#8482; On-Site Intelligence
               </div>
-              <div style="display:inline-flex;align-items:center;gap:7px;background:rgba(124,58,237,0.15);
-                          border:1px solid rgba(196,181,253,0.2);border-radius:999px;padding:4px 11px;
-                          font-size:0.62rem;font-weight:600;color:#C4B5FD;width:fit-content;">
-                <div style="width:6px;height:6px;border-radius:50%;background:#7C3AED;flex-shrink:0;"></div>
+              <div style="display:inline-flex;align-items:center;gap:9px;background:rgba(124,58,237,0.15);
+                          border:1px solid rgba(196,181,253,0.2);border-radius:999px;padding:7px 16px;
+                          font-size:0.85rem;font-weight:600;color:#C4B5FD;width:fit-content;">
+                <div style="width:8px;height:8px;border-radius:50%;background:#7C3AED;flex-shrink:0;"></div>
                 In-Market Audiences
               </div>
-              <div style="display:inline-flex;align-items:center;gap:7px;background:rgba(124,58,237,0.15);
-                          border:1px solid rgba(196,181,253,0.2);border-radius:999px;padding:4px 11px;
-                          font-size:0.62rem;font-weight:600;color:#C4B5FD;width:fit-content;">
-                <div style="width:6px;height:6px;border-radius:50%;background:#7C3AED;flex-shrink:0;"></div>
+              <div style="display:inline-flex;align-items:center;gap:9px;background:rgba(124,58,237,0.15);
+                          border:1px solid rgba(196,181,253,0.2);border-radius:999px;padding:7px 16px;
+                          font-size:0.85rem;font-weight:600;color:#C4B5FD;width:fit-content;">
+                <div style="width:8px;height:8px;border-radius:50%;background:#7C3AED;flex-shrink:0;"></div>
                 Multi-Channel Activation
               </div>
             </div>
           </div>
-          <div style="font-size:0.58rem;color:#3D2A5E;font-weight:500;">Powered by LeadNavigator.AI</div>
+          <div style="font-size:0.78rem;color:#3D2A5E;font-weight:500;">Powered by LeadNavigator.AI</div>
         </div>
         """, unsafe_allow_html=True)
 
     with right:
-        st.markdown("<br><br><br><br>", unsafe_allow_html=True)
+        st.markdown("<br><br>", unsafe_allow_html=True)
         st.markdown(
             f'<div style="text-align:center;margin-bottom:6px;">'
             f'<span class="serif-gradient-centerpiece" style="font-size:2rem;">Welcome to {PITCH_COMPANY_NAME}</span></div>',
