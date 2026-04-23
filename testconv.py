@@ -306,12 +306,45 @@ def apply_custom_theme(primary_color):
             white-space: nowrap;
         }}
 
+        /* ── SECTION TITLES ── */
+        .section-title {{
+            font-family: 'Outfit', sans-serif;
+            font-weight: 700;
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.13em;
+            color: #94A3B8;
+            margin: 0 0 10px 0;
+            padding: 0;
+        }}
+
         /* ── PREMIUM TABLE ── */
-        .premium-table-container {{ width: 100% !important; border-radius: 12px; border: 1px solid {primary_color}; background: #FFFFFF; overflow: hidden; margin-top: 1rem; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }}
+        .premium-table-container {{ width: 100% !important; border-radius: 12px; border: 1px solid #EBE4F4; background: #FFFFFF; overflow: hidden; margin-top: 0.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.03); }}
         .premium-table-container table {{ width: 100% !important; border-collapse: collapse !important; border: none !important; }}
-        .premium-table-container th {{ font-family: 'Outfit', sans-serif !important; background-color: #F8F6FA !important; color: {primary_color} !important; font-weight: 700 !important; text-align: center !important; padding: 15px 12px !important; border-bottom: 2px solid {primary_color} !important; font-size: 0.95rem !important; }}
-        .premium-table-container td {{ font-family: 'Outfit', sans-serif !important; text-align: center !important; padding: 12px !important; border-bottom: 1px solid #EBE4F4 !important; font-size: 0.9rem !important; color: #1e293b !important; }}
-        .premium-table-container td:first-child {{ font-weight: 700 !important; color: #0F172A !important; }}
+        .premium-table-container th {{
+            font-family: 'Outfit', sans-serif !important;
+            background-color: #FAFAFC !important;
+            color: #94A3B8 !important;
+            font-weight: 700 !important;
+            text-align: center !important;
+            padding: 11px 12px !important;
+            border-bottom: 1.5px solid #EBE4F4 !important;
+            font-size: 0.62rem !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.1em !important;
+        }}
+        .premium-table-container td {{
+            font-family: 'Outfit', sans-serif !important;
+            text-align: center !important;
+            padding: 11px 12px !important;
+            border-bottom: 1px solid #F1F5F9 !important;
+            font-size: 0.82rem !important;
+            font-weight: 800 !important;
+            color: #0F172A !important;
+        }}
+        .premium-table-container td:first-child {{ color: #CBD5E1 !important; font-size: 0.9rem !important; }}
+        .premium-table-container td:nth-child(2) {{ color: {primary_color} !important; font-weight: 700 !important; }}
+        .premium-table-container tr:last-child td {{ border-bottom: none !important; }}
 
         /* ── MISC ── */
         .serif-gradient-centerpiece {{ font-family: 'Playfair Display', serif !important; background: linear-gradient(90deg, #4D148C 0%, #20B2AA 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: inline-block; font-weight: 700 !important; letter-spacing: -0.5px; }}
@@ -341,12 +374,15 @@ def apply_custom_theme(primary_color):
             outline: none !important;
         }}
 
-        /* Main area buttons */
+        /* Main area buttons — all-caps, spaced */
         .stButton > button {{
             white-space: nowrap !important;
-            font-size: 0.78rem !important;
-            padding: 6px 10px !important;
-            font-weight: 600 !important;
+            font-size: 0.65rem !important;
+            padding: 6px 14px !important;
+            font-weight: 700 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.09em !important;
+            font-family: 'Outfit', sans-serif !important;
         }}
 
         /* Multiselect tags (main area) */
@@ -791,11 +827,11 @@ def dashboard_page():
 
         # ── SORT BY ──
         st.markdown('<p class="sidebar-section-label">Sort By</p>', unsafe_allow_html=True)
-        if st.button("High→Low", key="sort_htl",
+        if st.button("High → Low", key="sort_htl",
                      type="primary" if not st.session_state.sort_asc else "secondary"):
             st.session_state.sort_asc = False
             st.rerun()
-        if st.button("Low→High", key="sort_lth",
+        if st.button("Low → High", key="sort_lth",
                      type="primary" if st.session_state.sort_asc else "secondary"):
             st.session_state.sort_asc = True
             st.rerun()
@@ -850,7 +886,7 @@ def dashboard_page():
     # ── Resolve control values ──
     metric_choice = st.session_state.metric_choice
     is_ascending  = st.session_state.sort_asc
-    sort_label    = "Low→High" if is_ascending else "High→Low"
+    sort_label    = "Low → High" if is_ascending else "High → Low"
 
     # =====================================================
     # MAIN AREA — data filtering
@@ -974,7 +1010,7 @@ def dashboard_page():
     # =====================================================
     # SINGLE VARIABLE DEEP DIVE
     # =====================================================
-    st.subheader("🎯 Single Variable Deep Dive")
+    st.markdown('<p class="section-title">Single Variable Deep Dive</p>', unsafe_allow_html=True)
 
     if "active_single_var" not in st.session_state:
         st.session_state.active_single_var = configs[0][0]
@@ -1035,7 +1071,7 @@ def dashboard_page():
     # =====================================================
     # MULTI-VARIABLE COMBINATION MATRIX
     # =====================================================
-    st.subheader("📊 Multi-Variable Combination Matrix")
+    st.markdown('<p class="section-title">Multi-Variable Combination Matrix</p>', unsafe_allow_html=True)
     with st.expander("🎛️ Combination Filters", expanded=True):
         selected_filters, included_types = {}, []
         f_cols = st.columns(3)
