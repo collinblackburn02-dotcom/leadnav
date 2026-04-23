@@ -4,6 +4,7 @@ import numpy as np
 from google.cloud import bigquery
 from google.oauth2 import service_account
 import matplotlib.colors as mcolors
+import plotly.graph_objects as go
 import itertools
 import re
 import requests
@@ -1205,6 +1206,122 @@ def dashboard_page():
                          'Conv %': '{:.2f}%', 'Rev/Visitor': '${:,.2f}'})\
                 .background_gradient(subset=['Rev/Visitor', 'Conv %'], cmap=brand_gradient)
             render_premium_table(styler)
+
+    # =====================================================
+    # TIME SERIES CHART
+    # =====================================================
+    st.markdown('<p class="section-title" style="margin-top:1.6rem;">Performance Over Time</p>', unsafe_allow_html=True)
+
+    if 'time_gran' not in st.session_state:
+        st.session_state.time_gran = 'Daily'
+
+    gran_choice = st.radio(
+        "Time granularity",
+        options=['Daily', 'Weekly', 'Monthly'],
+        index=['Daily', 'Weekly', 'Monthly'].index(st.session_state.time_gran),
+        horizontal=True,
+        key='time_gran_radio',
+        label_visibility='collapsed'
+    )
+    st.session_state.time_gran = gran_choice
+
+    freq_map = {'Daily': 'D', 'Weekly': 'W', 'Monthly': 'MS'}
+    freq = freq_map[gran_choice]
+
+    _TS_NORM = {'Homeowner': 'Yes', 'Renter': 'No', 'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female'}
+
+    # Visitor time series
+    if selected_col == 'state' and tenant_type == 'B2C':
+        v_ts = st.session_state.df_state_map.copy()
+        v_ts = v_ts.rename(columns={'visit_date': 'ts_date', 'total_visitors': 'Visitors', 'state': selected_col})
+    else:
+        v_ts = st.session_state.df_demo_cube.copy()
+        v_ts = v_ts.rename(columns={'visit_date': 'ts_date', 'total_visitors': 'Visitors'})
+
+    if selected_col in v_ts.columns:
+        v_ts[selected_col] = v_ts[selected_col].replace(_TS_NORM)
+    v_ts = v_ts[~v_ts[selected_col].isin(EXCLUDE_LIST)]
+    v_ts['ts_date'] = pd.to_datetime(v_ts['ts_date'])
+    v_agg = v_ts.groupby([pd.Grouper(key='ts_date', freq=freq), selected_col])['Visitors'].sum().reset_index()
+
+    # Order time series
+    if not df_p_filtered.empty and selected_col in df_p_filtered.columns:
+        p_ts = df_p_filtered.copy()
+        p_ts['ts_date'] = pd.to_datetime(p_ts['order_date']).dt.normalize()
+        if selected_col in p_ts.columns:
+            p_ts[selected_col] = p_ts[selected_col].replace(_TS_NORM)
+        p_ts = p_ts[~p_ts[selected_col].isin(EXCLUDE_LIST)]
+        p_agg = p_ts.groupby([pd.Grouper(key='ts_date', freq=freq), selected_col]).agg(
+            Purchases=('Order_ID', 'nunique'),
+            Revenue=('Total', 'sum')
+        ).reset_index()
+    else:
+        p_agg = pd.DataFrame(columns=['ts_date', selected_col, 'Purchases', 'Revenue'])
+
+    # Merge and compute metrics
+    ts_df = pd.merge(v_agg, p_agg, on=['ts_date', selected_col], how='outer').fillna(0)
+    ts_df['Conv %']      = (ts_df['Purchases'] / ts_df['Visitors'].replace(0, 1) * 100).round(2)
+    ts_df['Rev/Visitor'] = (ts_df['Revenue']   / ts_df['Visitors'].replace(0, 1)).round(2)
+    ts_df = ts_df.sort_values('ts_date')
+
+    ts_metric_col = metric_map[metric_choice]  # e.g. 'Rev/Visitor'
+
+    if not ts_df.empty:
+        segments = sorted([s for s in ts_df[selected_col].unique() if str(s) not in EXCLUDE_LIST])
+        CHART_COLORS = ['#4D148C', '#7C3AED', '#20B2AA', '#F59E0B', '#E11D48', '#059669', '#A78BFA', '#0EA5E9']
+
+        y_tickformat = {
+            'Rev/Visitor': '$,.2f',
+            'Conv %':      '.2f',
+            'Revenue':     '$,.0f',
+            'Purchases':   ',.0f',
+            'Visitors':    ',.0f',
+        }.get(ts_metric_col, '')
+
+        y_suffix = '%' if ts_metric_col == 'Conv %' else ''
+
+        fig = go.Figure()
+        for i, seg in enumerate(segments):
+            seg_data = ts_df[ts_df[selected_col] == seg].sort_values('ts_date')
+            if seg_data[ts_metric_col].sum() == 0:
+                continue
+            fig.add_trace(go.Scatter(
+                x=seg_data['ts_date'],
+                y=seg_data[ts_metric_col],
+                name=str(seg),
+                mode='lines+markers',
+                line=dict(color=CHART_COLORS[i % len(CHART_COLORS)], width=2.5),
+                marker=dict(size=5),
+                hovertemplate=f'<b>%{{x|%b %d, %Y}}</b><br>{seg}: %{{y:{y_tickformat}}}{y_suffix}<extra></extra>',
+            ))
+
+        fig.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='#FFFFFF',
+            font=dict(family='Outfit', size=12, color='#0F172A'),
+            legend=dict(
+                orientation='h', yanchor='bottom', y=1.02,
+                xanchor='left', x=0,
+                font=dict(size=12, color='#0F172A'),
+                bgcolor='rgba(0,0,0,0)',
+            ),
+            margin=dict(l=0, r=10, t=40, b=0),
+            xaxis=dict(
+                showgrid=False, zeroline=False,
+                tickfont=dict(size=11, color='#94A3B8'),
+                linecolor='#EBE4F4', showline=True,
+            ),
+            yaxis=dict(
+                showgrid=True, gridcolor='#F1F5F9', zeroline=False,
+                tickfont=dict(size=11, color='#94A3B8'),
+                tickformat=y_tickformat,
+                ticksuffix=y_suffix,
+            ),
+            hovermode='x unified',
+            height=340,
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
 
     st.divider()
 
