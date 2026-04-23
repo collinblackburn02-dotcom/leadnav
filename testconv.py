@@ -1210,7 +1210,7 @@ def dashboard_page():
     # TIME SERIES CHART
     # =====================================================
     st.markdown("<br><br>", unsafe_allow_html=True)
-    st.markdown('<p class="section-title">Performance Over Time</p>', unsafe_allow_html=True)
+    st.markdown('<p class="section-title">Single Variable Performance Over Time</p>', unsafe_allow_html=True)
 
     if 'time_gran' not in st.session_state:
         st.session_state.time_gran = 'Daily'
@@ -1227,7 +1227,7 @@ def dashboard_page():
 
     st.markdown(
         f'<p style="font-family:Outfit,sans-serif;font-size:1.64rem;font-weight:600;'
-        f'color:{PITCH_BRAND_COLOR};text-align:center;margin:8px 0 4px 0;">'
+        f'color:{PITCH_BRAND_COLOR};text-align:center;margin:8px 0 4px 0;text-transform:uppercase;letter-spacing:0.08em;">'
         f'{active_var} &nbsp;·&nbsp; {metric_choice}</p>',
         unsafe_allow_html=True
     )
