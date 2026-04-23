@@ -46,8 +46,8 @@ def apply_custom_theme(primary_color):
         /* ── SIDEBAR ── */
         [data-testid="stSidebar"] {{
             background-color: {SIDEBAR_BG} !important;
-            min-width: 210px !important;
-            max-width: 210px !important;
+            min-width: 252px !important;
+            max-width: 252px !important;
             padding-top: 0 !important;
         }}
         [data-testid="stSidebar"] > div:first-child {{
