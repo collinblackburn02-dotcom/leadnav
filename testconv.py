@@ -57,12 +57,12 @@ def apply_custom_theme(primary_color):
             color: {SIDEBAR_TEXT} !important;
         }}
 
-        /* Sidebar date pickers — black text so it's readable */
+        /* Sidebar date pickers — match secondary button scheme */
         [data-testid="stSidebar"] .stDateInput input {{
-            background: rgba(255,255,255,0.9) !important;
-            border: 1px solid rgba(196,181,253,0.3) !important;
+            background: rgba(255,255,255,0.05) !important;
+            border: 1px solid rgba(196,181,253,0.22) !important;
             border-radius: 8px !important;
-            color: #0F172A !important;
+            color: {SIDEBAR_TEXT} !important;
             font-size: 0.88rem !important;
             padding: 5px 9px !important;
         }}
@@ -74,7 +74,7 @@ def apply_custom_theme(primary_color):
             letter-spacing: 0.09em !important;
         }}
 
-        /* Sidebar number input — black text, compact */
+        /* Sidebar number input — match secondary button scheme, compact */
         [data-testid="stSidebar"] .stNumberInput {{
             margin-bottom: 0 !important;
         }}
@@ -82,10 +82,10 @@ def apply_custom_theme(primary_color):
             min-height: 0 !important;
         }}
         [data-testid="stSidebar"] .stNumberInput input {{
-            background: rgba(255,255,255,0.9) !important;
-            border: 1px solid rgba(196,181,253,0.3) !important;
+            background: rgba(255,255,255,0.05) !important;
+            border: 1px solid rgba(196,181,253,0.22) !important;
             border-radius: 8px 0 0 8px !important;
-            color: #0F172A !important;
+            color: {SIDEBAR_TEXT} !important;
             font-size: 0.88rem !important;
             text-align: center !important;
             padding: 3px 6px !important;
@@ -93,8 +93,8 @@ def apply_custom_theme(primary_color):
             min-height: 0 !important;
         }}
         [data-testid="stSidebar"] .stNumberInput button {{
-            background: rgba(255,255,255,0.15) !important;
-            border: 1px solid rgba(196,181,253,0.2) !important;
+            background: rgba(255,255,255,0.05) !important;
+            border: 1px solid rgba(196,181,253,0.22) !important;
             color: {SIDEBAR_TEXT} !important;
             height: 30px !important;
             min-height: 0 !important;
@@ -103,10 +103,10 @@ def apply_custom_theme(primary_color):
             font-size: 0.88rem !important;
         }}
 
-        /* Sidebar file uploader */
+        /* Sidebar file uploader — match secondary button scheme */
         [data-testid="stSidebar"] [data-testid="stFileUploader"] {{
             background: rgba(255,255,255,0.05) !important;
-            border: 1.5px dashed rgba(196,181,253,0.3) !important;
+            border: 1px solid rgba(196,181,253,0.22) !important;
             border-radius: 8px !important;
         }}
         [data-testid="stSidebar"] [data-testid="stFileUploader"] * {{
@@ -114,6 +114,10 @@ def apply_custom_theme(primary_color):
             font-size: 0.72rem !important;
         }}
         [data-testid="stSidebar"] [data-testid="stFileUploader"] button {{
+            background: rgba(255,255,255,0.05) !important;
+            border: 1px solid rgba(196,181,253,0.22) !important;
+            border-radius: 6px !important;
+            color: {SIDEBAR_TEXT} !important;
             font-size: 0.68rem !important;
             padding: 3px 8px !important;
         }}
@@ -145,7 +149,7 @@ def apply_custom_theme(primary_color):
             font-weight: 600 !important;
             padding: 3px 14px !important;
             white-space: nowrap !important;
-            margin-bottom: 3px !important;
+            margin-bottom: 1px !important;
             line-height: 1.3 !important;
             transition: all 0.15s ease !important;
             border-width: 1px !important;
