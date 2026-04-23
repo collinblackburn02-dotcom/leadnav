@@ -641,12 +641,16 @@ if 'client_name' not in st.session_state:
 
 # ================ 5. LOGIN PAGE =================
 def login_page():
-    # Hide sidebar on login page — prevents flash of sidebar content
+    # Hide sidebar, strip padding, go full viewport height
     st.markdown(
         '<style>'
         '[data-testid="stSidebar"]{display:none!important;}'
         '[data-testid="collapsedControl"]{display:none!important;}'
-        '.stHorizontalBlock{gap:0!important;}'
+        '[data-testid="stMain"]{padding:0!important;}'
+        '[data-testid="stMainBlockContainer"]{padding:0!important;max-width:100%!important;}'
+        '[data-testid="stHorizontalBlock"]{gap:0!important;min-height:100vh!important;align-items:stretch!important;}'
+        '[data-testid="stHorizontalBlock"]>[data-testid="stVerticalBlockBorderWrapper"]{min-height:100vh!important;}'
+        '[data-testid="stHorizontalBlock"] [data-testid="stVerticalBlock"]{min-height:100vh!important;}'
         '</style>',
         unsafe_allow_html=True
     )
@@ -655,8 +659,8 @@ def login_page():
 
     with left:
         st.markdown(f"""
-        <div style="background:#160A2E;border-radius:14px 0 0 14px;padding:40px 28px;
-                    min-height:580px;display:flex;flex-direction:column;justify-content:space-between;
+        <div style="background:#160A2E;padding:40px 28px;
+                    min-height:100vh;display:flex;flex-direction:column;justify-content:space-between;
                     box-sizing:border-box;">
           <div>
             <div style="font-family:'Playfair Display',serif;font-size:1.35rem;font-weight:700;color:#fff;">
@@ -702,12 +706,12 @@ def login_page():
               </div>
             </div>
           </div>
-          <div style="font-size:0.58rem;color:#3D2A5E;font-weight:500;">Powered by LeadNavigator HHS</div>
+          <div style="font-size:0.58rem;color:#3D2A5E;font-weight:500;">Powered by LeadNavigator.AI</div>
         </div>
         """, unsafe_allow_html=True)
 
     with right:
-        st.markdown("<br><br>", unsafe_allow_html=True)
+        st.markdown("<br><br><br><br>", unsafe_allow_html=True)
         st.markdown(
             f'<div style="text-align:center;margin-bottom:6px;">'
             f'<span class="serif-gradient-centerpiece" style="font-size:2rem;">Welcome to {PITCH_COMPANY_NAME}</span></div>',
