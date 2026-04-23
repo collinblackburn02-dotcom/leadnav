@@ -310,11 +310,11 @@ def apply_custom_theme(primary_color):
         .section-title {{
             font-family: 'Outfit', sans-serif;
             font-weight: 700;
-            font-size: 0.65rem;
+            font-size: 1.1rem;
             text-transform: uppercase;
-            letter-spacing: 0.13em;
-            color: #94A3B8;
-            margin: 0 0 10px 0;
+            letter-spacing: 0.1em;
+            color: #0F172A;
+            margin: 0 0 12px 0;
             padding: 0;
         }}
 
@@ -323,13 +323,13 @@ def apply_custom_theme(primary_color):
         .premium-table-container table {{ width: 100% !important; border-collapse: collapse !important; border: none !important; }}
         .premium-table-container th {{
             font-family: 'Outfit', sans-serif !important;
-            background-color: #FAFAFC !important;
-            color: #94A3B8 !important;
+            background-color: {primary_color} !important;
+            color: #FFFFFF !important;
             font-weight: 700 !important;
             text-align: center !important;
-            padding: 11px 12px !important;
-            border-bottom: 1.5px solid #EBE4F4 !important;
-            font-size: 0.62rem !important;
+            padding: 13px 12px !important;
+            border-bottom: none !important;
+            font-size: 0.72rem !important;
             text-transform: uppercase !important;
             letter-spacing: 0.1em !important;
         }}
@@ -342,7 +342,7 @@ def apply_custom_theme(primary_color):
             font-weight: 800 !important;
             color: #0F172A !important;
         }}
-        .premium-table-container td:first-child {{ color: #CBD5E1 !important; font-size: 0.9rem !important; }}
+        .premium-table-container td:first-child {{ color: {primary_color} !important; font-size: 0.9rem !important; font-weight: 700 !important; }}
         .premium-table-container td:nth-child(2) {{ color: {primary_color} !important; font-weight: 700 !important; }}
         .premium-table-container tr:last-child td {{ border-bottom: none !important; }}
 
@@ -374,15 +374,20 @@ def apply_custom_theme(primary_color):
             outline: none !important;
         }}
 
-        /* Main area buttons — all-caps, spaced */
-        .stButton > button {{
+        /* Main area buttons only — all-caps, spaced */
+        [data-testid="stMain"] .stButton > button {{
             white-space: nowrap !important;
-            font-size: 0.65rem !important;
+            font-size: 0.7rem !important;
             padding: 6px 14px !important;
             font-weight: 700 !important;
             text-transform: uppercase !important;
             letter-spacing: 0.09em !important;
             font-family: 'Outfit', sans-serif !important;
+        }}
+        /* Sidebar buttons — explicitly no uppercase so nothing bleeds through */
+        [data-testid="stSidebar"] .stButton > button {{
+            text-transform: none !important;
+            letter-spacing: normal !important;
         }}
 
         /* Multiselect tags (main area) */
