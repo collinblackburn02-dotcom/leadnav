@@ -1374,24 +1374,29 @@ def dashboard_page():
 
     valid_matrix_configs = [c for c in configs if c[1] != 'state']
 
-    # ── VARIABLE CHIP ROW ──
+    # ── VARIABLE CHIP ROW — st.pills naturally sizes to text, supports multi-select ──
     st.markdown('<p class="ctrl-label" style="margin-bottom:8px;">Include Variables</p>', unsafe_allow_html=True)
-    # Column widths proportional to label length so text never gets cut off
-    label_widths = [max(1.2, len(label) * 0.15) for label, _ in valid_matrix_configs]
-    spacer_w     = sum(label_widths) * 0.3
-    mx_cols = st.columns(label_widths + [spacer_w])
-    for i, (label, col_name) in enumerate(valid_matrix_configs):
-        is_active = col_name in st.session_state.matrix_vars
-        if mx_cols[i].button(label, key=f"mx_chip_{col_name}",
-                             type="primary" if is_active else "secondary",
-                             use_container_width=True):
-            if is_active:
-                st.session_state.matrix_vars = [v for v in st.session_state.matrix_vars if v != col_name]
-            else:
-                st.session_state.matrix_vars.append(col_name)
-                if col_name not in st.session_state.matrix_filters:
-                    st.session_state.matrix_filters[col_name] = []
-            st.rerun()
+
+    var_labels   = [label for label, _ in valid_matrix_configs]
+    label_to_col = {label: col for label, col in valid_matrix_configs}
+
+    selected_labels = st.pills(
+        "Variables",
+        options=var_labels,
+        selection_mode="multi",
+        label_visibility="collapsed",
+        key="mx_var_pills"
+    )
+    if selected_labels is None:
+        selected_labels = []
+
+    # Initialise filters for newly added variables
+    for lbl in selected_labels:
+        col_name = label_to_col[lbl]
+        if col_name not in st.session_state.matrix_filters:
+            st.session_state.matrix_filters[col_name] = []
+
+    st.session_state.matrix_vars = [label_to_col[l] for l in selected_labels]
 
     # ── FILTER PANELS ──
     _MX_NORM     = {'Homeowner': 'Yes', 'Renter': 'No', 'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female'}
