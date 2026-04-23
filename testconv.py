@@ -85,7 +85,7 @@ def apply_custom_theme(primary_color):
             min-height: 0 !important;
         }}
         /* Number input — single pill, one border on the outer row container */
-        [data-testid="stSidebar"] .stNumberInput > div > div:first-child {{
+        [data-testid="stSidebar"] .stNumberInput > div:last-child {{
             background: rgba(255,255,255,0.05) !important;
             border: 1.5px solid rgba(196,181,253,0.45) !important;
             border-radius: 999px !important;
@@ -94,9 +94,10 @@ def apply_custom_theme(primary_color):
             align-items: center !important;
             height: 34px !important;
         }}
-        /* Hide any extra divs Streamlit injects on focus */
-        [data-testid="stSidebar"] .stNumberInput > div > div:not(:first-child) {{
-            display: none !important;
+        /* Suppress focus ghost box on number input */
+        [data-testid="stSidebar"] .stNumberInput input:focus {{
+            outline: none !important;
+            box-shadow: none !important;
         }}
         /* Strip inner borders from all children */
         [data-testid="stSidebar"] .stNumberInput [data-baseweb="input"],
@@ -1372,12 +1373,15 @@ def dashboard_page():
 
     # ── VARIABLE CHIP ROW ──
     st.markdown('<p class="ctrl-label" style="margin-bottom:8px;">Include Variables</p>', unsafe_allow_html=True)
-    n_mx  = len(valid_matrix_configs)
-    mx_cols = st.columns([1] * n_mx + [n_mx])
+    # Column widths proportional to label length so text never gets cut off
+    label_widths = [max(1.2, len(label) * 0.15) for label, _ in valid_matrix_configs]
+    spacer_w     = sum(label_widths) * 0.3
+    mx_cols = st.columns(label_widths + [spacer_w])
     for i, (label, col_name) in enumerate(valid_matrix_configs):
         is_active = col_name in st.session_state.matrix_vars
         if mx_cols[i].button(label, key=f"mx_chip_{col_name}",
-                             type="primary" if is_active else "secondary"):
+                             type="primary" if is_active else "secondary",
+                             use_container_width=True):
             if is_active:
                 st.session_state.matrix_vars = [v for v in st.session_state.matrix_vars if v != col_name]
             else:
@@ -1411,8 +1415,9 @@ def dashboard_page():
             unsafe_allow_html=True
         )
 
-        n_opts   = len(opts)
-        opt_cols = st.columns([1] + [1] * n_opts + [max(1, n_opts)])
+        opt_widths = [0.8] + [max(1.0, len(o) * 0.13) for o in opts]
+        spacer_o   = sum(opt_widths) * 0.3
+        opt_cols   = st.columns(opt_widths + [spacer_o])
 
         if opt_cols[0].button("All", key=f"mx_all_{col_name}",
                               type="primary" if is_all else "secondary",
