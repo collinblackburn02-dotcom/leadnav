@@ -31,7 +31,7 @@ st.set_page_config(
     page_title=f"{PITCH_COMPANY_NAME} | Conversion Engine",
     page_icon="🧭",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
 def apply_custom_theme(primary_color):
@@ -711,15 +711,6 @@ def load_order_base(pixel_id, tenant_type):
 if 'app_state' not in st.session_state:
     st.session_state.app_state = 'login'
 
-# Hide sidebar immediately if not on dashboard — prevents flash of sidebar content on login
-if st.session_state.get('app_state', 'login') != 'dashboard':
-    st.markdown(
-        '<style>'
-        '[data-testid="stSidebar"]{display:none!important;}'
-        '[data-testid="collapsedControl"]{display:none!important;}'
-        '</style>',
-        unsafe_allow_html=True
-    )
 if 'pixel_id' not in st.session_state:
     st.session_state.pixel_id = None
 if 'tenant_type' not in st.session_state:
