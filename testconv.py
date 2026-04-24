@@ -19,6 +19,8 @@ N8N_WEBHOOK_URL = "https://n8n.srv1144572.hstgr.cloud/webhook/669d6ef0-1393-479e
 BQ_B2C_VISITOR_TABLE = "leadnav-hhs.leadnav_platform.b2c_visitor_summary"
 BQ_B2B_VISITOR_TABLE = "leadnav-hhs.leadnav_platform.b2b_visitor_summary"
 BQ_ORDERS_TABLE      = "leadnav-hhs.leadnav_platform.platform_order_data"
+BQ_USERS_TABLE       = "leadnav-hhs.leadnav_platform.platform_users"
+BQ_LOGIN_LOGS_TABLE  = "leadnav-hhs.leadnav_platform.platform_login_logs"
 
 EXCLUDE_LIST = ['Unknown', 'UNKNOWN', 'U', '', 'None', 'NONE', 'nan', 'NaN', 'null', 'NULL', '<NA>', 'ALL']
 
@@ -502,6 +504,40 @@ def apply_custom_theme(primary_color):
         }}
 
 
+        /* ── MAIN VIEW TAB SELECTOR — top right, underline style ── */
+        .st-key-main_tab_selector > div[role="radiogroup"],
+        .st-key-main_tab_selector > div {{
+            gap: 0 !important;
+            border-bottom: 1.5px solid #EBE4F4 !important;
+            justify-content: flex-end !important;
+        }}
+        .st-key-main_tab_selector [data-baseweb="radio"] {{
+            border-radius: 0 !important;
+            background: transparent !important;
+            border: none !important;
+            padding: 3px 9px 5px !important;
+            border-bottom: 1.5px solid transparent !important;
+            margin-bottom: -1.5px !important;
+            cursor: pointer !important;
+        }}
+        .st-key-main_tab_selector [data-baseweb="radio"]:has(input:checked) {{
+            border-bottom-color: {primary_color} !important;
+        }}
+        .st-key-main_tab_selector [data-baseweb="radio"] > div:first-child {{
+            display: none !important;
+        }}
+        .st-key-main_tab_selector [data-baseweb="radio"] > div:last-child p {{
+            font-size: 0.42rem !important;
+            font-weight: 700 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.12em !important;
+            color: #94A3B8 !important;
+            margin: 0 !important;
+        }}
+        .st-key-main_tab_selector [data-baseweb="radio"]:has(input:checked) > div:last-child p {{
+            color: {primary_color} !important;
+        }}
+
         /* ── VARIABLE SELECTOR RADIO-AS-PILLS ── */
         [data-testid="stMain"] .stRadio > label {{
             display: none !important;
@@ -723,6 +759,12 @@ if 'has_unsaved_enrichment' not in st.session_state:
     st.session_state.has_unsaved_enrichment = False
 if 'pending_save_orders' not in st.session_state:
     st.session_state.pending_save_orders = pd.DataFrame()
+if 'is_admin' not in st.session_state:
+    st.session_state.is_admin = False
+if 'main_tab_selector' not in st.session_state:
+    st.session_state.main_tab_selector = 'Customer Insights'
+if 'cust_metric' not in st.session_state:
+    st.session_state.cust_metric = '% of Purchasers'
 
 # ================ 5. LOGIN PAGE =================
 def login_page():
@@ -810,30 +852,37 @@ def login_page():
             password = st.text_input("Password", type="password", key="login_password")
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("Sign In", use_container_width=True, type="primary"):
-                users = dict(st.secrets.get("users", {}))
-                if username in users and users[username].get("password") == password:
-                    st.session_state.username = username
-                    st.session_state.pixel_id = users[username].get("pixel_id")
-                    st.session_state.tenant_type = users[username].get("tenant_type")
-                    st.session_state.client_name = users[username].get("client_name", username.replace("_", " ").title())
-                    with st.spinner("Syncing your data..."):
-                        df_demo, df_state, error = load_visitor_base(
-                            st.session_state.pixel_id, st.session_state.tenant_type
-                        )
-                        df_orders, order_error = load_order_base(
-                            st.session_state.pixel_id, st.session_state.tenant_type
-                        )
-                    if error:
-                        st.error(f"Error loading visitor data: {error}")
-                    elif order_error:
-                        st.error(f"Error loading order data: {order_error}")
-                    else:
-                        st.session_state.df_demo = df_demo
-                        st.session_state.df_state = df_state
-                        st.session_state.df_orders = df_orders
-                        st.session_state.app_state = 'dashboard'
+                user_info, auth_error = authenticate_user(username, password)
+                if user_info:
+                    st.session_state.username    = username
+                    st.session_state.pixel_id    = user_info['pixel_id']
+                    st.session_state.tenant_type = user_info['tenant_type']
+                    st.session_state.client_name = user_info['client_name']
+                    st.session_state.is_admin    = user_info.get('is_admin', False)
+                    log_login(username, True, user_info['pixel_id'])
+                    if user_info.get('is_admin'):
+                        st.session_state.app_state = 'admin'
                         st.rerun()
+                    else:
+                        with st.spinner("Syncing your data..."):
+                            df_demo, df_state, error = load_visitor_base(
+                                st.session_state.pixel_id, st.session_state.tenant_type
+                            )
+                            df_orders, order_error = load_order_base(
+                                st.session_state.pixel_id, st.session_state.tenant_type
+                            )
+                        if error:
+                            st.error(f"Error loading visitor data: {error}")
+                        elif order_error:
+                            st.error(f"Error loading order data: {order_error}")
+                        else:
+                            st.session_state.df_demo   = df_demo
+                            st.session_state.df_state  = df_state
+                            st.session_state.df_orders = df_orders
+                            st.session_state.app_state = 'dashboard'
+                            st.rerun()
                 else:
+                    log_login(username, False)
                     st.error("Invalid username or password")
             st.markdown(
                 '<p style="text-align:center;font-size:0.72rem;color:#94A3B8;margin-top:14px;">'
@@ -1056,7 +1105,409 @@ def save_enriched_orders_to_bq(pixel_id):
     except Exception as e:
         return False, f"Error saving to database: {e}"
 
-# ================ 8. DASHBOARD PAGE =================
+# ================ 7C. ADMIN HELPER FUNCTIONS =================
+
+def ensure_admin_tables(client):
+    """Create admin tables if they don't exist."""
+    users_ddl = f"""
+    CREATE TABLE IF NOT EXISTS `{BQ_USERS_TABLE}` (
+        username STRING,
+        password STRING,
+        pixel_id STRING,
+        tenant_type STRING,
+        client_name STRING,
+        is_admin BOOL,
+        is_active BOOL,
+        created_at TIMESTAMP
+    )"""
+    logs_ddl = f"""
+    CREATE TABLE IF NOT EXISTS `{BQ_LOGIN_LOGS_TABLE}` (
+        username STRING,
+        login_timestamp TIMESTAMP,
+        success BOOL,
+        pixel_id STRING
+    )"""
+    try:
+        client.query(users_ddl).result()
+        client.query(logs_ddl).result()
+    except Exception:
+        pass
+
+def authenticate_user(username, password):
+    """Authenticate via BQ users table, fall back to st.secrets."""
+    try:
+        client = get_bq_client()
+        ensure_admin_tables(client)
+        query = f"""
+        SELECT * FROM `{BQ_USERS_TABLE}`
+        WHERE username = @username AND password = @password AND is_active = true
+        LIMIT 1
+        """
+        job_config = bigquery.QueryJobConfig(query_parameters=[
+            bigquery.ScalarQueryParameter("username", "STRING", username),
+            bigquery.ScalarQueryParameter("password", "STRING", password),
+        ])
+        df = client.query(query, job_config=job_config).to_dataframe()
+        if not df.empty:
+            row = df.iloc[0]
+            return {
+                'pixel_id':   str(row['pixel_id']),
+                'tenant_type': str(row['tenant_type']),
+                'client_name': str(row['client_name']),
+                'is_admin':    bool(row['is_admin']),
+            }, None
+    except Exception:
+        pass
+    # Fallback: st.secrets
+    users = dict(st.secrets.get("users", {}))
+    if username in users and users[username].get("password") == password:
+        return {
+            'pixel_id':    users[username].get('pixel_id', ''),
+            'tenant_type': users[username].get('tenant_type', 'B2C'),
+            'client_name': users[username].get('client_name', username.replace('_', ' ').title()),
+            'is_admin':    users[username].get('is_admin', False),
+        }, None
+    return None, "Invalid username or password"
+
+def log_login(username, success, pixel_id=""):
+    """Log a login attempt to BigQuery."""
+    try:
+        client = get_bq_client()
+        client.insert_rows_json(BQ_LOGIN_LOGS_TABLE, [{
+            'username':        username,
+            'login_timestamp': datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S'),
+            'success':         success,
+            'pixel_id':        pixel_id,
+        }])
+    except Exception:
+        pass
+
+def get_all_users():
+    try:
+        client = get_bq_client()
+        df = client.query(f"SELECT * FROM `{BQ_USERS_TABLE}` ORDER BY created_at DESC").to_dataframe()
+        return df, None
+    except Exception as e:
+        return pd.DataFrame(), str(e)
+
+def save_user_to_bq(username, password, pixel_id, tenant_type, client_name, is_admin=False, is_active=True):
+    try:
+        client = get_bq_client()
+        # Upsert: delete existing then insert
+        del_cfg = bigquery.QueryJobConfig(query_parameters=[
+            bigquery.ScalarQueryParameter("username", "STRING", username)
+        ])
+        client.query(f"DELETE FROM `{BQ_USERS_TABLE}` WHERE username = @username", job_config=del_cfg).result()
+        errors = client.insert_rows_json(BQ_USERS_TABLE, [{
+            'username': username, 'password': password, 'pixel_id': pixel_id,
+            'tenant_type': tenant_type, 'client_name': client_name,
+            'is_admin': is_admin, 'is_active': is_active,
+            'created_at': datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S'),
+        }])
+        return (False, str(errors)) if errors else (True, "User saved.")
+    except Exception as e:
+        return False, str(e)
+
+def set_user_active(username, active):
+    try:
+        client = get_bq_client()
+        cfg = bigquery.QueryJobConfig(query_parameters=[
+            bigquery.ScalarQueryParameter("username", "STRING", username),
+            bigquery.ScalarQueryParameter("active",   "BOOL",   active),
+        ])
+        client.query(
+            f"UPDATE `{BQ_USERS_TABLE}` SET is_active=@active WHERE username=@username",
+            job_config=cfg
+        ).result()
+        return True, "Updated."
+    except Exception as e:
+        return False, str(e)
+
+def delete_user_from_bq(username):
+    try:
+        client = get_bq_client()
+        cfg = bigquery.QueryJobConfig(query_parameters=[
+            bigquery.ScalarQueryParameter("username", "STRING", username)
+        ])
+        client.query(f"DELETE FROM `{BQ_USERS_TABLE}` WHERE username=@username", job_config=cfg).result()
+        return True, "User deleted."
+    except Exception as e:
+        return False, str(e)
+
+def get_usage_summary():
+    """Per-client usage stats from BQ."""
+    try:
+        client = get_bq_client()
+        orders_q = f"""
+        SELECT pixel_id,
+               COUNT(DISTINCT order_id) AS total_orders,
+               ROUND(COUNTIF(gender IS NOT NULL AND gender != 'Unknown') / NULLIF(COUNT(*),0) * 100, 1) AS match_rate_pct,
+               MAX(order_date) AS last_upload
+        FROM `{BQ_ORDERS_TABLE}`
+        GROUP BY pixel_id
+        """
+        logins_q = f"""
+        SELECT pixel_id, MAX(login_timestamp) AS last_login
+        FROM `{BQ_LOGIN_LOGS_TABLE}`
+        WHERE success = true
+        GROUP BY pixel_id
+        """
+        df_orders = client.query(orders_q).to_dataframe()
+        df_logins = client.query(logins_q).to_dataframe()
+        df = pd.merge(df_orders, df_logins, on='pixel_id', how='left')
+        return df, None
+    except Exception as e:
+        return pd.DataFrame(), str(e)
+
+def get_login_history(limit=50):
+    try:
+        client = get_bq_client()
+        df = client.query(f"""
+        SELECT username, login_timestamp, success, pixel_id
+        FROM `{BQ_LOGIN_LOGS_TABLE}`
+        ORDER BY login_timestamp DESC
+        LIMIT {limit}
+        """).to_dataframe()
+        return df, None
+    except Exception as e:
+        return pd.DataFrame(), str(e)
+
+def get_aggregate_analytics(start_date=None, end_date=None):
+    """Aggregate + per-client analytics from BQ visitor + orders tables."""
+    try:
+        client = get_bq_client()
+        date_filter = ""
+        if start_date and end_date:
+            date_filter = f"WHERE order_date BETWEEN '{start_date}' AND '{end_date}'"
+        per_client_q = f"""
+        SELECT
+            o.pixel_id,
+            COUNT(DISTINCT o.order_id)                                              AS purchases,
+            ROUND(SUM(o.revenue), 2)                                                AS revenue,
+            MAX(v.total_visitors)                                                   AS visitors
+        FROM `{BQ_ORDERS_TABLE}` o
+        LEFT JOIN (
+            SELECT pixel_id, SUM(total_visitors) AS total_visitors
+            FROM `{BQ_B2C_VISITOR_TABLE}` GROUP BY pixel_id
+        ) v USING (pixel_id)
+        {date_filter}
+        GROUP BY o.pixel_id
+        """
+        df = client.query(per_client_q).to_dataframe()
+        df['conv_pct']     = (df['purchases'] / df['visitors'].replace(0, 1) * 100).round(2)
+        df['rev_per_visit'] = (df['revenue'] / df['visitors'].replace(0, 1)).round(2)
+        return df, None
+    except Exception as e:
+        return pd.DataFrame(), str(e)
+
+# ================ 8. ADMIN PAGE =================
+def admin_page():
+    # Hide sidebar for admin
+    st.markdown('<style>[data-testid="stSidebar"]{display:none!important;}[data-testid="collapsedControl"]{display:none!important;}</style>', unsafe_allow_html=True)
+
+    # Header
+    hdr_l, hdr_r = st.columns([8, 1])
+    with hdr_l:
+        st.markdown(
+            f'<div style="font-family:\'Playfair Display\',serif;font-size:1.8rem;font-weight:700;color:#0F172A;padding:1rem 0 0.5rem 0;">'
+            f'Lead<span style="color:{PITCH_BRAND_COLOR};">Navigator</span> '
+            f'<span style="font-size:1rem;font-weight:600;color:#94A3B8;font-family:Outfit,sans-serif;"> Admin Console</span></div>',
+            unsafe_allow_html=True
+        )
+    with hdr_r:
+        if st.button("Logout", key="admin_logout"):
+            for k in ['app_state','username','pixel_id','tenant_type','client_name','is_admin']:
+                st.session_state[k] = 'login' if k == 'app_state' else None
+            st.rerun()
+
+    st.divider()
+
+    tab1, tab2, tab3, tab4 = st.tabs(["👥  Users", "📁  Data Management", "📊  Usage", "🔢  Analytics"])
+
+    # ── TAB 1: USER MANAGEMENT ──────────────────────────────
+    with tab1:
+        st.markdown('<p class="section-title">User Management</p>', unsafe_allow_html=True)
+        users_df, err = get_all_users()
+        if err:
+            st.warning(f"Could not load users from database: {err}. Using st.secrets fallback.")
+            secrets_users = dict(st.secrets.get("users", {}))
+            users_df = pd.DataFrame([
+                {'username': u, 'client_name': d.get('client_name', u), 'pixel_id': d.get('pixel_id',''),
+                 'tenant_type': d.get('tenant_type','B2C'), 'is_admin': d.get('is_admin', False), 'is_active': True}
+                for u, d in secrets_users.items()
+            ])
+
+        if not users_df.empty:
+            for _, row in users_df.iterrows():
+                uname = row['username']
+                active = bool(row.get('is_active', True))
+                with st.expander(f"{'🔑 ' if row.get('is_admin') else '👤 '} {uname}  —  {row.get('client_name','')}  ({row.get('pixel_id','')})"):
+                    ec1, ec2, ec3 = st.columns(3)
+                    new_pw     = ec1.text_input("New password", key=f"pw_{uname}", placeholder="leave blank to keep")
+                    new_client = ec2.text_input("Client name", value=row.get('client_name',''), key=f"cn_{uname}")
+                    new_pixel  = ec3.text_input("Pixel ID",    value=row.get('pixel_id',''),   key=f"px_{uname}")
+                    ec4, ec5, ec6, ec7 = st.columns(4)
+                    new_tenant = ec4.selectbox("Tenant type", ["B2C","B2B"], index=0 if row.get('tenant_type')=="B2C" else 1, key=f"tt_{uname}")
+                    new_admin  = ec5.checkbox("Admin", value=bool(row.get('is_admin',False)), key=f"adm_{uname}")
+
+                    ba, bd, bt = ec6.button("💾 Save", key=f"save_{uname}"), ec7.button("🗑 Delete", key=f"del_{uname}"), ec6.button(f"{'🔴 Deactivate' if active else '🟢 Activate'}", key=f"tog_{uname}")
+                    if ba:
+                        pw = new_pw if new_pw else str(row.get('password',''))
+                        ok, msg = save_user_to_bq(uname, pw, new_pixel, new_tenant, new_client, new_admin, active)
+                        st.success(msg) if ok else st.error(msg)
+                        st.rerun()
+                    if bd:
+                        ok, msg = delete_user_from_bq(uname)
+                        st.success(msg) if ok else st.error(msg)
+                        st.rerun()
+                    if bt:
+                        ok, msg = set_user_active(uname, not active)
+                        st.success(msg) if ok else st.error(msg)
+                        st.rerun()
+
+        st.markdown("---")
+        st.markdown('<p class="section-title">Add New User</p>', unsafe_allow_html=True)
+        with st.form("add_user_form"):
+            nc1, nc2, nc3 = st.columns(3)
+            nu = nc1.text_input("Username")
+            np_ = nc2.text_input("Password", type="password")
+            npi = nc3.text_input("Pixel ID")
+            nc4, nc5, nc6 = st.columns(3)
+            ncn  = nc4.text_input("Client name")
+            ntt  = nc5.selectbox("Tenant type", ["B2C","B2B"])
+            nadm = nc6.checkbox("Admin user")
+            if st.form_submit_button("Add User", type="primary"):
+                if nu and np_ and npi:
+                    ok, msg = save_user_to_bq(nu, np_, npi, ntt, ncn or nu, nadm, True)
+                    st.success(msg) if ok else st.error(msg)
+                    st.rerun()
+                else:
+                    st.error("Username, password and pixel ID are required.")
+
+    # ── TAB 2: DATA MANAGEMENT ──────────────────────────────
+    with tab2:
+        st.markdown('<p class="section-title">Data Management</p>', unsafe_allow_html=True)
+        all_users, _ = get_all_users()
+        client_options = []
+        if not all_users.empty:
+            client_options = all_users[~all_users['is_admin'].fillna(False)][['client_name','pixel_id','tenant_type']].drop_duplicates().values.tolist()
+
+        if client_options:
+            client_labels = [f"{c[0]} ({c[1]})" for c in client_options]
+            sel_idx = st.selectbox("Select client", range(len(client_labels)), format_func=lambda i: client_labels[i], key="admin_client_sel")
+            sel_client = client_options[sel_idx]
+            sel_pixel, sel_tenant = sel_client[1], sel_client[2]
+
+            dcol1, dcol2 = st.columns(2)
+            with dcol1:
+                if st.button("👁 View as this client", type="primary"):
+                    with st.spinner("Loading client data..."):
+                        df_demo, df_state, err = load_visitor_base(sel_pixel, sel_tenant)
+                        df_orders, oerr = load_order_base(sel_pixel, sel_tenant)
+                    if not err and not oerr:
+                        st.session_state.pixel_id    = sel_pixel
+                        st.session_state.tenant_type = sel_tenant
+                        st.session_state.client_name = sel_client[0]
+                        st.session_state.df_demo     = df_demo
+                        st.session_state.df_state    = df_state
+                        st.session_state.df_orders   = df_orders
+                        st.session_state.app_state   = 'dashboard'
+                        st.rerun()
+                    else:
+                        st.error(err or oerr)
+
+            st.markdown("---")
+            st.markdown(f'<p class="ctrl-label">Upload orders for {sel_client[0]}</p>', unsafe_allow_html=True)
+            adm_upload = st.file_uploader("Upload CSV", type=['csv'], key="admin_upload")
+            if adm_upload:
+                adm_btn = st.button("Upload & Enrich", type="primary", key="admin_enrich_btn")
+                adm_slot = st.empty()
+                if adm_btn:
+                    adm_slot.info("⏳ Uploading & enriching... This can take up to 3 minutes.")
+                    ok, msg = run_enrichment(adm_upload, sel_pixel, sel_tenant)
+                    adm_slot.success(msg) if ok else adm_slot.error(msg)
+
+            st.markdown("---")
+            st.markdown('<p class="ctrl-label" style="color:#E11D48;">Danger Zone</p>', unsafe_allow_html=True)
+            try:
+                client_bq = get_bq_client()
+                cfg = bigquery.QueryJobConfig(query_parameters=[bigquery.ScalarQueryParameter("pid","STRING",sel_pixel)])
+                cnt = client_bq.query(f"SELECT COUNT(*) as n FROM `{BQ_ORDERS_TABLE}` WHERE pixel_id=@pid", job_config=cfg).to_dataframe().iloc[0]['n']
+                st.warning(f"This client has **{int(cnt):,}** orders in BigQuery.")
+                if st.button(f"🗑 Delete ALL orders for {sel_client[0]}", key="admin_del_orders"):
+                    client_bq.query(f"DELETE FROM `{BQ_ORDERS_TABLE}` WHERE pixel_id=@pid", job_config=cfg).result()
+                    load_order_base.clear()
+                    st.success("All orders deleted.")
+                    st.rerun()
+            except Exception as e:
+                st.error(str(e))
+        else:
+            st.info("No client users found. Add users in the Users tab first.")
+
+    # ── TAB 3: USAGE ────────────────────────────────────────
+    with tab3:
+        st.markdown('<p class="section-title">Usage Summary</p>', unsafe_allow_html=True)
+        usage_df, uerr = get_usage_summary()
+        if uerr:
+            st.error(f"Could not load usage data: {uerr}")
+        elif not usage_df.empty:
+            # Merge with user table to get client names
+            if not all_users.empty:
+                usage_df = usage_df.merge(all_users[['pixel_id','client_name']], on='pixel_id', how='left')
+            usage_df['match_rate_pct'] = usage_df['match_rate_pct'].fillna(0).astype(str) + '%'
+            usage_df['last_upload']    = pd.to_datetime(usage_df['last_upload'], errors='coerce').dt.strftime('%Y-%m-%d')
+            usage_df['last_login']     = pd.to_datetime(usage_df['last_login'],  errors='coerce').dt.strftime('%Y-%m-%d %H:%M')
+            disp = usage_df[['client_name','pixel_id','total_orders','match_rate_pct','last_upload','last_login']].rename(columns={
+                'client_name': 'Client', 'pixel_id': 'Pixel ID', 'total_orders': 'Orders Saved',
+                'match_rate_pct': 'Match Rate', 'last_upload': 'Last Upload', 'last_login': 'Last Login'
+            })
+            st.dataframe(disp, use_container_width=True, hide_index=True)
+        else:
+            st.info("No usage data yet.")
+
+        st.markdown('<p class="section-title" style="margin-top:2rem;">Login History</p>', unsafe_allow_html=True)
+        log_df, lerr = get_login_history(50)
+        if not lerr and not log_df.empty:
+            log_df['login_timestamp'] = pd.to_datetime(log_df['login_timestamp'], errors='coerce').dt.strftime('%Y-%m-%d %H:%M:%S')
+            log_df['success'] = log_df['success'].map({True: '✅', False: '❌'})
+            st.dataframe(log_df.rename(columns={'username':'User','login_timestamp':'Time','success':'Result','pixel_id':'Pixel'}),
+                         use_container_width=True, hide_index=True)
+        else:
+            st.info("No login history yet.")
+
+    # ── TAB 4: ANALYTICS ────────────────────────────────────
+    with tab4:
+        st.markdown('<p class="section-title">Analytics</p>', unsafe_allow_html=True)
+        anal_df, aerr = get_aggregate_analytics()
+        if aerr:
+            st.error(f"Could not load analytics: {aerr}")
+        elif not anal_df.empty:
+            # Aggregate KPI cards
+            tot_v = int(anal_df['visitors'].sum())
+            tot_r = float(anal_df['revenue'].sum())
+            tot_p = int(anal_df['purchases'].sum())
+            avg_c = (tot_p / tot_v * 100) if tot_v > 0 else 0
+            k1, k2, k3, k4 = st.columns(4)
+            for col, lbl, val in zip([k1,k2,k3,k4],
+                ['Total Visitors','Total Revenue','Total Purchases','Avg Conv Rate'],
+                [f'{tot_v:,.0f}', f'${tot_r:,.0f}', f'{tot_p:,.0f}', f'{avg_c:.2f}%']):
+                col.markdown(f'<div class="kpi-card"><div class="kpi-label">{lbl}</div><div class="kpi-value">{val}</div></div>', unsafe_allow_html=True)
+
+            st.markdown('<p class="section-title" style="margin-top:1.5rem;">Per-Client Breakdown</p>', unsafe_allow_html=True)
+            if not all_users.empty:
+                anal_df = anal_df.merge(all_users[['pixel_id','client_name']], on='pixel_id', how='left')
+            anal_df['conv_pct']      = anal_df['conv_pct'].map(lambda x: f'{x:.2f}%')
+            anal_df['rev_per_visit'] = anal_df['rev_per_visit'].map(lambda x: f'${x:,.2f}')
+            anal_df['revenue']       = anal_df['revenue'].map(lambda x: f'${x:,.0f}')
+            disp_a = anal_df[['client_name','pixel_id','visitors','purchases','revenue','conv_pct','rev_per_visit']].rename(columns={
+                'client_name':'Client','pixel_id':'Pixel ID','visitors':'Visitors',
+                'purchases':'Purchases','revenue':'Revenue','conv_pct':'Conv %','rev_per_visit':'Rev/Visitor'
+            })
+            st.dataframe(disp_a, use_container_width=True, hide_index=True)
+        else:
+            st.info("No analytics data yet.")
+
+# ================ 9. DASHBOARD PAGE =================
 def dashboard_page():
     tenant_type = st.session_state.tenant_type
     pixel_id    = st.session_state.pixel_id
@@ -1167,14 +1618,23 @@ def dashboard_page():
             end_date   = st.date_input("End Date",   st.session_state.date_range[1], key="sb_end")
             st.session_state.date_range = (start_date, end_date)
 
-        # ── RANK BY ──
+        # ── RANK BY (adapts to active tab) ──
         with st.expander("Rank By", expanded=False):
-            for m in metrics:
-                is_active = (st.session_state.metric_choice == m)
-                if st.button(m, key=f"metric_{m}",
-                             type="primary" if is_active else "secondary"):
-                    st.session_state.metric_choice = m
-                    st.rerun()
+            _cur_tab = st.session_state.get('main_tab_selector', 'Customer Insights')
+            if _cur_tab == 'Customer Insights':
+                cust_rank_opts = ["% of Purchasers", "AOV", "Revenue", "Purchases"]
+                for m in cust_rank_opts:
+                    if st.button(m, key=f"cust_metric_{m}",
+                                 type="primary" if st.session_state.cust_metric == m else "secondary"):
+                        st.session_state.cust_metric = m
+                        st.rerun()
+            else:
+                for m in metrics:
+                    is_active = (st.session_state.metric_choice == m)
+                    if st.button(m, key=f"metric_{m}",
+                                 type="primary" if is_active else "secondary"):
+                        st.session_state.metric_choice = m
+                        st.rerun()
 
         # ── SORT BY ──
         with st.expander("Sort By", expanded=False):
@@ -1271,9 +1731,20 @@ def dashboard_page():
 
 
     # =====================================================
-    # DASHBOARD TITLE
+    # TAB SELECTOR (top right) + TITLE
     # =====================================================
     client_name = st.session_state.get('client_name') or st.session_state.get('username', '')
+
+    _, tab_r = st.columns([7, 2])
+    with tab_r:
+        active_tab = st.radio(
+            "View",
+            ["Customer Insights", "Conversion Insights"],
+            horizontal=True,
+            label_visibility="collapsed",
+            key="main_tab_selector"
+        )
+
     st.markdown(
         f'<div style="text-align:center; margin-bottom: 0.8rem;">'
         f'<span class="serif-gradient-centerpiece" style="font-size: 2.6rem;">'
@@ -1282,50 +1753,42 @@ def dashboard_page():
     )
 
     # =====================================================
-    # KPI CARDS
+    # KPI CARDS (adapt to active tab)
     # =====================================================
-    total_visitors  = int(df_demo_filtered['total_visitors'].sum()) if not df_demo_filtered.empty else 0
     total_revenue   = float(df_p_filtered['Total'].sum()) if not df_p_filtered.empty and 'Total' in df_p_filtered.columns else 0.0
     total_purchases = int(df_p_filtered['Order_ID'].nunique()) if not df_p_filtered.empty and 'Order_ID' in df_p_filtered.columns else 0
+    total_visitors  = int(df_demo_filtered['total_visitors'].sum()) if not df_demo_filtered.empty else 0
     conv_rate       = (total_purchases / total_visitors * 100) if total_visitors > 0 else 0.0
     rev_per_visitor = (total_revenue / total_visitors) if total_visitors > 0 else 0.0
+    overall_aov     = (total_revenue / total_purchases) if total_purchases > 0 else 0.0
 
     k1, k2, k3, k4 = st.columns(4)
-    with k1:
-        st.markdown(
-            f'<div class="kpi-card"><div class="kpi-label">Total Visitors</div>'
-            f'<div class="kpi-value">{total_visitors:,.0f}</div>'
-            f'<div class="kpi-sub">{start_date} – {end_date}</div></div>',
-            unsafe_allow_html=True
-        )
-    with k2:
-        st.markdown(
-            f'<div class="kpi-card"><div class="kpi-label">Total Revenue</div>'
-            f'<div class="kpi-value">${total_revenue:,.0f}</div>'
-            f'<div class="kpi-sub">{total_purchases:,} orders</div></div>',
-            unsafe_allow_html=True
-        )
-    with k3:
-        st.markdown(
-            f'<div class="kpi-card"><div class="kpi-label">Conversion Rate</div>'
-            f'<div class="kpi-value">{conv_rate:.2f}%</div>'
-            f'<div class="kpi-sub">of visitors purchased</div></div>',
-            unsafe_allow_html=True
-        )
-    with k4:
-        st.markdown(
-            f'<div class="kpi-card"><div class="kpi-label">Revenue Per Visitor</div>'
-            f'<div class="kpi-value">${rev_per_visitor:,.2f}</div>'
-            f'<div class="kpi-sub">avg across date range</div></div>',
-            unsafe_allow_html=True
-        )
+    if active_tab == 'Customer Insights':
+        with k1:
+            st.markdown(f'<div class="kpi-card"><div class="kpi-label">Total Revenue</div><div class="kpi-value">${total_revenue:,.0f}</div><div class="kpi-sub">{total_purchases:,} orders</div></div>', unsafe_allow_html=True)
+        with k2:
+            st.markdown(f'<div class="kpi-card"><div class="kpi-label">Total Purchases</div><div class="kpi-value">{total_purchases:,}</div><div class="kpi-sub">{start_date} – {end_date}</div></div>', unsafe_allow_html=True)
+        with k3:
+            st.markdown(f'<div class="kpi-card"><div class="kpi-label">Avg Order Value</div><div class="kpi-value">${overall_aov:,.2f}</div><div class="kpi-sub">across all segments</div></div>', unsafe_allow_html=True)
+        with k4:
+            st.markdown(f'<div class="kpi-card"><div class="kpi-label">Date Range</div><div class="kpi-value" style="font-size:1rem;">{start_date}</div><div class="kpi-sub">→ {end_date}</div></div>', unsafe_allow_html=True)
+    else:
+        with k1:
+            st.markdown(f'<div class="kpi-card"><div class="kpi-label">Total Visitors</div><div class="kpi-value">{total_visitors:,.0f}</div><div class="kpi-sub">{start_date} – {end_date}</div></div>', unsafe_allow_html=True)
+        with k2:
+            st.markdown(f'<div class="kpi-card"><div class="kpi-label">Total Revenue</div><div class="kpi-value">${total_revenue:,.0f}</div><div class="kpi-sub">{total_purchases:,} orders</div></div>', unsafe_allow_html=True)
+        with k3:
+            st.markdown(f'<div class="kpi-card"><div class="kpi-label">Conversion Rate</div><div class="kpi-value">{conv_rate:.2f}%</div><div class="kpi-sub">of visitors purchased</div></div>', unsafe_allow_html=True)
+        with k4:
+            st.markdown(f'<div class="kpi-card"><div class="kpi-label">Revenue Per Visitor</div><div class="kpi-value">${rev_per_visitor:,.2f}</div><div class="kpi-sub">avg across date range</div></div>', unsafe_allow_html=True)
 
     # =====================================================
     # ACTIVE FILTER PILLS
     # =====================================================
+    active_rank_label = st.session_state.cust_metric if active_tab == 'Customer Insights' else metric_choice
     pills_html = '<div class="filter-pills-row">'
     pills_html += f'<span class="filter-pill">📅 {start_date} → {end_date}</span>'
-    pills_html += f'<span class="filter-pill">🏅 {metric_choice}</span>'
+    pills_html += f'<span class="filter-pill">🏅 {active_rank_label}</span>'
     pills_html += f'<span class="filter-pill">↕ {sort_label}</span>'
     if min_purchasers > 0:
         pills_html += f'<span class="filter-pill">≥ {min_purchasers} purchases</span>'
@@ -1335,7 +1798,121 @@ def dashboard_page():
     st.divider()
 
     # =====================================================
-    # SINGLE VARIABLE DEEP DIVE
+    # CUSTOMER INSIGHTS TAB
+    # =====================================================
+    if active_tab == 'Customer Insights':
+        _CUST_NORM = {'Homeowner': 'Yes', 'Renter': 'No', 'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female'}
+        cust_configs = [c for c in configs if c[1] != 'state']
+        cust_metric  = st.session_state.cust_metric
+
+        st.markdown('<p class="section-title">Customer Analysis</p>', unsafe_allow_html=True)
+
+        if 'active_cust_var' not in st.session_state:
+            st.session_state.active_cust_var = cust_configs[0][0]
+
+        cust_var_labels = [label for label, _ in cust_configs]
+        cust_idx = cust_var_labels.index(st.session_state.active_cust_var) if st.session_state.active_cust_var in cust_var_labels else 0
+        active_cust_var = st.radio("Customer variable", options=cust_var_labels, index=cust_idx,
+                                   horizontal=True, label_visibility="collapsed", key="cust_var_radio")
+        st.session_state.active_cust_var = active_cust_var
+        cust_col = dict(cust_configs)[active_cust_var]
+
+        if not df_p_filtered.empty and cust_col in df_p_filtered.columns:
+            cust_df = df_p_filtered.copy()
+            cust_df[cust_col] = cust_df[cust_col].replace(_CUST_NORM)
+            # Display-level remap
+            cust_df[cust_col] = cust_df[cust_col].replace({'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female'})
+
+            grp = cust_df[~cust_df[cust_col].isin(EXCLUDE_LIST)].groupby(cust_col).agg(
+                Purchases=('Order_ID', 'nunique'), Revenue=('Total', 'sum')
+            ).reset_index()
+
+            grp = grp[grp['Purchases'] >= min_purchasers]
+            if not grp.empty:
+                total_purch = grp['Purchases'].sum()
+                grp['AOV']              = (grp['Revenue'] / grp['Purchases'].replace(0, 1)).round(2)
+                grp['% of Purchasers']  = (grp['Purchases'] / total_purch * 100).round(2)
+                grp = grp.sort_values(cust_metric, ascending=is_ascending)
+                grp.insert(0, 'Rank', range(1, len(grp) + 1))
+
+                display_df   = grp.rename(columns={cust_col: active_cust_var})
+                display_cols = ['Rank', active_cust_var, 'Revenue', 'Purchases', '% of Purchasers', 'AOV']
+                styler = display_df[display_cols].style\
+                    .set_properties(**{'font-weight': '800'}, subset=[cust_metric] if cust_metric in display_cols else [])\
+                    .format({'Revenue': '${:,.2f}', 'Purchases': '{:,.0f}',
+                             '% of Purchasers': '{:.2f}%', 'AOV': '${:,.2f}'})
+                render_premium_table(styler)
+        else:
+            st.info("Upload and enrich orders to see customer analysis.")
+
+        # ── Customer Insights Time Series ──
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        st.markdown('<p class="section-title">Customer Performance Over Time</p>', unsafe_allow_html=True)
+
+        if 'cust_time_gran' not in st.session_state:
+            st.session_state.cust_time_gran = 'Daily'
+        cust_gran = st.radio("Granularity", ['Daily', 'Weekly', 'Monthly'],
+                             index=['Daily','Weekly','Monthly'].index(st.session_state.cust_time_gran),
+                             horizontal=True, key='cust_time_gran_radio', label_visibility='collapsed')
+        st.session_state.cust_time_gran = cust_gran
+
+        st.markdown(
+            f'<p style="font-family:Outfit,sans-serif;font-size:1.35rem;font-weight:600;'
+            f'color:{PITCH_BRAND_COLOR};text-align:center;margin:8px 0 4px 0;'
+            f'text-transform:uppercase;letter-spacing:0.08em;font-size:1.35rem!important;">'
+            f'{active_cust_var} &nbsp;·&nbsp; {cust_metric}</p>',
+            unsafe_allow_html=True
+        )
+
+        if not df_p_filtered.empty and cust_col in df_p_filtered.columns:
+            import altair as alt
+            freq_map = {'Daily': 'D', 'Weekly': 'W', 'Monthly': 'MS'}
+            freq = freq_map[cust_gran]
+            p_ts = df_p_filtered.copy()
+            p_ts['ts_date'] = pd.to_datetime(p_ts['order_date']).dt.tz_convert(None).dt.normalize() if pd.to_datetime(p_ts['order_date']).dt.tz is not None else pd.to_datetime(p_ts['order_date']).dt.normalize()
+            p_ts[cust_col]  = p_ts[cust_col].replace(_CUST_NORM)
+            p_ts = p_ts[~p_ts[cust_col].isin(EXCLUDE_LIST)]
+            ct_agg = p_ts.groupby([pd.Grouper(key='ts_date', freq=freq), cust_col]).agg(
+                Purchases=('Order_ID', 'nunique'), Revenue=('Total', 'sum')
+            ).reset_index()
+            ct_agg['AOV']             = (ct_agg['Revenue'] / ct_agg['Purchases'].replace(0,1)).round(2)
+            # % of purchasers per period
+            period_totals = ct_agg.groupby('ts_date')['Purchases'].transform('sum')
+            ct_agg['% of Purchasers'] = (ct_agg['Purchases'] / period_totals.replace(0,1) * 100).round(2)
+            ct_agg = ct_agg.sort_values('ts_date')
+
+            cust_ts_col_map = {'% of Purchasers': '% of Purchasers', 'AOV': 'AOV', 'Revenue': 'Revenue', 'Purchases': 'Purchases'}
+            cust_ts_col = cust_ts_col_map.get(cust_metric, 'AOV')
+
+            CHART_COLORS = ['#4D148C', '#7C3AED', '#20B2AA', '#F59E0B', '#E11D48', '#059669']
+            segs = sorted(ct_agg[cust_col].unique())
+            active_segs = [s for s in segs if ct_agg[ct_agg[cust_col]==s][cust_ts_col].sum() > 0]
+
+            if active_segs:
+                chart_df = ct_agg[ct_agg[cust_col].isin(active_segs)].rename(columns={cust_col:'Segment', cust_ts_col:'Value'})
+                chart_df['ts_date'] = pd.to_datetime(chart_df['ts_date'])
+                label_expr_c = {
+                    '% of Purchasers': "format(datum.value,'.1f')+'%'",
+                    'AOV':             "'$'+format(datum.value,',.2f')",
+                    'Revenue':         "'$'+format(datum.value,',.0f')",
+                    'Purchases':       "format(datum.value,',.0f')",
+                }.get(cust_metric, "format(datum.value,',.2f')")
+                tt_fmt_c = {'% of Purchasers':'.1f','AOV':'$,.2f','Revenue':'$,.0f','Purchases':',.0f'}.get(cust_metric,',.2f')
+                tt_title_c = cust_metric + (' (%)' if cust_metric == '% of Purchasers' else '')
+                color_scale_c = alt.Scale(domain=active_segs, range=CHART_COLORS[:len(active_segs)])
+                x_enc_c = alt.X('ts_date:T', axis=alt.Axis(format='%b %d', labelColor='#0F172A', tickColor='#EBE4F4', domainColor='#EBE4F4', gridOpacity=0, labelFontSize=11, labelFont='Outfit', title=None))
+                y_enc_c = alt.Y('Value:Q', title='', axis=alt.Axis(labelExpr=label_expr_c, labelColor='#0F172A', gridColor='#F1F5F9', domainOpacity=0, tickOpacity=0, labelFontSize=11, labelFont='Outfit'))
+                color_enc_c = alt.Color('Segment:N', scale=color_scale_c, legend=alt.Legend(orient='top', title=None, labelFontSize=12, labelFont='Outfit', labelColor='#0F172A', symbolStrokeWidth=3, symbolSize=120, padding=6))
+                line_c   = alt.Chart(chart_df).mark_line(strokeWidth=2.5, interpolate='monotone').encode(x=x_enc_c, y=y_enc_c, color=color_enc_c)
+                points_c = alt.Chart(chart_df).mark_circle(size=55).encode(x=x_enc_c, y=y_enc_c,
+                    color=alt.Color('Segment:N', scale=color_scale_c, legend=None),
+                    tooltip=[alt.Tooltip('ts_date:T', title='Date', format='%b %d, %Y'), alt.Tooltip('Segment:N', title=active_cust_var), alt.Tooltip('Value:Q', title=tt_title_c, format=tt_fmt_c)])
+                st.altair_chart((line_c + points_c).properties(height=320, background='transparent'), use_container_width=True)
+
+        return  # Don't render Conversion Insights content when on Customer Insights tab
+
+    # =====================================================
+    # CONVERSION INSIGHTS — SINGLE VARIABLE DEEP DIVE
     # =====================================================
     st.markdown('<p class="section-title">Single Variable Deep Dive</p>', unsafe_allow_html=True)
 
@@ -1718,6 +2295,8 @@ def dashboard_page():
 def main():
     if st.session_state.app_state == 'login':
         login_page()
+    elif st.session_state.app_state == 'admin':
+        admin_page()
     elif st.session_state.app_state == 'onboarding':
         onboarding_page()
     elif st.session_state.app_state == 'dashboard':
