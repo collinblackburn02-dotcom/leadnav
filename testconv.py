@@ -431,38 +431,40 @@ def apply_custom_theme(primary_color):
             letter-spacing: normal !important;
         }}
 
-        /* ── ST.PILLS inside bordered containers — smaller filter option style ── */
-        [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stBaseButton-pills"] {{
+        /* ── Filter option pills inside bordered containers — soft pill style ── */
+        [data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stBaseButton-pills"] {{
             border-radius: 999px !important;
-            font-size: 0.72rem !important;
+            font-size: 0.75rem !important;
             font-weight: 600 !important;
-            padding: 3px 11px !important;
+            padding: 4px 13px !important;
             border: 1px solid #D8C8F5 !important;
             background: #F0EBFA !important;
             color: {primary_color} !important;
             text-transform: none !important;
             letter-spacing: 0 !important;
         }}
-        [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stBaseButton-pills"] p,
-        [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stBaseButton-pills"] span {{
-            font-size: 0.72rem !important;
+        [data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stBaseButton-pills"] p,
+        [data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stBaseButton-pills"] span {{
+            font-size: 0.75rem !important;
+            font-weight: 600 !important;
             text-transform: none !important;
             color: {primary_color} !important;
         }}
-        [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stBaseButton-pillsActive"] {{
+        [data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stBaseButton-pillsActive"] {{
             border-radius: 999px !important;
-            font-size: 0.72rem !important;
+            font-size: 0.75rem !important;
             font-weight: 600 !important;
-            padding: 3px 11px !important;
+            padding: 4px 13px !important;
             border: 1px solid {primary_color} !important;
             background: {primary_color} !important;
             color: #FFFFFF !important;
             text-transform: none !important;
             letter-spacing: 0 !important;
         }}
-        [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stBaseButton-pillsActive"] p,
-        [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stBaseButton-pillsActive"] span {{
-            font-size: 0.72rem !important;
+        [data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stBaseButton-pillsActive"] p,
+        [data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stBaseButton-pillsActive"] span {{
+            font-size: 0.75rem !important;
+            font-weight: 600 !important;
             color: #FFFFFF !important;
             text-transform: none !important;
         }}
@@ -1590,11 +1592,12 @@ def dashboard_page():
     if selected_labels is None:
         selected_labels = []
 
-    # Initialise filters for newly added variables
+    # Initialise filters and pills state for newly added variables
     for lbl in selected_labels:
         col_name = label_to_col[lbl]
         if col_name not in st.session_state.matrix_filters:
             st.session_state.matrix_filters[col_name] = []
+            st.session_state[f"mx_ms_{col_name}"] = ["All"]  # auto-select All
 
     st.session_state.matrix_vars = [label_to_col[l] for l in selected_labels]
 
@@ -1614,6 +1617,12 @@ def dashboard_page():
         current = st.session_state.matrix_filters.get(col_name, [])
         is_all  = (current == [])
 
+        pills_key = f"mx_ms_{col_name}"
+
+        # Auto-select "All" when variable is first activated
+        if pills_key not in st.session_state:
+            st.session_state[pills_key] = ["All"]
+
         with st.container(border=True):
             st.markdown(
                 f'<p style="font-family:Outfit,sans-serif;font-size:0.62rem;font-weight:700;'
@@ -1621,15 +1630,25 @@ def dashboard_page():
                 f'{label} — filter</p>',
                 unsafe_allow_html=True
             )
-            new_val = st.pills(
+            raw_sel = st.pills(
                 label,
-                options=opts,
+                options=["All"] + opts,
                 selection_mode="multi",
                 label_visibility="collapsed",
-                key=f"mx_ms_{col_name}",
-                default=current if current else None,
+                key=pills_key,
             )
-            new_val = new_val if new_val else []
+
+            # All logic: nothing selected → revert to All; All + specific → drop All
+            if not raw_sel:
+                new_val = []  # empty = all
+            elif "All" in raw_sel and len(raw_sel) > 1:
+                # User just picked a specific value while All was selected → drop All
+                new_val = [v for v in raw_sel if v != "All"]
+            elif "All" in raw_sel:
+                new_val = []  # All selected, no filter
+            else:
+                new_val = list(raw_sel)
+
             st.session_state.matrix_filters[col_name] = new_val
 
         if new_val:
