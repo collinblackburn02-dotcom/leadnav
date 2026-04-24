@@ -431,6 +431,42 @@ def apply_custom_theme(primary_color):
             letter-spacing: normal !important;
         }}
 
+        /* ── ST.PILLS inside bordered containers — smaller filter option style ── */
+        [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stBaseButton-pills"] {{
+            border-radius: 999px !important;
+            font-size: 0.72rem !important;
+            font-weight: 600 !important;
+            padding: 3px 11px !important;
+            border: 1px solid #D8C8F5 !important;
+            background: #F0EBFA !important;
+            color: {primary_color} !important;
+            text-transform: none !important;
+            letter-spacing: 0 !important;
+        }}
+        [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stBaseButton-pills"] p,
+        [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stBaseButton-pills"] span {{
+            font-size: 0.72rem !important;
+            text-transform: none !important;
+            color: {primary_color} !important;
+        }}
+        [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stBaseButton-pillsActive"] {{
+            border-radius: 999px !important;
+            font-size: 0.72rem !important;
+            font-weight: 600 !important;
+            padding: 3px 11px !important;
+            border: 1px solid {primary_color} !important;
+            background: {primary_color} !important;
+            color: #FFFFFF !important;
+            text-transform: none !important;
+            letter-spacing: 0 !important;
+        }}
+        [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stBaseButton-pillsActive"] p,
+        [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stBaseButton-pillsActive"] span {{
+            font-size: 0.72rem !important;
+            color: #FFFFFF !important;
+            text-transform: none !important;
+        }}
+
         /* ── ST.PILLS — unselected state ── */
         [data-testid="stBaseButton-pills"] {{
             border-radius: 8px !important;
@@ -1581,17 +1617,19 @@ def dashboard_page():
         with st.container(border=True):
             st.markdown(
                 f'<p style="font-family:Outfit,sans-serif;font-size:0.62rem;font-weight:700;'
-                f'text-transform:uppercase;letter-spacing:0.1em;color:#94A3B8;margin-bottom:4px;">'
-                f'{label} — filter <span style="font-weight:400;text-transform:none;letter-spacing:0;">'
-                f'(empty = all)</span></p>',
+                f'text-transform:uppercase;letter-spacing:0.1em;color:#94A3B8;margin-bottom:6px;">'
+                f'{label} — filter</p>',
                 unsafe_allow_html=True
             )
-            new_val = st.multiselect(
-                label, options=opts, default=current,
-                key=f"mx_ms_{col_name}",
+            new_val = st.pills(
+                label,
+                options=opts,
+                selection_mode="multi",
                 label_visibility="collapsed",
-                placeholder="All values included"
+                key=f"mx_ms_{col_name}",
+                default=current if current else None,
             )
+            new_val = new_val if new_val else []
             st.session_state.matrix_filters[col_name] = new_val
 
         if new_val:
