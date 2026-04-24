@@ -7,6 +7,7 @@ import matplotlib.colors as mcolors
 import itertools
 import re
 import requests
+import hashlib
 from datetime import datetime, timedelta
 import io
 
@@ -443,10 +444,23 @@ def apply_custom_theme(primary_color):
             background: #FFFFFF !important;
             color: {primary_color} !important;
         }}
-        [data-testid="stBaseButton-pills"][aria-pressed="true"] {{
+        /* Selected state — try all possible Streamlit selected attributes */
+        [data-testid="stBaseButton-pills"][aria-pressed="true"],
+        [data-testid="stBaseButton-pills"][aria-checked="true"],
+        [data-testid="stBaseButton-pills"][data-active="true"] {{
             background: {primary_color} !important;
             border-color: {primary_color} !important;
             color: #FFFFFF !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.09em !important;
+        }}
+        [data-testid="stBaseButton-pills"][aria-pressed="true"] p,
+        [data-testid="stBaseButton-pills"][aria-pressed="true"] span,
+        [data-testid="stBaseButton-pills"][aria-checked="true"] p,
+        [data-testid="stBaseButton-pills"][aria-checked="true"] span {{
+            color: #FFFFFF !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.09em !important;
         }}
         [data-testid="stBaseButton-pills"] p,
         [data-testid="stBaseButton-pills"] span {{
@@ -673,6 +687,10 @@ if 'username' not in st.session_state:
     st.session_state.username = None
 if 'client_name' not in st.session_state:
     st.session_state.client_name = None
+if 'has_unsaved_enrichment' not in st.session_state:
+    st.session_state.has_unsaved_enrichment = False
+if 'pending_save_orders' not in st.session_state:
+    st.session_state.pending_save_orders = pd.DataFrame()
 
 # ================ 5. LOGIN PAGE =================
 def login_page():
@@ -882,9 +900,25 @@ def run_enrichment(uploaded_file, pixel_id, tenant_type):
             joined_df['Total'] = 0.0
         joined_df['Total'] = pd.to_numeric(joined_df['Total'], errors='coerce').fillna(0.0)
 
+        # Detect order ID column from the original CSV
+        order_id_col = next((c for c in raw_df.columns if any(x == c for x in
+                             ['name', 'order_id', 'order_number', 'id', 'number'])), None)
+
         temp_orders = pd.DataFrame()
-        temp_orders['Order_ID'] = 'TEMP_' + joined_df.index.astype(str)
-        temp_orders['Total']    = joined_df['Total']
+        # Generate deterministic IDs so re-uploading the same orders won't create duplicates
+        if order_id_col and order_id_col in orders_join.columns:
+            temp_orders['Order_ID'] = ('EN_' + orders_join[order_id_col].astype(str).str.strip()
+                                       .apply(lambda x: hashlib.md5(x.encode()).hexdigest()[:16]))
+        else:
+            temp_orders['Order_ID'] = [
+                'EN_' + hashlib.md5(f"{e}_{d}_{a}".encode()).hexdigest()[:16]
+                for e, d, a in zip(
+                    joined_df['email_match'],
+                    joined_df.get(date_col, pd.Series([''] * len(joined_df))),
+                    joined_df['Total']
+                )
+            ]
+        temp_orders['Total'] = joined_df['Total']
 
         if date_col and date_col in joined_df.columns:
             temp_orders['order_date'] = pd.to_datetime(joined_df[date_col], errors='coerce').fillna(datetime.now())
@@ -913,10 +947,82 @@ def run_enrichment(uploaded_file, pixel_id, tenant_type):
 
         num_enriched = len(temp_orders)
         num_matched  = int(temp_orders[['gender', 'age_range', 'income_bucket']].ne('Unknown').any(axis=1).sum())
+
+        # Store enriched orders so user can save them to BigQuery
+        st.session_state.pending_save_orders     = temp_orders.copy()
+        st.session_state.has_unsaved_enrichment  = True
+
         return True, f"✅ {num_enriched:,} orders enriched, {num_matched:,} matched with identity data."
 
     except Exception as e:
         return False, f"Error during enrichment: {e}"
+
+# ================ 7B. SAVE ENRICHED ORDERS TO BIGQUERY =================
+def save_enriched_orders_to_bq(pixel_id):
+    """Save pending enriched orders to BigQuery, deduplicating by order_id."""
+    try:
+        pending = st.session_state.get('pending_save_orders', pd.DataFrame())
+        if pending.empty:
+            return False, "No enriched orders to save."
+
+        client = get_bq_client()
+
+        # Fetch existing order IDs for this pixel so we don't duplicate
+        existing_query = f"""
+        SELECT order_id FROM `{BQ_ORDERS_TABLE}`
+        WHERE pixel_id = @pixel_id
+        """
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[bigquery.ScalarQueryParameter("pixel_id", "STRING", pixel_id)]
+        )
+        existing_df = client.query(existing_query, job_config=job_config).to_dataframe()
+        existing_ids = set(existing_df['order_id'].astype(str).tolist()) if not existing_df.empty else set()
+
+        # Filter to only new orders
+        df_new = pending[~pending['Order_ID'].astype(str).isin(existing_ids)].copy()
+
+        if df_new.empty:
+            return True, "All orders already exist in the database — nothing new to save."
+
+        # Rename columns to match BQ schema
+        df_bq = df_new.rename(columns={'Order_ID': 'order_id', 'Total': 'revenue'})
+
+        # Ensure all BQ columns are present
+        bq_cols = ['pixel_id', 'order_id', 'order_date', 'customer_email', 'revenue',
+                   'lineitem_name', 'state', 'gender', 'age_range', 'income_bucket',
+                   'net_worth_bucket', 'homeowner', 'marital_status', 'children',
+                   'company_name', 'company_industry', 'employee_count_range',
+                   'job_title', 'seniority', 'company_revenue']
+        for col in bq_cols:
+            if col not in df_bq.columns:
+                df_bq[col] = None
+        df_bq = df_bq[bq_cols]
+
+        # Convert order_date to datetime if needed
+        df_bq['order_date'] = pd.to_datetime(df_bq['order_date'], errors='coerce')
+        df_bq['revenue']    = pd.to_numeric(df_bq['revenue'], errors='coerce').fillna(0.0)
+
+        # Append to BigQuery
+        job = client.load_table_from_dataframe(
+            df_bq,
+            BQ_ORDERS_TABLE,
+            job_config=bigquery.LoadJobConfig(
+                write_disposition=bigquery.WriteDisposition.WRITE_APPEND
+            )
+        )
+        job.result()
+
+        # Clear the pending state
+        st.session_state.pending_save_orders    = pd.DataFrame()
+        st.session_state.has_unsaved_enrichment = False
+
+        # Clear order cache so the dashboard reloads with the new data
+        load_order_base.clear()
+
+        return True, f"✅ {len(df_new):,} orders saved to the database."
+
+    except Exception as e:
+        return False, f"Error saving to database: {e}"
 
 # ================ 8. DASHBOARD PAGE =================
 def dashboard_page():
@@ -994,6 +1100,34 @@ def dashboard_page():
                         st.rerun()
                     else:
                         upload_status.error(message)
+
+        # ── SAVE TO DATABASE (shows only after successful enrichment) ──
+        if st.session_state.get('has_unsaved_enrichment', False):
+            pending = st.session_state.get('pending_save_orders', pd.DataFrame())
+            n_pending = len(pending)
+            st.markdown(
+                f'<p style="font-family:Outfit,sans-serif;font-size:0.65rem;font-weight:700;'
+                f'text-transform:uppercase;letter-spacing:0.08em;color:#A78BFA;margin-bottom:5px;">'
+                f'{n_pending:,} orders ready to save</p>',
+                unsafe_allow_html=True
+            )
+            save_btn = st.button("💾  Save to Database", key="save_to_bq_btn",
+                                 type="primary", use_container_width=True)
+            save_slot = st.empty()
+            if save_btn:
+                save_slot.markdown(
+                    '<div style="background:rgba(124,58,237,0.15);border:1px solid rgba(196,181,253,0.3);'
+                    'border-radius:8px;padding:8px;color:#C4B5FD;font-size:0.72rem;text-align:center;">'
+                    '⏳ Saving to database...</div>',
+                    unsafe_allow_html=True
+                )
+                ok, msg = save_enriched_orders_to_bq(pixel_id)
+                if ok:
+                    save_slot.success(msg)
+                    st.rerun()
+                else:
+                    save_slot.error(msg)
+            st.markdown("---")
 
         # ── DATE RANGE ──
         with st.expander("Date Range", expanded=False):
