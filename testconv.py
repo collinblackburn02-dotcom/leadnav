@@ -1619,9 +1619,14 @@ def dashboard_page():
 
         pills_key = f"mx_ms_{col_name}"
 
-        # Auto-select "All" when variable is first activated
-        if pills_key not in st.session_state:
+        # Correct the widget state BEFORE rendering (Streamlit allows pre-render edits)
+        current_raw = st.session_state.get(pills_key, ["All"])
+        if not current_raw:
+            # Nothing selected → snap back to All
             st.session_state[pills_key] = ["All"]
+        elif "All" in current_raw and len(current_raw) > 1:
+            # All + specific → drop All, keep specifics
+            st.session_state[pills_key] = [v for v in current_raw if v != "All"]
 
         with st.container(border=True):
             st.markdown(
@@ -1638,20 +1643,9 @@ def dashboard_page():
                 key=pills_key,
             )
 
-            # All logic: nothing selected → revert to All; All + specific → drop All
-            prev_filter = st.session_state.matrix_filters.get(col_name, [])
-            if not raw_sel:
-                # Nothing selected → force back to All
-                st.session_state[pills_key] = ["All"]
-                new_val = []
-                st.rerun()
-            elif "All" in raw_sel and len(raw_sel) > 1:
-                # Specific value added while All was active → drop All
-                new_val = [v for v in raw_sel if v != "All"]
-                st.session_state[pills_key] = new_val
-                st.rerun()
-            elif "All" in raw_sel:
-                new_val = []  # All selected, no filter
+            # Derive the actual filter from the (already-corrected) selection
+            if not raw_sel or "All" in raw_sel:
+                new_val = []  # All → no filter applied
             else:
                 new_val = list(raw_sel)
 
