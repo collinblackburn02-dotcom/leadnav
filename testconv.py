@@ -431,8 +431,8 @@ def apply_custom_theme(primary_color):
             letter-spacing: normal !important;
         }}
 
-        /* ── Filter option pills — deselected: faded white ── */
-        [data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stBaseButton-pills"] {{
+        /* ── Filter option pills — unselected: faded white ── */
+        [data-testid="stBaseButton-pills"] {{
             border-radius: 999px !important;
             font-size: 0.75rem !important;
             font-weight: 500 !important;
@@ -443,14 +443,14 @@ def apply_custom_theme(primary_color):
             text-transform: none !important;
             letter-spacing: 0 !important;
         }}
-        [data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stBaseButton-pills"] p,
-        [data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stBaseButton-pills"] span {{
+        [data-testid="stBaseButton-pills"] p,
+        [data-testid="stBaseButton-pills"] span {{
             font-size: 0.75rem !important;
             text-transform: none !important;
             color: #B0A0D0 !important;
         }}
-        /* ── Filter option pills — selected: light purple fill like the top filter chips ── */
-        [data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stBaseButton-pillsActive"] {{
+        /* ── Filter option pills — selected: light purple like top filter chips ── */
+        [data-testid="stBaseButton-pillsActive"] {{
             border-radius: 999px !important;
             font-size: 0.75rem !important;
             font-weight: 600 !important;
@@ -461,56 +461,46 @@ def apply_custom_theme(primary_color):
             text-transform: none !important;
             letter-spacing: 0 !important;
         }}
-        [data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stBaseButton-pillsActive"] p,
-        [data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stBaseButton-pillsActive"] span {{
+        [data-testid="stBaseButton-pillsActive"] p,
+        [data-testid="stBaseButton-pillsActive"] span {{
             font-size: 0.75rem !important;
             font-weight: 600 !important;
             color: {primary_color} !important;
             text-transform: none !important;
         }}
-
-        /* ── ST.PILLS — unselected state ── */
-        [data-testid="stBaseButton-pills"] {{
+        /* ── Variable selector pills override — keep solid purple ── */
+        .st-key-mx_var_pills [data-testid="stBaseButton-pills"] {{
             border-radius: 8px !important;
             font-size: 0.85rem !important;
             font-weight: 500 !important;
-            text-transform: uppercase !important;
-            letter-spacing: 0.09em !important;
-            font-family: 'Outfit', sans-serif !important;
             padding: 5px 13px !important;
             border: 1.5px solid #D8C8F5 !important;
             background: #FFFFFF !important;
             color: {primary_color} !important;
-        }}
-        [data-testid="stBaseButton-pills"] p,
-        [data-testid="stBaseButton-pills"] span {{
-            font-size: 0.85rem !important;
-            font-weight: 500 !important;
             text-transform: uppercase !important;
             letter-spacing: 0.09em !important;
-            color: {primary_color} !important;
         }}
-        /* ── ST.PILLS — selected state (Streamlit uses a different testid) ── */
-        [data-testid="stBaseButton-pillsActive"] {{
+        .st-key-mx_var_pills [data-testid="stBaseButton-pillsActive"] {{
             border-radius: 8px !important;
             font-size: 0.85rem !important;
             font-weight: 500 !important;
-            text-transform: uppercase !important;
-            letter-spacing: 0.09em !important;
-            font-family: 'Outfit', sans-serif !important;
             padding: 5px 13px !important;
             border: 1.5px solid {primary_color} !important;
             background: {primary_color} !important;
             color: #FFFFFF !important;
-        }}
-        [data-testid="stBaseButton-pillsActive"] p,
-        [data-testid="stBaseButton-pillsActive"] span {{
-            font-size: 0.85rem !important;
-            font-weight: 500 !important;
             text-transform: uppercase !important;
             letter-spacing: 0.09em !important;
-            color: #FFFFFF !important;
         }}
+        .st-key-mx_var_pills [data-testid="stBaseButton-pills"] p,
+        .st-key-mx_var_pills [data-testid="stBaseButton-pills"] span,
+        .st-key-mx_var_pills [data-testid="stBaseButton-pillsActive"] p,
+        .st-key-mx_var_pills [data-testid="stBaseButton-pillsActive"] span {{
+            font-size: 0.85rem !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.09em !important;
+            color: inherit !important;
+        }}
+
 
         /* ── VARIABLE SELECTOR RADIO-AS-PILLS ── */
         [data-testid="stMain"] .stRadio > label {{
