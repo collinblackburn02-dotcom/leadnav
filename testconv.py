@@ -1592,12 +1592,14 @@ def dashboard_page():
     if selected_labels is None:
         selected_labels = []
 
-    # Initialise filters and pills state for newly added variables
+    # Initialise filters for newly added variables
     for lbl in selected_labels:
         col_name = label_to_col[lbl]
         if col_name not in st.session_state.matrix_filters:
             st.session_state.matrix_filters[col_name] = []
-            st.session_state[f"mx_ms_{col_name}"] = ["All"]  # auto-select All
+            # Clear any stale pills state so it re-initialises to all-selected
+            if f"mx_ms_{col_name}" in st.session_state:
+                del st.session_state[f"mx_ms_{col_name}"]
 
     st.session_state.matrix_vars = [label_to_col[l] for l in selected_labels]
 
@@ -1619,14 +1621,9 @@ def dashboard_page():
 
         pills_key = f"mx_ms_{col_name}"
 
-        # Correct the widget state BEFORE rendering (Streamlit allows pre-render edits)
-        current_raw = st.session_state.get(pills_key, ["All"])
-        if not current_raw:
-            # Nothing selected → snap back to All
-            st.session_state[pills_key] = ["All"]
-        elif "All" in current_raw and len(current_raw) > 1:
-            # All + specific → drop All, keep specifics
-            st.session_state[pills_key] = [v for v in current_raw if v != "All"]
+        # Pre-select ALL options when variable is first activated
+        if pills_key not in st.session_state:
+            st.session_state[pills_key] = opts
 
         with st.container(border=True):
             st.markdown(
@@ -1637,15 +1634,15 @@ def dashboard_page():
             )
             raw_sel = st.pills(
                 label,
-                options=["All"] + opts,
+                options=opts,
                 selection_mode="multi",
                 label_visibility="collapsed",
                 key=pills_key,
             )
 
-            # Derive the actual filter from the (already-corrected) selection
-            if not raw_sel or "All" in raw_sel:
-                new_val = []  # All → no filter applied
+            # All selected (or nothing) = no filter; partial selection = filter to those
+            if not raw_sel or set(raw_sel) == set(opts):
+                new_val = []
             else:
                 new_val = list(raw_sel)
 
