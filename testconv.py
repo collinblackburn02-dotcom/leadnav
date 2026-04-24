@@ -431,8 +431,26 @@ def apply_custom_theme(primary_color):
             letter-spacing: normal !important;
         }}
 
-        /* ── Filter option pills inside bordered containers — soft pill style ── */
+        /* ── Filter option pills — deselected: faded white ── */
         [data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stBaseButton-pills"] {{
+            border-radius: 999px !important;
+            font-size: 0.75rem !important;
+            font-weight: 500 !important;
+            padding: 4px 13px !important;
+            border: 1px solid #E2D9F3 !important;
+            background: #FFFFFF !important;
+            color: #B0A0D0 !important;
+            text-transform: none !important;
+            letter-spacing: 0 !important;
+        }}
+        [data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stBaseButton-pills"] p,
+        [data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stBaseButton-pills"] span {{
+            font-size: 0.75rem !important;
+            text-transform: none !important;
+            color: #B0A0D0 !important;
+        }}
+        /* ── Filter option pills — selected: light purple fill like the top filter chips ── */
+        [data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stBaseButton-pillsActive"] {{
             border-radius: 999px !important;
             font-size: 0.75rem !important;
             font-weight: 600 !important;
@@ -443,29 +461,11 @@ def apply_custom_theme(primary_color):
             text-transform: none !important;
             letter-spacing: 0 !important;
         }}
-        [data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stBaseButton-pills"] p,
-        [data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stBaseButton-pills"] span {{
-            font-size: 0.75rem !important;
-            font-weight: 600 !important;
-            text-transform: none !important;
-            color: {primary_color} !important;
-        }}
-        [data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stBaseButton-pillsActive"] {{
-            border-radius: 999px !important;
-            font-size: 0.75rem !important;
-            font-weight: 600 !important;
-            padding: 4px 13px !important;
-            border: 1px solid {primary_color} !important;
-            background: {primary_color} !important;
-            color: #FFFFFF !important;
-            text-transform: none !important;
-            letter-spacing: 0 !important;
-        }}
         [data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stBaseButton-pillsActive"] p,
         [data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stBaseButton-pillsActive"] span {{
             font-size: 0.75rem !important;
             font-weight: 600 !important;
-            color: #FFFFFF !important;
+            color: {primary_color} !important;
             text-transform: none !important;
         }}
 
