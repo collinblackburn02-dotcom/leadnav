@@ -640,16 +640,16 @@ def bucket_income(val):
     num = get_real_number(val)
     if num is None: return 'Unknown'
     if num < 50000: return 'Under $50k'
-    elif num < 100000: return '$50k-$100k'
-    elif num < 200000: return '$100k-$200k'
+    elif num < 100000: return '$50k-100k'
+    elif num < 200000: return '$100k-200k'
     else: return '$200k+'
 
 def bucket_net_worth(val):
     num = get_real_number(val)
     if num is None: return 'Unknown'
     if num < 100000: return 'Under $100k'
-    elif num < 500000: return '$100k-$500k'
-    elif num < 1000000: return '$500k-$1M'
+    elif num < 500000: return '$100k-500k'
+    elif num < 1000000: return '$500k-1M'
     else: return '$1M+'
 
 def clean_gender(val):
@@ -1639,11 +1639,17 @@ def dashboard_page():
             )
 
             # All logic: nothing selected → revert to All; All + specific → drop All
+            prev_filter = st.session_state.matrix_filters.get(col_name, [])
             if not raw_sel:
-                new_val = []  # empty = all
+                # Nothing selected → force back to All
+                st.session_state[pills_key] = ["All"]
+                new_val = []
+                st.rerun()
             elif "All" in raw_sel and len(raw_sel) > 1:
-                # User just picked a specific value while All was selected → drop All
+                # Specific value added while All was active → drop All
                 new_val = [v for v in raw_sel if v != "All"]
+                st.session_state[pills_key] = new_val
+                st.rerun()
             elif "All" in raw_sel:
                 new_val = []  # All selected, no filter
             else:
