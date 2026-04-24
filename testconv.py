@@ -431,7 +431,7 @@ def apply_custom_theme(primary_color):
             letter-spacing: normal !important;
         }}
 
-        /* ── ST.PILLS — match single variable radio style exactly ── */
+        /* ── ST.PILLS — unselected state ── */
         [data-testid="stBaseButton-pills"] {{
             border-radius: 8px !important;
             font-size: 0.85rem !important;
@@ -444,31 +444,34 @@ def apply_custom_theme(primary_color):
             background: #FFFFFF !important;
             color: {primary_color} !important;
         }}
-        /* Selected state — try all possible Streamlit selected attributes */
-        [data-testid="stBaseButton-pills"][aria-pressed="true"],
-        [data-testid="stBaseButton-pills"][aria-checked="true"],
-        [data-testid="stBaseButton-pills"][data-active="true"] {{
-            background: {primary_color} !important;
-            border-color: {primary_color} !important;
-            color: #FFFFFF !important;
-            text-transform: uppercase !important;
-            letter-spacing: 0.09em !important;
-        }}
-        [data-testid="stBaseButton-pills"][aria-pressed="true"] p,
-        [data-testid="stBaseButton-pills"][aria-pressed="true"] span,
-        [data-testid="stBaseButton-pills"][aria-checked="true"] p,
-        [data-testid="stBaseButton-pills"][aria-checked="true"] span {{
-            color: #FFFFFF !important;
-            text-transform: uppercase !important;
-            letter-spacing: 0.09em !important;
-        }}
         [data-testid="stBaseButton-pills"] p,
         [data-testid="stBaseButton-pills"] span {{
             font-size: 0.85rem !important;
             font-weight: 500 !important;
             text-transform: uppercase !important;
             letter-spacing: 0.09em !important;
-            color: inherit !important;
+            color: {primary_color} !important;
+        }}
+        /* ── ST.PILLS — selected state (Streamlit uses a different testid) ── */
+        [data-testid="stBaseButton-pillsActive"] {{
+            border-radius: 8px !important;
+            font-size: 0.85rem !important;
+            font-weight: 500 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.09em !important;
+            font-family: 'Outfit', sans-serif !important;
+            padding: 5px 13px !important;
+            border: 1.5px solid {primary_color} !important;
+            background: {primary_color} !important;
+            color: #FFFFFF !important;
+        }}
+        [data-testid="stBaseButton-pillsActive"] p,
+        [data-testid="stBaseButton-pillsActive"] span {{
+            font-size: 0.85rem !important;
+            font-weight: 500 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.09em !important;
+            color: #FFFFFF !important;
         }}
 
         /* ── VARIABLE SELECTOR RADIO-AS-PILLS ── */
