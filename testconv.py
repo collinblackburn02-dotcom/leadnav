@@ -504,37 +504,43 @@ def apply_custom_theme(primary_color):
         }}
 
 
-        /* ── MAIN VIEW TAB SELECTOR — top right, underline style ── */
-        .st-key-main_tab_selector > div[role="radiogroup"],
-        .st-key-main_tab_selector > div {{
+        /* ── MAIN VIEW TAB SELECTOR — underline style, beats general radio CSS ── */
+        [data-testid="stMain"] .stRadio.st-key-main_tab_selector > div[role="radiogroup"],
+        [data-testid="stMain"] .stRadio.st-key-main_tab_selector > div {{
             gap: 0 !important;
             border-bottom: 1.5px solid #EBE4F4 !important;
             justify-content: flex-end !important;
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
         }}
-        .st-key-main_tab_selector [data-baseweb="radio"] {{
+        [data-testid="stMain"] .stRadio.st-key-main_tab_selector [data-baseweb="radio"] {{
             border-radius: 0 !important;
             background: transparent !important;
             border: none !important;
-            padding: 3px 9px 5px !important;
             border-bottom: 1.5px solid transparent !important;
+            padding: 3px 10px 5px !important;
             margin-bottom: -1.5px !important;
             cursor: pointer !important;
         }}
-        .st-key-main_tab_selector [data-baseweb="radio"]:has(input:checked) {{
+        [data-testid="stMain"] .stRadio.st-key-main_tab_selector [data-baseweb="radio"]:has(input:checked) {{
+            background: transparent !important;
+            border-color: transparent !important;
             border-bottom-color: {primary_color} !important;
         }}
-        .st-key-main_tab_selector [data-baseweb="radio"] > div:first-child {{
+        [data-testid="stMain"] .stRadio.st-key-main_tab_selector [data-baseweb="radio"] > div:first-child {{
             display: none !important;
         }}
-        .st-key-main_tab_selector [data-baseweb="radio"] > div:last-child p {{
+        [data-testid="stMain"] .stRadio.st-key-main_tab_selector [data-baseweb="radio"] > div:last-child p {{
             font-size: 0.42rem !important;
             font-weight: 700 !important;
             text-transform: uppercase !important;
             letter-spacing: 0.12em !important;
             color: #94A3B8 !important;
             margin: 0 !important;
+            white-space: nowrap !important;
         }}
-        .st-key-main_tab_selector [data-baseweb="radio"]:has(input:checked) > div:last-child p {{
+        [data-testid="stMain"] .stRadio.st-key-main_tab_selector [data-baseweb="radio"]:has(input:checked) > div:last-child p {{
             color: {primary_color} !important;
         }}
 
@@ -1735,7 +1741,7 @@ def dashboard_page():
     # =====================================================
     client_name = st.session_state.get('client_name') or st.session_state.get('username', '')
 
-    _, tab_r = st.columns([7, 2])
+    _, tab_r = st.columns([5, 3])
     with tab_r:
         active_tab = st.radio(
             "View",
@@ -1745,10 +1751,11 @@ def dashboard_page():
             key="main_tab_selector"
         )
 
+    tab_title = f"{client_name}'s Customer Insights" if active_tab == 'Customer Insights' else f"{client_name}'s Conversion Insights"
     st.markdown(
         f'<div style="text-align:center; margin-bottom: 0.8rem;">'
         f'<span class="serif-gradient-centerpiece" style="font-size: 2.6rem;">'
-        f'{client_name} Conversion Dashboard</span></div>',
+        f'{tab_title}</span></div>',
         unsafe_allow_html=True
     )
 
