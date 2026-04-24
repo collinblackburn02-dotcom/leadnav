@@ -1597,9 +1597,10 @@ def dashboard_page():
         col_name = label_to_col[lbl]
         if col_name not in st.session_state.matrix_filters:
             st.session_state.matrix_filters[col_name] = []
-            # Clear any stale pills state so it re-initialises to all-selected
-            if f"mx_ms_{col_name}" in st.session_state:
-                del st.session_state[f"mx_ms_{col_name}"]
+            # Clear stale pills state so it re-initialises to all-selected on next render
+            pk = f"mx_ms_{col_name}"
+            if pk in st.session_state:
+                del st.session_state[pk]
 
     st.session_state.matrix_vars = [label_to_col[l] for l in selected_labels]
 
@@ -1621,9 +1622,14 @@ def dashboard_page():
 
         pills_key = f"mx_ms_{col_name}"
 
+        # Escape $ in labels so Streamlit doesn't render them as LaTeX math
+        def _safe(s): return str(s).replace('$', r'\$')
+        safe_opts   = [_safe(o) for o in opts]
+        safe_to_raw = {_safe(o): o for o in opts}   # reverse map for filtering
+
         # Pre-select ALL options when variable is first activated
         if pills_key not in st.session_state:
-            st.session_state[pills_key] = opts
+            st.session_state[pills_key] = safe_opts
 
         with st.container(border=True):
             st.markdown(
@@ -1634,17 +1640,20 @@ def dashboard_page():
             )
             raw_sel = st.pills(
                 label,
-                options=opts,
+                options=safe_opts,
                 selection_mode="multi",
                 label_visibility="collapsed",
                 key=pills_key,
             )
 
-            # All selected (or nothing) = no filter; partial selection = filter to those
-            if not raw_sel or set(raw_sel) == set(opts):
+            # Map display labels back to original BQ values for filtering
+            sel_orig = [safe_to_raw.get(v, v) for v in (raw_sel or [])]
+
+            # All selected (or nothing) = no filter; partial = filter to those
+            if not sel_orig or set(sel_orig) == set(opts):
                 new_val = []
             else:
-                new_val = list(raw_sel)
+                new_val = sel_orig
 
             st.session_state.matrix_filters[col_name] = new_val
 
