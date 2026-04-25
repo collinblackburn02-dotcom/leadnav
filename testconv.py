@@ -623,22 +623,24 @@ def get_bq_client():
 def load_visitor_base(pixel_id, tenant_type):
     try:
         client = get_bq_client()
+        # Support comma-separated pixel IDs for multi-pixel users
+        pixel_ids = [p.strip() for p in str(pixel_id).split(',') if p.strip()]
         if tenant_type == "B2C":
             query = f"""
             SELECT pixel_id, visit_date, total_visitors, state, gender, age_range, income_bucket,
                    net_worth_bucket, homeowner, marital_status, children
             FROM `{BQ_B2C_VISITOR_TABLE}`
-            WHERE pixel_id = @pixel_id
+            WHERE pixel_id IN UNNEST(@pixel_ids)
             """
         else:
             query = f"""
             SELECT pixel_id, visit_date, total_visitors, industry, employee_count_range, job_title,
                    seniority, company_revenue
             FROM `{BQ_B2B_VISITOR_TABLE}`
-            WHERE pixel_id = @pixel_id
+            WHERE pixel_id IN UNNEST(@pixel_ids)
             """
         job_config = bigquery.QueryJobConfig(
-            query_parameters=[bigquery.ScalarQueryParameter("pixel_id", "STRING", pixel_id)]
+            query_parameters=[bigquery.ArrayQueryParameter("pixel_ids", "STRING", pixel_ids)]
         )
         df = client.query(query, job_config=job_config).to_dataframe()
         if df.empty:
@@ -720,15 +722,17 @@ def clean_state(val):
 def load_order_base(pixel_id, tenant_type):
     try:
         client = get_bq_client()
+        # Support comma-separated pixel IDs for multi-pixel users
+        pixel_ids = [p.strip() for p in str(pixel_id).split(',') if p.strip()]
         query = f"""
         SELECT pixel_id, order_id, order_date, customer_email, revenue, lineitem_name, state,
                gender, age_range, income_bucket, net_worth_bucket, homeowner, marital_status, children,
                company_name, company_industry, employee_count_range, job_title, seniority, company_revenue
         FROM `{BQ_ORDERS_TABLE}`
-        WHERE pixel_id = @pixel_id
+        WHERE pixel_id IN UNNEST(@pixel_ids)
         """
         job_config = bigquery.QueryJobConfig(
-            query_parameters=[bigquery.ScalarQueryParameter("pixel_id", "STRING", pixel_id)]
+            query_parameters=[bigquery.ArrayQueryParameter("pixel_ids", "STRING", pixel_ids)]
         )
         df = client.query(query, job_config=job_config).to_dataframe()
         if df.empty:
@@ -918,6 +922,8 @@ def onboarding_page():
 # ================ 7. ENRICHMENT HELPER =================
 def run_enrichment(uploaded_file, pixel_id, tenant_type):
     """Run the full enrichment pipeline. Returns (success, message)."""
+    # Use only the primary (first) pixel ID for saving enriched orders
+    pixel_id = str(pixel_id).split(',')[0].strip()
     try:
         raw_df = pd.read_csv(io.BytesIO(uploaded_file.getvalue()), encoding='latin1', on_bad_lines='skip')
         raw_df.columns = [str(c).strip().lower() for c in raw_df.columns]
@@ -1047,6 +1053,8 @@ def run_enrichment(uploaded_file, pixel_id, tenant_type):
 # ================ 7B. SAVE ENRICHED ORDERS TO BIGQUERY =================
 def save_enriched_orders_to_bq(pixel_id):
     """Save pending enriched orders to BigQuery, deduplicating by order_id."""
+    # Always save under the primary (first) pixel ID
+    pixel_id = str(pixel_id).split(',')[0].strip()
     try:
         pending = st.session_state.get('pending_save_orders', pd.DataFrame())
         if pending.empty:
@@ -1335,13 +1343,32 @@ def admin_page():
         st.markdown('<p class="section-title">User Management</p>', unsafe_allow_html=True)
         users_df, err = get_all_users()
         if err:
-            st.warning(f"Could not load users from database: {err}. Using st.secrets fallback.")
-            secrets_users = dict(st.secrets.get("users", {}))
-            users_df = pd.DataFrame([
-                {'username': u, 'client_name': d.get('client_name', u), 'pixel_id': d.get('pixel_id',''),
-                 'tenant_type': d.get('tenant_type','B2C'), 'is_admin': d.get('is_admin', False), 'is_active': True}
-                for u, d in secrets_users.items()
-            ])
+            st.warning(f"Could not load users from database: {err}.")
+            users_df = pd.DataFrame()
+
+        # Show secrets users not yet in BQ
+        secrets_users = dict(st.secrets.get("users", {}))
+        bq_usernames  = set(users_df['username'].tolist()) if not users_df.empty else set()
+        secrets_only  = {u: d for u, d in secrets_users.items() if u not in bq_usernames}
+
+        if secrets_only:
+            st.info(f"**{len(secrets_only)} user(s) are still in st.secrets and not yet in the database.** Use Migrate to add them.")
+            for uname, data in secrets_only.items():
+                with st.expander(f"⚠️ {uname}  —  {data.get('client_name', uname)}  (secrets only)"):
+                    st.caption(f"Pixel ID: {data.get('pixel_id','')}  |  Tenant: {data.get('tenant_type','B2C')}  |  Admin: {data.get('is_admin', False)}")
+                    if st.button(f"Migrate {uname} to database", key=f"migrate_{uname}", type="primary"):
+                        ok, msg = save_user_to_bq(
+                            uname,
+                            data.get('password', ''),
+                            data.get('pixel_id', ''),
+                            data.get('tenant_type', 'B2C'),
+                            data.get('client_name', uname),
+                            data.get('is_admin', False),
+                            True
+                        )
+                        st.success(msg) if ok else st.error(msg)
+                        st.rerun()
+            st.markdown("---")
 
         if not users_df.empty:
             for _, row in users_df.iterrows():
@@ -1351,7 +1378,7 @@ def admin_page():
                     ec1, ec2, ec3 = st.columns(3)
                     new_pw     = ec1.text_input("New password", key=f"pw_{uname}", placeholder="leave blank to keep")
                     new_client = ec2.text_input("Client name", value=row.get('client_name',''), key=f"cn_{uname}")
-                    new_pixel  = ec3.text_input("Pixel ID",    value=row.get('pixel_id',''),   key=f"px_{uname}")
+                    new_pixel  = ec3.text_input("Pixel ID(s)", value=row.get('pixel_id',''), key=f"px_{uname}", help="Comma-separated for multiple pixels")
                     ec4, ec5, ec6, ec7 = st.columns(4)
                     new_tenant = ec4.selectbox("Tenant type", ["B2C","B2B"], index=0 if row.get('tenant_type')=="B2C" else 1, key=f"tt_{uname}")
                     new_admin  = ec5.checkbox("Admin", value=bool(row.get('is_admin',False)), key=f"adm_{uname}")
@@ -1377,7 +1404,7 @@ def admin_page():
             nc1, nc2, nc3 = st.columns(3)
             nu = nc1.text_input("Username")
             np_ = nc2.text_input("Password", type="password")
-            npi = nc3.text_input("Pixel ID")
+            npi = nc3.text_input("Pixel ID(s)", help="Comma-separated for multiple pixels e.g. px1,px2")
             nc4, nc5, nc6 = st.columns(3)
             ncn  = nc4.text_input("Client name")
             ntt  = nc5.selectbox("Tenant type", ["B2C","B2B"])
@@ -1565,6 +1592,7 @@ def dashboard_page():
         st.markdown("---")
 
         # ── UPLOAD ORDERS (collapsible) ──
+        _primary_px = str(pixel_id).split(',')[0].strip()
         with st.expander("Upload Orders", expanded=False):
             uploaded_file = st.file_uploader(
                 "Upload CSV", type=['csv'],
