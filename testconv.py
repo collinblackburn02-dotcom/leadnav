@@ -1223,7 +1223,7 @@ def save_visitor_data_to_bq(df, pixel_id):
         # Always set PIXEL_ID from the selected client
         df['PIXEL_ID'] = str(pixel_id).split(',')[0].strip()
 
-        # Parse timestamp if present
+        # Parse timestamp if present, keep as datetime for BQ TIMESTAMP type
         if 'EVENT_TIMESTAMP' in df.columns:
             df['EVENT_TIMESTAMP'] = pd.to_datetime(df['EVENT_TIMESTAMP'], errors='coerce')
 
@@ -1232,7 +1232,12 @@ def save_visitor_data_to_bq(df, pixel_id):
             if col not in df.columns:
                 df[col] = None
 
-        df_upload = df[RAW_COLS]
+        df_upload = df[RAW_COLS].copy()
+
+        # Cast all STRING columns to str — BQ schema is all STRING except EVENT_TIMESTAMP
+        for col in RAW_COLS:
+            if col != 'EVENT_TIMESTAMP':
+                df_upload[col] = df_upload[col].astype(str).replace('nan', None)
 
         job = client.load_table_from_dataframe(
             df_upload, BQ_PIXEL_RAW_TABLE,
