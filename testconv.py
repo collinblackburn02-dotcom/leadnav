@@ -1610,7 +1610,10 @@ def admin_page():
             if rollup_btn:
                 rollup_slot.info("⏳ Running visitor rollup — this may take a minute...")
                 ok, msg = run_visitor_rollup()
-                rollup_slot.success(msg) if ok else rollup_slot.error(msg)
+                if ok:
+                    rollup_slot.success(msg)
+                else:
+                    rollup_slot.error(msg)
 
             st.markdown("---")
             st.markdown('<p class="ctrl-label" style="color:#E11D48;">Danger Zone</p>', unsafe_allow_html=True)
