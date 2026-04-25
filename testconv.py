@@ -1035,8 +1035,9 @@ def run_enrichment(uploaded_file, pixel_id, tenant_type):
             for b2b_col in ['company_name', 'company_industry', 'employee_count_range', 'job_title', 'seniority', 'company_revenue']:
                 temp_orders[b2b_col] = joined_df[b2b_col] if b2b_col in joined_df.columns else 'Unknown'
 
-        if not st.session_state.df_orders.empty:
-            st.session_state.df_orders = pd.concat([st.session_state.df_orders, temp_orders], ignore_index=True)
+        existing = st.session_state.get('df_orders', pd.DataFrame())
+        if not existing.empty:
+            st.session_state.df_orders = pd.concat([existing, temp_orders], ignore_index=True)
         else:
             st.session_state.df_orders = temp_orders
 
