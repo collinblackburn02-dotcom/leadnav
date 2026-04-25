@@ -2034,7 +2034,7 @@ def dashboard_page():
     else:
         orders_in_range = df_orders.copy()
 
-    # Ghost day integrity shield
+    # Ghost day integrity shield (for Conversion Insights only)
     st.session_state.df_demo_cube = df_demo_filtered
     st.session_state.df_state_map = df_state_filtered
     active_days = set(df_demo_filtered['visit_date'].dt.date.unique()) if not df_demo_filtered.empty else set()
@@ -2047,6 +2047,11 @@ def dashboard_page():
     # Exclude $0 orders — a purchase only counts if revenue > 0
     if not df_p_filtered.empty and 'Total' in df_p_filtered.columns:
         df_p_filtered = df_p_filtered[pd.to_numeric(df_p_filtered['Total'], errors='coerce').fillna(0) > 0]
+
+    # Customer Insights uses all orders in date range — no ghost day filter
+    df_cust_orders = orders_in_range.copy()
+    if not df_cust_orders.empty and 'Total' in df_cust_orders.columns:
+        df_cust_orders = df_cust_orders[pd.to_numeric(df_cust_orders['Total'], errors='coerce').fillna(0) > 0]
 
 
     # =====================================================
@@ -2075,8 +2080,10 @@ def dashboard_page():
     # =====================================================
     # KPI CARDS (adapt to active tab)
     # =====================================================
-    total_revenue   = float(df_p_filtered['Total'].sum()) if not df_p_filtered.empty and 'Total' in df_p_filtered.columns else 0.0
-    total_purchases = int(df_p_filtered['Order_ID'].nunique()) if not df_p_filtered.empty and 'Order_ID' in df_p_filtered.columns else 0
+    # KPI base values — customer insights uses unfiltered orders, conversion uses ghost-day filtered
+    _kpi_orders     = df_cust_orders if active_tab == 'Customer Insights' else df_p_filtered
+    total_revenue   = float(_kpi_orders['Total'].sum()) if not _kpi_orders.empty and 'Total' in _kpi_orders.columns else 0.0
+    total_purchases = int(_kpi_orders['Order_ID'].nunique()) if not _kpi_orders.empty and 'Order_ID' in _kpi_orders.columns else 0
     total_visitors  = int(df_demo_filtered['total_visitors'].sum()) if not df_demo_filtered.empty else 0
     conv_rate       = (total_purchases / total_visitors * 100) if total_visitors > 0 else 0.0
     rev_per_visitor = (total_revenue / total_visitors) if total_visitors > 0 else 0.0
@@ -2137,8 +2144,8 @@ def dashboard_page():
         st.session_state.active_cust_var = active_cust_var
         cust_col = dict(cust_configs)[active_cust_var]
 
-        if not df_p_filtered.empty and cust_col in df_p_filtered.columns:
-            cust_df = df_p_filtered.copy()
+        if not df_cust_orders.empty and cust_col in df_cust_orders.columns:
+            cust_df = df_cust_orders.copy()
             cust_df[cust_col] = cust_df[cust_col].replace(_CUST_NORM)
             # Display-level remap
             cust_df[cust_col] = cust_df[cust_col].replace({'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female'})
@@ -2184,11 +2191,11 @@ def dashboard_page():
             unsafe_allow_html=True
         )
 
-        if not df_p_filtered.empty and cust_col in df_p_filtered.columns:
+        if not df_cust_orders.empty and cust_col in df_cust_orders.columns:
             import altair as alt
             freq_map = {'Daily': 'D', 'Weekly': 'W', 'Monthly': 'MS'}
             freq = freq_map[cust_gran]
-            p_ts = df_p_filtered.copy()
+            p_ts = df_cust_orders.copy()
             p_ts['ts_date'] = pd.to_datetime(p_ts['order_date']).dt.tz_convert(None).dt.normalize() if pd.to_datetime(p_ts['order_date']).dt.tz is not None else pd.to_datetime(p_ts['order_date']).dt.normalize()
             p_ts[cust_col]  = p_ts[cust_col].replace(_CUST_NORM)
             p_ts = p_ts[~p_ts[cust_col].isin(EXCLUDE_LIST)]
