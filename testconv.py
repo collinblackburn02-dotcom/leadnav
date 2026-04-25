@@ -2353,7 +2353,12 @@ def dashboard_page():
     freq_map = {'Daily': 'D', 'Weekly': 'W', 'Monthly': 'MS'}
     freq = freq_map[gran_choice]
 
-    _TS_NORM = {'Homeowner': 'Yes', 'Renter': 'No', 'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female'}
+    _TS_NORM = {
+        'Homeowner': 'Yes', 'Renter': 'No', 'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female',
+        '$50k-100k': '$50k-$100k', '$100k-200k': '$100k-$200k',
+        '$100k-500k': '$100k-$500k', '$500k-1M': '$500k-$1M',
+        '65 and older': '65+', '65 And Older': '65+',
+    }
 
     # Visitor time series
     if selected_col == 'state' and tenant_type == 'B2C':
