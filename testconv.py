@@ -1589,7 +1589,30 @@ def admin_page():
                 if adm_btn:
                     adm_slot.info("⏳ Uploading & enriching... This can take up to 3 minutes.")
                     ok, msg = run_enrichment(adm_upload, sel_pixel, sel_tenant)
-                    adm_slot.success(msg) if ok else adm_slot.error(msg)
+                    if ok:
+                        adm_slot.success(msg)
+                        # Show save button immediately after enrichment
+                        st.session_state['admin_enrichment_done'] = True
+                        st.session_state['admin_enrichment_pixel'] = sel_pixel
+                    else:
+                        adm_slot.error(msg)
+
+            # Save to BQ button — appears after successful enrichment
+            if st.session_state.get('admin_enrichment_done') and \
+               st.session_state.get('admin_enrichment_pixel') == sel_pixel:
+                pending = st.session_state.get('pending_save_orders', pd.DataFrame())
+                n = len(pending)
+                st.info(f"**{n:,} enriched orders ready.** Save them to BigQuery now?")
+                save_adm_btn  = st.button("💾 Save Enriched Orders to Database", type="primary", key="admin_save_orders_btn")
+                save_adm_slot = st.empty()
+                if save_adm_btn:
+                    save_adm_slot.info("⏳ Saving to BigQuery...")
+                    ok2, msg2 = save_enriched_orders_to_bq(sel_pixel)
+                    if ok2:
+                        save_adm_slot.success(msg2)
+                        st.session_state['admin_enrichment_done'] = False
+                    else:
+                        save_adm_slot.error(msg2)
 
             st.markdown("---")
             st.markdown('<p class="ctrl-label">Data Health</p>', unsafe_allow_html=True)
