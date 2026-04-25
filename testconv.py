@@ -1273,9 +1273,12 @@ def run_visitor_rollup():
       CASE WHEN LOWER(r.HOMEOWNER) LIKE '%homeowner%' THEN 'Homeowner' WHEN LOWER(r.HOMEOWNER) LIKE '%renter%' THEN 'Renter' ELSE 'Unknown' END,
       CASE WHEN LOWER(TRIM(r.MARRIED)) IN ('married','y','yes') THEN 'Married' WHEN LOWER(TRIM(r.MARRIED)) IN ('single','n','no') THEN 'Single' WHEN LOWER(TRIM(r.MARRIED)) LIKE '%divorced%' THEN 'Divorced' ELSE 'Unknown' END,
       CASE WHEN UPPER(TRIM(r.CHILDREN))='Y' THEN 'Yes' WHEN UPPER(TRIM(r.CHILDREN))='N' THEN 'No' ELSE 'Unknown' END
-    FROM `leadnav-hhs.leadnav_platform.pixel_events_raw` r
-    WHERE r.PIXEL_ID IS NOT NULL
-      AND CONCAT(r.PIXEL_ID, CAST(DATE(r.EVENT_TIMESTAMP,'America/Chicago') AS STRING)) NOT IN (
+    FROM (
+      SELECT * FROM `leadnav-hhs.leadnav_platform.pixel_events_raw`
+      WHERE PIXEL_ID IS NOT NULL
+      QUALIFY ROW_NUMBER() OVER (PARTITION BY HEM_SHA256, EVENT_TIMESTAMP ORDER BY HEM_SHA256) = 1
+    ) r
+    WHERE CONCAT(r.PIXEL_ID, CAST(DATE(r.EVENT_TIMESTAMP,'America/Chicago') AS STRING)) NOT IN (
         SELECT DISTINCT CONCAT(pixel_id, CAST(visit_date AS STRING)) FROM `leadnav-hhs.leadnav_platform.b2c_visitor_summary`
       )
     GROUP BY 1,2,4,5,6,7,8,9,10,11
@@ -1299,9 +1302,12 @@ def run_visitor_rollup():
            WHEN TRIM(r.SENIORITY_LEVEL)='' OR r.SENIORITY_LEVEL IS NULL THEN 'Unknown'
            ELSE INITCAP(TRIM(r.SENIORITY_LEVEL)) END,
       COALESCE(NULLIF(TRIM(r.COMPANY_REVENUE),''),'Unknown')
-    FROM `leadnav-hhs.leadnav_platform.pixel_events_raw` r
-    WHERE r.PIXEL_ID IS NOT NULL
-      AND CONCAT(r.PIXEL_ID, CAST(DATE(r.EVENT_TIMESTAMP,'America/Chicago') AS STRING)) NOT IN (
+    FROM (
+      SELECT * FROM `leadnav-hhs.leadnav_platform.pixel_events_raw`
+      WHERE PIXEL_ID IS NOT NULL
+      QUALIFY ROW_NUMBER() OVER (PARTITION BY HEM_SHA256, EVENT_TIMESTAMP ORDER BY HEM_SHA256) = 1
+    ) r
+    WHERE CONCAT(r.PIXEL_ID, CAST(DATE(r.EVENT_TIMESTAMP,'America/Chicago') AS STRING)) NOT IN (
         SELECT DISTINCT CONCAT(pixel_id, CAST(visit_date AS STRING)) FROM `leadnav-hhs.leadnav_platform.b2b_visitor_summary`
       )
     GROUP BY 1,2,4,5,6,7,8
