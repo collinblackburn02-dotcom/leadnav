@@ -619,7 +619,7 @@ def get_bq_client():
     )
 
 # ================ 3. DATA LOADING =================
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, show_spinner=False)
 def load_visitor_base(pixel_id, tenant_type):
     try:
         client = get_bq_client()
@@ -716,7 +716,7 @@ def clean_state(val):
     if pd.isna(val): return 'Unknown'
     return str(val).strip().upper()
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, show_spinner=False)
 def load_order_base(pixel_id, tenant_type):
     try:
         client = get_bq_client()
