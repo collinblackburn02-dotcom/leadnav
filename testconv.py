@@ -675,16 +675,16 @@ def bucket_income(val):
     num = get_real_number(val)
     if num is None: return 'Unknown'
     if num < 50000: return 'Under $50k'
-    elif num < 100000: return '$50k-100k'
-    elif num < 200000: return '$100k-200k'
+    elif num < 100000: return '$50k-$100k'
+    elif num < 200000: return '$100k-$200k'
     else: return '$200k+'
 
 def bucket_net_worth(val):
     num = get_real_number(val)
     if num is None: return 'Unknown'
     if num < 100000: return 'Under $100k'
-    elif num < 500000: return '$100k-500k'
-    elif num < 1000000: return '$500k-1M'
+    elif num < 500000: return '$100k-$500k'
+    elif num < 1000000: return '$500k-$1M'
     else: return '$1M+'
 
 def clean_gender(val):
@@ -2128,7 +2128,11 @@ def dashboard_page():
     # CUSTOMER INSIGHTS TAB
     # =====================================================
     if active_tab == 'Customer Insights':
-        _CUST_NORM = {'Homeowner': 'Yes', 'Renter': 'No', 'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female'}
+        _CUST_NORM = {
+            'Homeowner': 'Yes', 'Renter': 'No', 'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female',
+            '$50k-100k': '$50k-$100k', '$100k-200k': '$100k-$200k',
+            '$100k-500k': '$100k-$500k', '$500k-1M': '$500k-$1M',
+        }
         cust_configs = [c for c in configs if c[1] != 'state']
         cust_metric  = st.session_state.cust_metric
 
@@ -2261,7 +2265,12 @@ def dashboard_page():
     selected_col = dict(configs)[active_var]
 
     # Normalize values so visitor data and order data use the same labels before merging
-    _VALUE_NORM = {'Homeowner': 'Yes', 'Renter': 'No', 'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female'}
+    _VALUE_NORM = {
+        'Homeowner': 'Yes', 'Renter': 'No', 'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female',
+        # Normalize legacy single-$ bucket strings to match BQ SQL double-$ format
+        '$50k-100k': '$50k-$100k', '$100k-200k': '$100k-$200k',
+        '$100k-500k': '$100k-$500k', '$500k-1M': '$500k-$1M',
+    }
     _demo_cube = st.session_state.df_demo_cube.copy()
     if selected_col in _demo_cube.columns:
         _demo_cube[selected_col] = _demo_cube[selected_col].replace(_VALUE_NORM)
@@ -2500,7 +2509,11 @@ def dashboard_page():
     st.session_state.matrix_vars = [label_to_col[l] for l in selected_labels]
 
     # ── FILTER PANELS ──
-    _MX_NORM     = {'Homeowner': 'Yes', 'Renter': 'No', 'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female'}
+    _MX_NORM     = {
+        'Homeowner': 'Yes', 'Renter': 'No', 'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female',
+        '$50k-100k': '$50k-$100k', '$100k-200k': '$100k-$200k',
+        '$100k-500k': '$100k-$500k', '$500k-1M': '$500k-$1M',
+    }
     included_types   = [col for col in st.session_state.matrix_vars
                         if col in [c[1] for c in valid_matrix_configs]]
     selected_filters = {}
