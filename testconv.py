@@ -1582,6 +1582,80 @@ def admin_page():
                     adm_slot.success(msg) if ok else adm_slot.error(msg)
 
             st.markdown("---")
+            st.markdown('<p class="ctrl-label">Data Health</p>', unsafe_allow_html=True)
+            dh_gran = st.radio("Granularity", ["Daily", "Weekly", "Monthly"],
+                               horizontal=True, key="admin_dh_gran", label_visibility="collapsed")
+            freq_map = {"Daily": "D", "Weekly": "W", "Monthly": "MS"}
+
+            try:
+                import altair as alt
+                client_bq = get_bq_client()
+                px_list   = [p.strip() for p in str(sel_pixel).split(',') if p.strip()]
+
+                # Visitor data
+                vis_table = BQ_B2C_VISITOR_TABLE if sel_tenant == 'B2C' else BQ_B2B_VISITOR_TABLE
+                vis_cfg   = bigquery.QueryJobConfig(query_parameters=[bigquery.ArrayQueryParameter("pids","STRING",px_list)])
+                vis_raw   = client_bq.query(
+                    f"SELECT visit_date, SUM(total_visitors) as visitors FROM `{vis_table}` WHERE pixel_id IN UNNEST(@pids) GROUP BY visit_date ORDER BY visit_date",
+                    job_config=vis_cfg).to_dataframe()
+
+                # Order data
+                ord_cfg = bigquery.QueryJobConfig(query_parameters=[bigquery.ArrayQueryParameter("pids","STRING",px_list)])
+                ord_raw = client_bq.query(
+                    f"SELECT DATE(order_date) as order_date, COUNT(DISTINCT order_id) as orders FROM `{BQ_ORDERS_TABLE}` WHERE pixel_id IN UNNEST(@pids) GROUP BY order_date ORDER BY order_date",
+                    job_config=ord_cfg).to_dataframe()
+
+                if vis_raw.empty and ord_raw.empty:
+                    st.info("No data found for this client yet.")
+                else:
+                    freq = freq_map[dh_gran]
+
+                    # Resample visitors
+                    if not vis_raw.empty:
+                        vis_raw['visit_date'] = pd.to_datetime(vis_raw['visit_date'])
+                        vis_agg = vis_raw.set_index('visit_date').resample(freq)['visitors'].sum().reset_index()
+                        vis_agg.columns = ['date', 'Visitors']
+                    else:
+                        vis_agg = pd.DataFrame(columns=['date','Visitors'])
+
+                    # Resample orders
+                    if not ord_raw.empty:
+                        ord_raw['order_date'] = pd.to_datetime(ord_raw['order_date'])
+                        ord_agg = ord_raw.set_index('order_date').resample(freq)['orders'].sum().reset_index()
+                        ord_agg.columns = ['date', 'Orders']
+                    else:
+                        ord_agg = pd.DataFrame(columns=['date','Orders'])
+
+                    # Merge for display
+                    combined = pd.merge(vis_agg, ord_agg, on='date', how='outer').fillna(0).sort_values('date')
+                    combined['date'] = pd.to_datetime(combined['date'])
+
+                    # Summary metrics
+                    mc1, mc2, mc3, mc4 = st.columns(4)
+                    mc1.metric("Total Visitor Rows", f"{int(combined['Visitors'].sum()):,}")
+                    mc2.metric("Total Order Rows",   f"{int(combined['Orders'].sum()):,}")
+                    mc3.metric("Date Range",
+                               f"{combined['date'].min().strftime('%b %d') if len(combined) else '—'} – "
+                               f"{combined['date'].max().strftime('%b %d, %Y') if len(combined) else '—'}")
+                    mc4.metric("Gaps (zero visitor days)",
+                               f"{int((combined['Visitors'] == 0).sum())}")
+
+                    # Chart
+                    long_df = combined.melt(id_vars='date', var_name='Metric', value_name='Count')
+                    color_scale = alt.Scale(domain=['Visitors','Orders'], range=['#4D148C','#20B2AA'])
+                    chart = alt.Chart(long_df).mark_line(point=True, strokeWidth=2).encode(
+                        x=alt.X('date:T', axis=alt.Axis(format='%b %d', labelColor='#0F172A', title=None)),
+                        y=alt.Y('Count:Q', axis=alt.Axis(labelColor='#0F172A', title=None)),
+                        color=alt.Color('Metric:N', scale=color_scale,
+                                        legend=alt.Legend(orient='top', title=None, labelColor='#0F172A')),
+                        tooltip=[alt.Tooltip('date:T', format='%b %d, %Y'), 'Metric:N', 'Count:Q']
+                    ).properties(height=260, background='transparent')
+                    st.altair_chart(chart, use_container_width=True)
+
+            except Exception as e:
+                st.error(f"Could not load data health: {e}")
+
+            st.markdown("---")
             st.markdown(f'<p class="ctrl-label">Upload raw visitor data for {sel_client[0]}</p>', unsafe_allow_html=True)
             st.caption("Upload a raw pixel events CSV. It will be saved to `pixel_events_raw` — visitor summary tables update on the next scheduled query run.")
             vis_upload = st.file_uploader("Upload visitor CSV", type=['csv'], key="admin_vis_upload")
