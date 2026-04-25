@@ -1015,7 +1015,8 @@ def run_enrichment(uploaded_file, pixel_id, tenant_type):
         temp_orders['Total'] = joined_df['Total']
 
         if date_col and date_col in joined_df.columns:
-            temp_orders['order_date'] = pd.to_datetime(joined_df[date_col], errors='coerce').fillna(datetime.now())
+            parsed = pd.to_datetime(joined_df[date_col], errors='coerce', utc=True)
+            temp_orders['order_date'] = parsed.dt.tz_convert(None).fillna(datetime.now())
         else:
             temp_orders['order_date'] = datetime.now()
 
@@ -1213,6 +1214,8 @@ def save_visitor_data_to_bq(df, pixel_id):
         'COMPANY_NAICS','COMPANY_INDUSTRY','BUSINESS_EMAIL','BUSINESS_VERIFIED_EMAILS',
         'SHA256_BUSINESS_EMAIL','JOB_TITLE','HEADLINE','DEPARTMENT','SENIORITY_LEVEL',
         'INFERRED_YEARS_EXPERIENCE','COMPANY_NAME_HISTORY','JOB_TITLE_HISTORY',
+        'EDUCATION_HISTORY','COMPANY_LINKEDIN_URL','INDIVIDUAL_LINKEDIN_URL',
+        'INDIVIDUAL_TWITTER_URL','INDIVIDUAL_FACEBOOK_URL','SKILLS','INTERESTS',
     ]
     try:
         client = get_bq_client()
