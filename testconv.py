@@ -21,6 +21,7 @@ BQ_B2B_VISITOR_TABLE = "leadnav-hhs.leadnav_platform.b2b_visitor_summary"
 BQ_ORDERS_TABLE      = "leadnav-hhs.leadnav_platform.platform_order_data"
 BQ_USERS_TABLE       = "leadnav-hhs.leadnav_platform.platform_users"
 BQ_LOGIN_LOGS_TABLE  = "leadnav-hhs.leadnav_platform.platform_login_logs"
+BQ_PIXEL_RAW_TABLE   = "leadnav-hhs.leadnav_platform.pixel_events_raw"
 
 EXCLUDE_LIST = ['Unknown', 'UNKNOWN', 'U', '', 'None', 'NONE', 'nan', 'NaN', 'null', 'NULL', '<NA>', 'ALL']
 
@@ -1196,6 +1197,121 @@ def log_login(username, success, pixel_id=""):
     except Exception:
         pass
 
+def save_visitor_data_to_bq(df, pixel_id):
+    """Upload raw pixel event CSV to pixel_events_raw. Visitor summary tables
+    update automatically when the scheduled BigQuery query next runs."""
+    # All expected columns in pixel_events_raw (uppercase)
+    RAW_COLS = [
+        'PIXEL_ID','HEM_SHA256','EVENT_TIMESTAMP','REFERRER_URL','FULL_URL','EDID',
+        'FIRST_NAME','LAST_NAME','PERSONAL_ADDRESS','PERSONAL_CITY','PERSONAL_STATE',
+        'PERSONAL_ZIP','PERSONAL_ZIP4','AGE_RANGE','CHILDREN','GENDER','HOMEOWNER',
+        'MARRIED','NET_WORTH','INCOME_RANGE','ALL_LANDLINES','LANDLINE_DNC',
+        'ALL_MOBILES','MOBILE_DNC','PERSONAL_EMAILS','PERSONAL_VERIFIED_EMAILS',
+        'SHA256_PERSONAL_EMAIL','COMPANY_NAME','COMPANY_DESCRIPTION',
+        'COMPANY_EMPLOYEE_COUNT','COMPANY_DOMAIN','COMPANY_ADDRESS','COMPANY_CITY',
+        'COMPANY_STATE','COMPANY_ZIP','COMPANY_PHONE','COMPANY_REVENUE','COMPANY_SIC',
+        'COMPANY_NAICS','COMPANY_INDUSTRY','BUSINESS_EMAIL','BUSINESS_VERIFIED_EMAILS',
+        'SHA256_BUSINESS_EMAIL','JOB_TITLE','HEADLINE','DEPARTMENT','SENIORITY_LEVEL',
+        'INFERRED_YEARS_EXPERIENCE','COMPANY_NAME_HISTORY','JOB_TITLE_HISTORY',
+    ]
+    try:
+        client = get_bq_client()
+        df = df.copy()
+        # Normalise column names to uppercase to match BQ schema
+        df.columns = [c.strip().upper() for c in df.columns]
+
+        # Always set PIXEL_ID from the selected client
+        df['PIXEL_ID'] = str(pixel_id).split(',')[0].strip()
+
+        # Parse timestamp if present
+        if 'EVENT_TIMESTAMP' in df.columns:
+            df['EVENT_TIMESTAMP'] = pd.to_datetime(df['EVENT_TIMESTAMP'], errors='coerce')
+
+        # Fill any missing schema columns with None
+        for col in RAW_COLS:
+            if col not in df.columns:
+                df[col] = None
+
+        df_upload = df[RAW_COLS]
+
+        job = client.load_table_from_dataframe(
+            df_upload, BQ_PIXEL_RAW_TABLE,
+            job_config=bigquery.LoadJobConfig(write_disposition=bigquery.WriteDisposition.WRITE_APPEND)
+        )
+        job.result()
+        return True, f"✅ {len(df_upload):,} raw events uploaded. Visitor summary tables will update on the next scheduled query run."
+    except Exception as e:
+        return False, str(e)
+
+def run_visitor_rollup():
+    """Run the B2C + B2B visitor rollup for all unprocessed dates across all pixels."""
+    B2C_SQL = """
+    INSERT INTO `leadnav-hhs.leadnav_platform.b2c_visitor_summary`
+      (pixel_id, visit_date, total_visitors, state, gender, age_range,
+       income_bucket, net_worth_bucket, homeowner, marital_status, children)
+    SELECT
+      r.PIXEL_ID, DATE(r.EVENT_TIMESTAMP,'America/Chicago'),
+      COUNT(*),
+      UPPER(TRIM(r.PERSONAL_STATE)),
+      CASE WHEN UPPER(TRIM(r.GENDER)) IN ('M','MALE') THEN 'Male' WHEN UPPER(TRIM(r.GENDER)) IN ('F','FEMALE') THEN 'Female' ELSE 'Unknown' END,
+      CASE WHEN r.AGE_RANGE IS NULL OR TRIM(r.AGE_RANGE)='' THEN 'Unknown' ELSE TRIM(r.AGE_RANGE) END,
+      CASE WHEN SAFE_CAST(REGEXP_EXTRACT(REPLACE(r.INCOME_RANGE,',',''),r'\\$(\\d+)') AS INT64)<50000 THEN 'Under $50k'
+           WHEN SAFE_CAST(REGEXP_EXTRACT(REPLACE(r.INCOME_RANGE,',',''),r'\\$(\\d+)') AS INT64)<100000 THEN '$50k-$100k'
+           WHEN SAFE_CAST(REGEXP_EXTRACT(REPLACE(r.INCOME_RANGE,',',''),r'\\$(\\d+)') AS INT64)<200000 THEN '$100k-$200k'
+           WHEN SAFE_CAST(REGEXP_EXTRACT(REPLACE(r.INCOME_RANGE,',',''),r'\\$(\\d+)') AS INT64)>=200000 THEN '$200k+'
+           ELSE 'Unknown' END,
+      CASE WHEN LOWER(r.NET_WORTH) LIKE '%less than%' OR LOWER(r.NET_WORTH) LIKE '%-$%' OR SAFE_CAST(REGEXP_EXTRACT(REPLACE(r.NET_WORTH,',',''),r'\\$(\\d+)') AS INT64)<100000 THEN 'Under $100k'
+           WHEN SAFE_CAST(REGEXP_EXTRACT(REPLACE(r.NET_WORTH,',',''),r'\\$(\\d+)') AS INT64)<500000 THEN '$100k-$500k'
+           WHEN SAFE_CAST(REGEXP_EXTRACT(REPLACE(r.NET_WORTH,',',''),r'\\$(\\d+)') AS INT64)<1000000 THEN '$500k-$1M'
+           WHEN SAFE_CAST(REGEXP_EXTRACT(REPLACE(r.NET_WORTH,',',''),r'\\$(\\d+)') AS INT64)>=1000000 OR LOWER(r.NET_WORTH) LIKE '%1,000,000%' THEN '$1M+'
+           ELSE 'Unknown' END,
+      CASE WHEN LOWER(r.HOMEOWNER) LIKE '%homeowner%' THEN 'Homeowner' WHEN LOWER(r.HOMEOWNER) LIKE '%renter%' THEN 'Renter' ELSE 'Unknown' END,
+      CASE WHEN LOWER(TRIM(r.MARRIED)) IN ('married','y','yes') THEN 'Married' WHEN LOWER(TRIM(r.MARRIED)) IN ('single','n','no') THEN 'Single' WHEN LOWER(TRIM(r.MARRIED)) LIKE '%divorced%' THEN 'Divorced' ELSE 'Unknown' END,
+      CASE WHEN UPPER(TRIM(r.CHILDREN))='Y' THEN 'Yes' WHEN UPPER(TRIM(r.CHILDREN))='N' THEN 'No' ELSE 'Unknown' END
+    FROM `leadnav-hhs.leadnav_platform.pixel_events_raw` r
+    WHERE r.PIXEL_ID IS NOT NULL
+      AND CONCAT(r.PIXEL_ID, CAST(DATE(r.EVENT_TIMESTAMP,'America/Chicago') AS STRING)) NOT IN (
+        SELECT DISTINCT CONCAT(pixel_id, CAST(visit_date AS STRING)) FROM `leadnav-hhs.leadnav_platform.b2c_visitor_summary`
+      )
+    GROUP BY 1,2,4,5,6,7,8,9,10,11
+    """
+
+    B2B_SQL = """
+    INSERT INTO `leadnav-hhs.leadnav_platform.b2b_visitor_summary`
+      (pixel_id, visit_date, total_visitors, industry, employee_count_range, job_title, seniority, company_revenue)
+    SELECT
+      r.PIXEL_ID, DATE(r.EVENT_TIMESTAMP,'America/Chicago'),
+      COUNT(*),
+      COALESCE(NULLIF(TRIM(r.COMPANY_INDUSTRY),''),'Unknown'),
+      COALESCE(NULLIF(TRIM(r.COMPANY_EMPLOYEE_COUNT),''),'Unknown'),
+      COALESCE(NULLIF(TRIM(r.JOB_TITLE),''),'Unknown'),
+      CASE WHEN LOWER(TRIM(r.SENIORITY_LEVEL))='cxo' THEN 'CXO'
+           WHEN LOWER(TRIM(r.SENIORITY_LEVEL))='vp' THEN 'VP'
+           WHEN LOWER(TRIM(r.SENIORITY_LEVEL))='director' THEN 'Director'
+           WHEN LOWER(TRIM(r.SENIORITY_LEVEL))='manager' THEN 'Manager'
+           WHEN LOWER(TRIM(r.SENIORITY_LEVEL))='staff' THEN 'Staff'
+           WHEN LOWER(TRIM(r.SENIORITY_LEVEL))='entry' THEN 'Entry'
+           WHEN TRIM(r.SENIORITY_LEVEL)='' OR r.SENIORITY_LEVEL IS NULL THEN 'Unknown'
+           ELSE INITCAP(TRIM(r.SENIORITY_LEVEL)) END,
+      COALESCE(NULLIF(TRIM(r.COMPANY_REVENUE),''),'Unknown')
+    FROM `leadnav-hhs.leadnav_platform.pixel_events_raw` r
+    WHERE r.PIXEL_ID IS NOT NULL
+      AND CONCAT(r.PIXEL_ID, CAST(DATE(r.EVENT_TIMESTAMP,'America/Chicago') AS STRING)) NOT IN (
+        SELECT DISTINCT CONCAT(pixel_id, CAST(visit_date AS STRING)) FROM `leadnav-hhs.leadnav_platform.b2b_visitor_summary`
+      )
+    GROUP BY 1,2,4,5,6,7,8
+    """
+    try:
+        client = get_bq_client()
+        b2c_job = client.query(B2C_SQL)
+        b2c_job.result()
+        b2b_job = client.query(B2B_SQL)
+        b2b_job.result()
+        load_visitor_base.clear()
+        return True, "✅ Visitor rollup complete — B2C and B2B summary tables updated for all unprocessed dates."
+    except Exception as e:
+        return False, f"Rollup error: {e}"
+
 def get_all_users():
     try:
         client = get_bq_client()
@@ -1461,17 +1577,56 @@ def admin_page():
                     adm_slot.success(msg) if ok else adm_slot.error(msg)
 
             st.markdown("---")
+            st.markdown(f'<p class="ctrl-label">Upload raw visitor data for {sel_client[0]}</p>', unsafe_allow_html=True)
+            st.caption("Upload a raw pixel events CSV. It will be saved to `pixel_events_raw` — visitor summary tables update on the next scheduled query run.")
+            vis_upload = st.file_uploader("Upload visitor CSV", type=['csv'], key="admin_vis_upload")
+            if vis_upload:
+                try:
+                    vis_preview = pd.read_csv(vis_upload)
+                    st.dataframe(vis_preview.head(3), use_container_width=True)
+                    st.caption(f"{len(vis_preview):,} rows · {len(vis_preview.columns)} columns detected")
+                    vis_btn  = st.button("💾 Save to pixel_events_raw", type="primary", key="admin_save_vis")
+                    vis_slot = st.empty()
+                    if vis_btn:
+                        vis_slot.info("⏳ Uploading raw event data...")
+                        ok, msg = save_visitor_data_to_bq(vis_preview, sel_pixel)
+                        vis_slot.success(msg) if ok else vis_slot.error(msg)
+                except Exception as e:
+                    st.error(str(e))
+
+            st.markdown("---")
+            st.markdown('<p class="ctrl-label">Run Visitor Rollup</p>', unsafe_allow_html=True)
+            st.caption("Processes all unprocessed dates in pixel_events_raw and updates both B2C and B2B summary tables. Equivalent to triggering the scheduled query manually.")
+            rollup_btn  = st.button("▶ Run Rollup Now", type="primary", key="admin_run_rollup")
+            rollup_slot = st.empty()
+            if rollup_btn:
+                rollup_slot.info("⏳ Running visitor rollup — this may take a minute...")
+                ok, msg = run_visitor_rollup()
+                rollup_slot.success(msg) if ok else rollup_slot.error(msg)
+
+            st.markdown("---")
             st.markdown('<p class="ctrl-label" style="color:#E11D48;">Danger Zone</p>', unsafe_allow_html=True)
             try:
                 client_bq = get_bq_client()
-                cfg = bigquery.QueryJobConfig(query_parameters=[bigquery.ScalarQueryParameter("pid","STRING",sel_pixel)])
-                cnt = client_bq.query(f"SELECT COUNT(*) as n FROM `{BQ_ORDERS_TABLE}` WHERE pixel_id=@pid", job_config=cfg).to_dataframe().iloc[0]['n']
-                st.warning(f"This client has **{int(cnt):,}** orders in BigQuery.")
-                if st.button(f"🗑 Delete ALL orders for {sel_client[0]}", key="admin_del_orders"):
-                    client_bq.query(f"DELETE FROM `{BQ_ORDERS_TABLE}` WHERE pixel_id=@pid", job_config=cfg).result()
-                    load_order_base.clear()
-                    st.success("All orders deleted.")
-                    st.rerun()
+                cfg       = bigquery.QueryJobConfig(query_parameters=[bigquery.ScalarQueryParameter("pid","STRING",sel_pixel)])
+                ord_cnt   = client_bq.query(f"SELECT COUNT(*) as n FROM `{BQ_ORDERS_TABLE}` WHERE pixel_id=@pid", job_config=cfg).to_dataframe().iloc[0]['n']
+                vis_cnt   = client_bq.query(f"SELECT COUNT(*) as n FROM `{BQ_PIXEL_RAW_TABLE}` WHERE PIXEL_ID=@pid", job_config=cfg).to_dataframe().iloc[0]['n']
+
+                dc1, dc2 = st.columns(2)
+                with dc1:
+                    st.warning(f"**{int(ord_cnt):,}** orders in database")
+                    if st.button("🗑 Delete ALL orders", key="admin_del_orders"):
+                        client_bq.query(f"DELETE FROM `{BQ_ORDERS_TABLE}` WHERE pixel_id=@pid", job_config=cfg).result()
+                        load_order_base.clear()
+                        st.success("All orders deleted.")
+                        st.rerun()
+                with dc2:
+                    st.warning(f"**{int(vis_cnt):,}** visitor rows in database")
+                    if st.button("🗑 Delete ALL visitor data", key="admin_del_visitors"):
+                        client_bq.query(f"DELETE FROM `{BQ_PIXEL_RAW_TABLE}` WHERE PIXEL_ID=@pid", job_config=cfg).result()
+                        load_visitor_base.clear()
+                        st.success("All raw visitor data deleted.")
+                        st.rerun()
             except Exception as e:
                 st.error(str(e))
         else:
