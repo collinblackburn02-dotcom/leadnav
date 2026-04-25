@@ -1595,7 +1595,10 @@ def admin_page():
                     if vis_btn:
                         vis_slot.info("⏳ Uploading raw event data...")
                         ok, msg = save_visitor_data_to_bq(vis_preview, sel_pixel)
-                        vis_slot.success(msg) if ok else vis_slot.error(msg)
+                        if ok:
+                            vis_slot.success(msg)
+                        else:
+                            vis_slot.error(msg)
                 except Exception as e:
                     st.error(str(e))
 
