@@ -2132,6 +2132,7 @@ def dashboard_page():
             'Homeowner': 'Yes', 'Renter': 'No', 'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female',
             '$50k-100k': '$50k-$100k', '$100k-200k': '$100k-$200k',
             '$100k-500k': '$100k-$500k', '$500k-1M': '$500k-$1M',
+            '65 and older': '65+', '65 And Older': '65+',
         }
         cust_configs = [c for c in configs if c[1] != 'state']
         cust_metric  = st.session_state.cust_metric
@@ -2267,9 +2268,9 @@ def dashboard_page():
     # Normalize values so visitor data and order data use the same labels before merging
     _VALUE_NORM = {
         'Homeowner': 'Yes', 'Renter': 'No', 'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female',
-        # Normalize legacy single-$ bucket strings to match BQ SQL double-$ format
         '$50k-100k': '$50k-$100k', '$100k-200k': '$100k-$200k',
         '$100k-500k': '$100k-$500k', '$500k-1M': '$500k-$1M',
+        '65 and older': '65+', '65 And Older': '65+',
     }
     _demo_cube = st.session_state.df_demo_cube.copy()
     if selected_col in _demo_cube.columns:
@@ -2513,6 +2514,7 @@ def dashboard_page():
         'Homeowner': 'Yes', 'Renter': 'No', 'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female',
         '$50k-100k': '$50k-$100k', '$100k-200k': '$100k-$200k',
         '$100k-500k': '$100k-$500k', '$500k-1M': '$500k-$1M',
+        '65 and older': '65+', '65 And Older': '65+',
     }
     included_types   = [col for col in st.session_state.matrix_vars
                         if col in [c[1] for c in valid_matrix_configs]]
