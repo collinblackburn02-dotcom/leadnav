@@ -1673,17 +1673,29 @@ def admin_page():
                     mc4.metric("Gaps (zero visitor days)",
                                f"{int((combined['Visitors'] == 0).sum())}")
 
-                    # Chart
-                    long_df = combined.melt(id_vars='date', var_name='Metric', value_name='Count')
-                    color_scale = alt.Scale(domain=['Visitors','Orders'], range=['#4D148C','#20B2AA'])
-                    chart = alt.Chart(long_df).mark_line(point=True, strokeWidth=2).encode(
-                        x=alt.X('date:T', axis=alt.Axis(format='%b %d', labelColor='#0F172A', title=None)),
-                        y=alt.Y('Count:Q', axis=alt.Axis(labelColor='#0F172A', title=None)),
-                        color=alt.Color('Metric:N', scale=color_scale,
-                                        legend=alt.Legend(orient='top', title=None, labelColor='#0F172A')),
-                        tooltip=[alt.Tooltip('date:T', format='%b %d, %Y'), 'Metric:N', 'Count:Q']
-                    ).properties(height=260, background='transparent')
-                    st.altair_chart(chart, use_container_width=True)
+                    # Two separate charts — different scales
+                    x_axis = alt.Axis(format='%b %d', labelColor='#0F172A', title=None, gridOpacity=0)
+                    y_axis = alt.Axis(labelColor='#0F172A', title=None, gridColor='#F1F5F9')
+
+                    if not vis_agg.empty:
+                        vis_chart = alt.Chart(combined).mark_line(
+                            point=True, strokeWidth=2.5, color='#4D148C', interpolate='monotone'
+                        ).encode(
+                            x=alt.X('date:T', axis=x_axis),
+                            y=alt.Y('Visitors:Q', axis=y_axis),
+                            tooltip=[alt.Tooltip('date:T', format='%b %d, %Y'), alt.Tooltip('Visitors:Q', format=',.0f')]
+                        ).properties(height=200, background='transparent', title=alt.TitleParams('Visitors', fontSize=11, color='#94A3B8', fontWeight='bold'))
+                        st.altair_chart(vis_chart, use_container_width=True)
+
+                    if not ord_agg.empty:
+                        ord_chart = alt.Chart(combined).mark_line(
+                            point=True, strokeWidth=2.5, color='#20B2AA', interpolate='monotone'
+                        ).encode(
+                            x=alt.X('date:T', axis=x_axis),
+                            y=alt.Y('Orders:Q', axis=y_axis),
+                            tooltip=[alt.Tooltip('date:T', format='%b %d, %Y'), alt.Tooltip('Orders:Q', format=',.0f')]
+                        ).properties(height=200, background='transparent', title=alt.TitleParams('Orders', fontSize=11, color='#94A3B8', fontWeight='bold'))
+                        st.altair_chart(ord_chart, use_container_width=True)
 
             except Exception as e:
                 st.error(f"Could not load data health: {e}")
