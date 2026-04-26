@@ -2957,7 +2957,21 @@ def dashboard_page():
         active_segs = [s for s in segments if ts_df[ts_df[selected_col] == s][ts_metric_col].sum() > 0]
 
         if active_segs:
-            chart_df = ts_df[ts_df[selected_col].isin(active_segs)].copy()
+            # Segment filter — mirrors the Customer Performance Over Time chart
+            seg_filter_key = f"conv_seg_filter_{selected_col}_{gran_choice}"
+            if seg_filter_key not in st.session_state:
+                st.session_state[seg_filter_key] = active_segs
+            selected_segs = st.multiselect(
+                "Show segments",
+                options=active_segs,
+                default=[s for s in st.session_state[seg_filter_key] if s in active_segs] or active_segs,
+                key=seg_filter_key,
+                label_visibility="collapsed"
+            )
+            if not selected_segs:
+                selected_segs = active_segs
+
+            chart_df = ts_df[ts_df[selected_col].isin(selected_segs)].copy()
             chart_df = chart_df.rename(columns={selected_col: 'Segment', ts_metric_col: 'Value'})
             chart_df['ts_date'] = pd.to_datetime(chart_df['ts_date'])
 
@@ -2975,7 +2989,7 @@ def dashboard_page():
                         'Conv %': '.1f', 'Purchases': ',.0f', 'Visitors': ',.0f'}.get(ts_metric_col, ',.2f')
             tt_title = metric_choice + (' (%)' if ts_metric_col == 'Conv %' else '')
 
-            color_scale = alt.Scale(domain=active_segs, range=CHART_COLORS[:len(active_segs)])
+            color_scale = alt.Scale(domain=selected_segs, range=CHART_COLORS[:len(selected_segs)])
 
             x_enc = alt.X('ts_date:T', axis=alt.Axis(
                 format='%b %d', labelColor='#0F172A', tickColor='#EBE4F4',
