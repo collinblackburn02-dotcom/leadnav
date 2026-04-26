@@ -2604,16 +2604,18 @@ def dashboard_page():
                 display_df   = grp.rename(columns={cust_col: active_cust_var})
                 display_cols = ['Rank', active_cust_var, 'Revenue', 'Purchases', '% of Purchasers', '% of Visitors', 'AOV']
 
-                fmt = {'Revenue': '${:,.2f}', 'Purchases': '{:,.0f}',
-                       '% of Purchasers': '{:.2f}%', 'AOV': '${:,.2f}'}
-                # Format % of Visitors only where not null
                 def fmt_vis(x):
                     return f'{x:.2f}%' if pd.notna(x) else '—'
 
                 styler = display_df[display_cols].style\
                     .set_properties(**{'font-weight': '800'}, subset=[cust_metric] if cust_metric in display_cols else [])\
-                    .format(fmt)\
-                    .format({'% of Visitors': fmt_vis})
+                    .format({
+                        'Revenue':          '${:,.2f}',
+                        'Purchases':        '{:,.0f}',
+                        '% of Purchasers':  '{:.2f}%',
+                        '% of Visitors':    fmt_vis,
+                        'AOV':              '${:,.2f}',
+                    })
                 render_premium_table(styler)
                 st.session_state.export_df    = display_df[display_cols].copy()
                 st.session_state.export_label = f"{active_cust_var} — Customer Insights"
