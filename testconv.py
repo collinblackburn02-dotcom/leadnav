@@ -1315,7 +1315,7 @@ def build_report_html(active_tab, configs, df_demo_cube, df_state_map,
             pivot = agg.pivot_table(index='ts_date', columns=col, values=key_col, aggfunc='first')
             pivot.index = pivot.index.strftime('%Y-%m-%d')
             pivot.columns.name = None
-            pivot = pivot.applymap(fmt_fn)
+            pivot = pivot.map(fmt_fn)
             out += f'<h4 class="gran">{gran_label}</h4>{fmt_table(pivot.reset_index().rename(columns={"ts_date":"Date"}))}'
         return out
 
@@ -1354,7 +1354,7 @@ def build_report_html(active_tab, configs, df_demo_cube, df_state_map,
             pivot = merged.pivot_table(index='ts_date', columns=col, values=key_col, aggfunc='first')
             pivot.index = pivot.index.strftime('%Y-%m-%d')
             pivot.columns.name = None
-            pivot = pivot.applymap(fmt_fn)
+            pivot = pivot.map(fmt_fn)
             out += f'<h4 class="gran">{gran_label}</h4>{fmt_table(pivot.reset_index().rename(columns={"ts_date":"Date"}))}'
         return out
 
