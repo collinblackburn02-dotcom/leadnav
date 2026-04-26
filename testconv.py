@@ -2057,13 +2057,32 @@ def dashboard_page():
     # ── Session state defaults ──
     if 'metric_choice' not in st.session_state:
         st.session_state.metric_choice = 'Revenue Per Visitor'
-    # Migrate old key name if saved in session state
     if st.session_state.metric_choice == 'Conversion Percent':
         st.session_state.metric_choice = 'Conversion Rate'
     if 'sort_asc' not in st.session_state:
         st.session_state.sort_asc = False
+
+    # Auto-initialise date ranges from actual data extents
+    if 'cust_date_range' not in st.session_state:
+        _o = st.session_state.get('df_orders', pd.DataFrame())
+        if not _o.empty and 'order_date' in _o.columns:
+            _od = pd.to_datetime(_o['order_date'], errors='coerce')
+            if _od.dt.tz is not None: _od = _od.dt.tz_convert(None)
+            st.session_state.cust_date_range = (_od.min().date(), _od.max().date())
+        else:
+            st.session_state.cust_date_range = ((datetime.now()-timedelta(days=30)).date(), datetime.now().date())
+
+    if 'conv_date_range' not in st.session_state:
+        _d = st.session_state.get('df_demo', pd.DataFrame())
+        if not _d.empty and 'visit_date' in _d.columns:
+            _vd = pd.to_datetime(_d['visit_date'], errors='coerce')
+            st.session_state.conv_date_range = (_vd.min().date(), _vd.max().date())
+        else:
+            st.session_state.conv_date_range = ((datetime.now()-timedelta(days=30)).date(), datetime.now().date())
+
+    # Keep legacy date_range in sync for backward compat
     if 'date_range' not in st.session_state:
-        st.session_state.date_range = (datetime.now() - timedelta(days=30), datetime.now())
+        st.session_state.date_range = st.session_state.conv_date_range
 
     # ── Configs ──
     if tenant_type == "B2C":
@@ -2155,10 +2174,17 @@ def dashboard_page():
                     save_slot.error(msg)
             st.markdown("---")
 
-        # ── DATE RANGE ──
+        # ── DATE RANGE (per-tab) ──
+        _sidebar_tab = st.session_state.get('main_tab_selector', 'Customer Insights')
         with st.expander("Date Range", expanded=False):
-            start_date = st.date_input("Start Date", st.session_state.date_range[0], key="sb_start")
-            end_date   = st.date_input("End Date",   st.session_state.date_range[1], key="sb_end")
+            if _sidebar_tab == 'Customer Insights':
+                start_date = st.date_input("Start Date", st.session_state.cust_date_range[0], key="sb_start_cust")
+                end_date   = st.date_input("End Date",   st.session_state.cust_date_range[1], key="sb_end_cust")
+                st.session_state.cust_date_range = (start_date, end_date)
+            else:
+                start_date = st.date_input("Start Date", st.session_state.conv_date_range[0], key="sb_start_conv")
+                end_date   = st.date_input("End Date",   st.session_state.conv_date_range[1], key="sb_end_conv")
+                st.session_state.conv_date_range = (start_date, end_date)
             st.session_state.date_range = (start_date, end_date)
 
         # ── RANK BY (adapts to active tab) ──
@@ -2333,6 +2359,15 @@ def dashboard_page():
             label_visibility="collapsed",
             key="main_tab_selector"
         )
+
+    # Pull the correct date range for the active tab
+    if active_tab == 'Customer Insights':
+        start_date = st.session_state.cust_date_range[0]
+        end_date   = st.session_state.cust_date_range[1]
+    else:
+        start_date = st.session_state.conv_date_range[0]
+        end_date   = st.session_state.conv_date_range[1]
+    st.session_state.date_range = (start_date, end_date)
 
     tab_title = f"{client_name}'s Customer Insights" if active_tab == 'Customer Insights' else f"{client_name}'s Conversion Insights"
     st.markdown(
