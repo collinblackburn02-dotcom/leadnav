@@ -1660,32 +1660,18 @@ def get_aggregate_analytics(start_date=None, end_date=None):
 
 # ================ 8. ADMIN PAGE =================
 def admin_page():
-    # Reset login full-screen CSS
+    # Minimal CSS — just undo login page locks and hide sidebar
     st.markdown(
         '<style>'
-        '[data-testid="stSidebar"]{display:none!important;}'
-        '[data-testid="collapsedControl"]{display:none!important;}'
         'html,body{overflow:auto!important;height:auto!important;}'
         '.stApp{height:auto!important;overflow:auto!important;}'
-        '[data-testid="stMain"]{padding:1rem 2rem!important;height:auto!important;overflow:auto!important;}'
-        '[data-testid="stMainBlockContainer"]{max-width:100%!important;padding:1rem!important;height:auto!important;}'
-        '[data-testid="stHorizontalBlock"]{gap:1rem!important;height:auto!important;align-items:flex-start!important;}'
+        '[data-testid="stSidebar"]{display:none!important;}'
+        '[data-testid="collapsedControl"]{display:none!important;}'
+        '[data-testid="stMain"]{height:auto!important;overflow:auto!important;}'
+        '[data-testid="stMainBlockContainer"]{height:auto!important;overflow:auto!important;}'
         '</style>',
         unsafe_allow_html=True
     )
-
-    # Clean loading screen on first render to clear login page styles
-    if not st.session_state.get('_admin_ready', False):
-        st.session_state._admin_ready = True
-        st.markdown(
-            '<div style="display:flex;justify-content:center;align-items:center;height:70vh;flex-direction:column;gap:16px;">'
-            f'<div style="font-family:\'Playfair Display\',serif;font-size:2rem;font-weight:700;color:#0F172A;">'
-            f'Lead<span style="color:{PITCH_BRAND_COLOR};">Navigator</span></div>'
-            '<div style="font-family:Outfit,sans-serif;font-size:0.85rem;color:#94A3B8;">Loading admin console…</div>'
-            '</div>',
-            unsafe_allow_html=True
-        )
-        st.rerun()
 
     # Header
     hdr_l, hdr_r = st.columns([8, 1])
@@ -1698,7 +1684,7 @@ def admin_page():
         )
     with hdr_r:
         if st.button("Logout", key="admin_logout"):
-            for k in ['app_state','username','pixel_id','tenant_type','client_name','is_admin','_admin_ready']:
+            for k in ['app_state','username','pixel_id','tenant_type','client_name','is_admin']:
                 st.session_state[k] = 'login' if k == 'app_state' else None
             st.rerun()
 
