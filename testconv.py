@@ -2571,7 +2571,6 @@ def dashboard_page():
         if not df_cust_orders.empty and cust_col in df_cust_orders.columns:
             cust_df = df_cust_orders.copy()
             cust_df[cust_col] = cust_df[cust_col].replace(_CUST_NORM)
-            # Display-level remap
             cust_df[cust_col] = cust_df[cust_col].replace({'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female'})
 
             grp = cust_df[~cust_df[cust_col].isin(EXCLUDE_LIST)].groupby(cust_col).agg(
@@ -2581,17 +2580,40 @@ def dashboard_page():
             grp = grp[grp['Purchases'] >= min_purchasers]
             if not grp.empty:
                 total_purch = grp['Purchases'].sum()
-                grp['AOV']              = (grp['Revenue'] / grp['Purchases'].replace(0, 1)).round(2)
-                grp['% of Purchasers']  = (grp['Purchases'] / total_purch * 100).round(2)
+                grp['AOV']             = (grp['Revenue'] / grp['Purchases'].replace(0, 1)).round(2)
+                grp['% of Purchasers'] = (grp['Purchases'] / total_purch * 100).round(2)
+
+                # % of Visitors — Option B: denominator = known visitor segments only
+                _vis_pct_col = '% of Visitors'
+                _dc = st.session_state.get('df_demo_cube', pd.DataFrame())
+                if not _dc.empty and cust_col in _dc.columns:
+                    _vc = _dc.copy()
+                    _vc[cust_col] = _vc[cust_col].replace(_CUST_NORM)
+                    v_grp = _vc[~_vc[cust_col].isin(EXCLUDE_LIST)].groupby(cust_col)['total_visitors'].sum()
+                    total_known_v = v_grp.sum()
+                    if total_known_v > 0:
+                        grp[_vis_pct_col] = grp[cust_col].map(v_grp / total_known_v * 100).round(2)
+                    else:
+                        grp[_vis_pct_col] = None
+                else:
+                    grp[_vis_pct_col] = None  # No pixel data — column shows blank
+
                 grp = grp.sort_values(cust_metric, ascending=is_ascending)
                 grp.insert(0, 'Rank', range(1, len(grp) + 1))
 
                 display_df   = grp.rename(columns={cust_col: active_cust_var})
-                display_cols = ['Rank', active_cust_var, 'Revenue', 'Purchases', '% of Purchasers', 'AOV']
+                display_cols = ['Rank', active_cust_var, 'Revenue', 'Purchases', '% of Purchasers', '% of Visitors', 'AOV']
+
+                fmt = {'Revenue': '${:,.2f}', 'Purchases': '{:,.0f}',
+                       '% of Purchasers': '{:.2f}%', 'AOV': '${:,.2f}'}
+                # Format % of Visitors only where not null
+                def fmt_vis(x):
+                    return f'{x:.2f}%' if pd.notna(x) else '—'
+
                 styler = display_df[display_cols].style\
                     .set_properties(**{'font-weight': '800'}, subset=[cust_metric] if cust_metric in display_cols else [])\
-                    .format({'Revenue': '${:,.2f}', 'Purchases': '{:,.0f}',
-                             '% of Purchasers': '{:.2f}%', 'AOV': '${:,.2f}'})
+                    .format(fmt)\
+                    .format({'% of Visitors': fmt_vis})
                 render_premium_table(styler)
                 st.session_state.export_df    = display_df[display_cols].copy()
                 st.session_state.export_label = f"{active_cust_var} — Customer Insights"
