@@ -713,8 +713,7 @@ def bucket_net_worth(val):
     if num is None: return 'Unknown'
     if num < 100000: return 'Under $100k'
     elif num < 500000: return '$100k-$500k'
-    elif num < 1000000: return '$500k-$1M'
-    else: return '$1M+'
+    else: return '$500k+'
 
 def clean_gender(val):
     if pd.isna(val): return 'Unknown'
@@ -1366,7 +1365,8 @@ def build_report_html(active_tab, configs, df_demo_cube, df_state_map,
     _NORM = {
         'Homeowner': 'Yes', 'Renter': 'No', 'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female',
         '$50k-100k': '$50k-$100k', '$100k-200k': '$100k-$200k',
-        '$100k-500k': '$100k-$500k', '$500k-1M': '$500k-$1M',
+        '$100k-500k': '$100k-$500k', '$100k-200k': '$100k-$200k',
+        '$500k-1M': '$500k+', '$500k-$1M': '$500k+', '$1M+': '$500k+',
         '65 and older': '65+', '65 And Older': '65+',
     }
     EX = ['Unknown','UNKNOWN','U','','None','NONE','nan','NaN','null','NULL','<NA>','ALL']
@@ -1566,8 +1566,7 @@ def run_visitor_rollup():
            ELSE 'Unknown' END,
       CASE WHEN LOWER(r.NET_WORTH) LIKE '%less than%' OR LOWER(r.NET_WORTH) LIKE '%-$%' OR SAFE_CAST(REGEXP_EXTRACT(REPLACE(r.NET_WORTH,',',''),r'\\$(\\d+)') AS INT64)<100000 THEN 'Under $100k'
            WHEN SAFE_CAST(REGEXP_EXTRACT(REPLACE(r.NET_WORTH,',',''),r'\\$(\\d+)') AS INT64)<500000 THEN '$100k-$500k'
-           WHEN SAFE_CAST(REGEXP_EXTRACT(REPLACE(r.NET_WORTH,',',''),r'\\$(\\d+)') AS INT64)<1000000 THEN '$500k-$1M'
-           WHEN SAFE_CAST(REGEXP_EXTRACT(REPLACE(r.NET_WORTH,',',''),r'\\$(\\d+)') AS INT64)>=1000000 OR LOWER(r.NET_WORTH) LIKE '%1,000,000%' THEN '$1M+'
+           WHEN SAFE_CAST(REGEXP_EXTRACT(REPLACE(r.NET_WORTH,',',''),r'\\$(\\d+)') AS INT64)>=500000 OR LOWER(r.NET_WORTH) LIKE '%or more%' THEN '$500k+'
            ELSE 'Unknown' END,
       CASE WHEN LOWER(r.HOMEOWNER) LIKE '%homeowner%' THEN 'Homeowner' WHEN LOWER(r.HOMEOWNER) LIKE '%renter%' THEN 'Renter' ELSE 'Unknown' END,
       CASE WHEN LOWER(TRIM(r.MARRIED)) IN ('married','y','yes') THEN 'Married' WHEN LOWER(TRIM(r.MARRIED)) IN ('single','n','no') THEN 'Single' WHEN LOWER(TRIM(r.MARRIED)) LIKE '%divorced%' THEN 'Divorced' ELSE 'Unknown' END,
@@ -2351,8 +2350,29 @@ def dashboard_page():
                 "Minimum Purchases", value=1, min_value=0, label_visibility="collapsed"
             )
 
-        selected_skus = []
-        sku_toggle = False
+        # ── FILTER BY SKU ──
+        with st.expander("Filter by SKU", expanded=False):
+            _all_orders = st.session_state.get('df_orders', pd.DataFrame())
+            if not _all_orders.empty and 'lineitem_name' in _all_orders.columns:
+                _sku_opts = sorted([
+                    str(x) for x in _all_orders['lineitem_name'].dropna().unique()
+                    if str(x) not in EXCLUDE_LIST and str(x) not in ('Enriched Import', 'nan', '')
+                ])
+            else:
+                _sku_opts = []
+
+            if _sku_opts:
+                selected_skus = st.multiselect(
+                    "Select SKUs",
+                    options=_sku_opts,
+                    label_visibility="collapsed",
+                    key="sku_filter_select",
+                    placeholder="All SKUs included"
+                )
+            else:
+                st.caption("No SKU data available.")
+                selected_skus = []
+        sku_toggle = bool(selected_skus)
 
         # Spacer to push logout/refresh to bottom
         st.markdown("<br><br><br><br><br>", unsafe_allow_html=True)
@@ -2457,10 +2477,17 @@ def dashboard_page():
     if not df_p_filtered.empty and 'Total' in df_p_filtered.columns:
         df_p_filtered = df_p_filtered[pd.to_numeric(df_p_filtered['Total'], errors='coerce').fillna(0) > 0]
 
+    # Apply SKU filter if selected (uses real BQ lineitem_name data)
+    if selected_skus and 'lineitem_name' in df_p_filtered.columns:
+        df_p_filtered = df_p_filtered[df_p_filtered['lineitem_name'].isin(selected_skus)]
+
     # Customer Insights uses all orders in date range — no ghost day filter
     df_cust_orders = orders_in_range.copy()
     if not df_cust_orders.empty and 'Total' in df_cust_orders.columns:
         df_cust_orders = df_cust_orders[pd.to_numeric(df_cust_orders['Total'], errors='coerce').fillna(0) > 0]
+    # Apply SKU filter to customer orders too
+    if selected_skus and not df_cust_orders.empty and 'lineitem_name' in df_cust_orders.columns:
+        df_cust_orders = df_cust_orders[df_cust_orders['lineitem_name'].isin(selected_skus)]
 
     # Store in session state so sidebar export can access them
     st.session_state['_export_p_filtered']    = df_p_filtered
@@ -2548,6 +2575,11 @@ def dashboard_page():
     pills_html += f'<span class="filter-pill">↕ {sort_label}</span>'
     if min_purchasers > 0:
         pills_html += f'<span class="filter-pill">≥ {min_purchasers} purchases</span>'
+    if selected_skus:
+        for _sku in selected_skus[:3]:
+            pills_html += f'<span class="filter-pill">🏷 {_sku}</span>'
+        if len(selected_skus) > 3:
+            pills_html += f'<span class="filter-pill">+{len(selected_skus)-3} more SKUs</span>'
     pills_html += '</div>'
     st.markdown(pills_html, unsafe_allow_html=True)
 
@@ -2776,7 +2808,8 @@ def dashboard_page():
     _VALUE_NORM = {
         'Homeowner': 'Yes', 'Renter': 'No', 'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female',
         '$50k-100k': '$50k-$100k', '$100k-200k': '$100k-$200k',
-        '$100k-500k': '$100k-$500k', '$500k-1M': '$500k-$1M',
+        '$100k-500k': '$100k-$500k', '$100k-200k': '$100k-$200k',
+        '$500k-1M': '$500k+', '$500k-$1M': '$500k+', '$1M+': '$500k+',
         '65 and older': '65+', '65 And Older': '65+',
     }
     _demo_cube = st.session_state.df_demo_cube.copy()
@@ -2865,7 +2898,8 @@ def dashboard_page():
     _TS_NORM = {
         'Homeowner': 'Yes', 'Renter': 'No', 'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female',
         '$50k-100k': '$50k-$100k', '$100k-200k': '$100k-$200k',
-        '$100k-500k': '$100k-$500k', '$500k-1M': '$500k-$1M',
+        '$100k-500k': '$100k-$500k', '$100k-200k': '$100k-$200k',
+        '$500k-1M': '$500k+', '$500k-$1M': '$500k+', '$1M+': '$500k+',
         '65 and older': '65+', '65 And Older': '65+',
     }
 
@@ -3027,7 +3061,8 @@ def dashboard_page():
     _MX_NORM     = {
         'Homeowner': 'Yes', 'Renter': 'No', 'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female',
         '$50k-100k': '$50k-$100k', '$100k-200k': '$100k-$200k',
-        '$100k-500k': '$100k-$500k', '$500k-1M': '$500k-$1M',
+        '$100k-500k': '$100k-$500k', '$100k-200k': '$100k-$200k',
+        '$500k-1M': '$500k+', '$500k-$1M': '$500k+', '$1M+': '$500k+',
         '65 and older': '65+', '65 And Older': '65+',
     }
     included_types   = [col for col in st.session_state.matrix_vars
