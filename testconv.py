@@ -1660,15 +1660,19 @@ def get_aggregate_analytics(start_date=None, end_date=None):
 
 # ================ 8. ADMIN PAGE =================
 def admin_page():
-    # Minimal CSS — just undo login page locks and hide sidebar
+    # Reset all login-page scroll locks; hide sidebar
     st.markdown(
         '<style>'
-        'html,body{overflow:auto!important;height:auto!important;}'
-        '.stApp{height:auto!important;overflow:auto!important;}'
+        'html{overflow-y:scroll!important;height:auto!important;}'
+        'body{overflow-y:scroll!important;height:auto!important;}'
+        '.stApp{height:auto!important;min-height:100vh!important;overflow:visible!important;}'
+        '[data-testid="stAppViewContainer"]{height:auto!important;overflow:visible!important;}'
+        '[data-testid="stMain"]{height:auto!important;overflow:visible!important;padding:1rem 2rem!important;}'
+        '[data-testid="stMainBlockContainer"]{height:auto!important;overflow:visible!important;max-width:100%!important;}'
+        '[data-testid="stVerticalBlock"]{height:auto!important;overflow:visible!important;}'
+        '[data-testid="stHorizontalBlock"]{height:auto!important;align-items:flex-start!important;}'
         '[data-testid="stSidebar"]{display:none!important;}'
         '[data-testid="collapsedControl"]{display:none!important;}'
-        '[data-testid="stMain"]{height:auto!important;overflow:auto!important;}'
-        '[data-testid="stMainBlockContainer"]{height:auto!important;overflow:auto!important;}'
         '</style>',
         unsafe_allow_html=True
     )
