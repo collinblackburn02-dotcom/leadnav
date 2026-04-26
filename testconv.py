@@ -2667,7 +2667,7 @@ def dashboard_page():
 
             if active_segs:
                 # Segment filter
-                seg_filter_key = f"cust_seg_filter_{cust_col}_{gran_choice}"
+                seg_filter_key = f"cust_seg_filter_{cust_col}_{cust_gran}"
                 if seg_filter_key not in st.session_state:
                     st.session_state[seg_filter_key] = active_segs
                 selected_segs = st.multiselect(
