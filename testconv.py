@@ -944,6 +944,70 @@ def onboarding_page():
                 st.rerun()
 
 # ================ 7. ENRICHMENT HELPER =================
+def validate_order_csv(df):
+    """Returns (errors, warnings, summary) for an order CSV."""
+    errors, warnings, summary = [], [], {}
+    cols_lower = [c.lower().strip() for c in df.columns]
+
+    # Must have email
+    email_col = next((c for c in df.columns if 'email' in c.lower()), None)
+    if not email_col:
+        errors.append("No email column found — the file must have a column with 'email' in the name.")
+    else:
+        emails = df[email_col].dropna().astype(str)
+        valid_pct = emails.str.contains('@').mean() * 100
+        summary['Email column'] = f"{email_col} ({valid_pct:.0f}% look valid)"
+        if valid_pct < 50:
+            warnings.append(f"Less than 50% of values in '{email_col}' look like real emails.")
+
+    # Revenue column — prefer exact matches over partial
+    _rev_keywords = ['total', 'revenue', 'amount']
+    _rev_matches  = [c for c in df.columns if any(x in c.lower() for x in _rev_keywords)]
+    _rev_exact    = [c for c in _rev_matches if c.lower().strip() in _rev_keywords]
+    rev_col       = (_rev_exact or _rev_matches or [None])[0]
+    if not rev_col:
+        warnings.append("No revenue column found. Revenue will be set to $0.")
+    elif len(_rev_matches) > 1:
+        summary['Revenue column']     = f"Multiple found — user must choose"
+        summary['_rev_matches']       = _rev_matches   # pass options back to caller
+    else:
+        summary['Revenue column'] = rev_col
+
+    # Date column (optional but flag)
+    date_col = next((c for c in df.columns if any(x in c.lower() for x in ['created','date','ordered'])), None)
+    summary['Date column']    = date_col or 'Not found — today\'s date will be used'
+    summary['Rows']           = f"{len(df):,}"
+    summary['Columns found']  = f"{len(df.columns)}"
+
+    return errors, warnings, summary
+
+def validate_visitor_csv(df):
+    """Returns (errors, warnings, summary) for a raw pixel events CSV."""
+    errors, warnings, summary = [], [], {}
+    upper_cols = {c.upper().strip() for c in df.columns}
+
+    REQUIRED = ['HEM_SHA256', 'EVENT_TIMESTAMP']
+    for req in REQUIRED:
+        if req not in upper_cols:
+            errors.append(f"Missing required column: {req}")
+
+    if 'EVENT_TIMESTAMP' in upper_cols:
+        ts_col = next(c for c in df.columns if c.upper().strip() == 'EVENT_TIMESTAMP')
+        parsed = pd.to_datetime(df[ts_col], errors='coerce')
+        bad = parsed.isna().sum()
+        if bad > 0:
+            warnings.append(f"{bad:,} rows have unparseable timestamps and will be skipped.")
+        else:
+            summary['Date range'] = f"{parsed.min().date()} → {parsed.max().date()}"
+
+    summary['Rows']          = f"{len(df):,}"
+    summary['Columns found'] = f"{len(df.columns)} of 57 expected"
+    missing = [c for c in ['PIXEL_ID','HEM_SHA256','EVENT_TIMESTAMP','GENDER','AGE_RANGE'] if c not in upper_cols]
+    if missing:
+        warnings.append(f"These columns not found (will be set to null): {', '.join(missing)}")
+
+    return errors, warnings, summary
+
 def run_enrichment(uploaded_file, pixel_id, tenant_type):
     """Run the full enrichment pipeline. Returns (success, message)."""
     # Use only the primary (first) pixel ID for saving enriched orders
@@ -956,7 +1020,15 @@ def run_enrichment(uploaded_file, pixel_id, tenant_type):
         if not email_col:
             return False, "No email column found in your CSV."
 
-        revenue_col  = next((c for c in raw_df.columns if any(x in c for x in ['total', 'revenue', 'amount'])), None)
+        # Use user-selected column if they chose from multiple options
+        _override    = st.session_state.pop('_override_rev_col', None)
+        if _override and _override in raw_df.columns:
+            revenue_col = _override
+        else:
+            _rev_kw    = ['total', 'revenue', 'amount']
+            _rev_all   = [c for c in raw_df.columns if any(x in c.lower() for x in _rev_kw)]
+            _rev_exact = [c for c in _rev_all if c.lower().strip() in _rev_kw]
+            revenue_col = (_rev_exact or _rev_all or [None])[0]
         lineitem_col = next((c for c in raw_df.columns if any(x in c for x in ['lineitem_name', 'line_item', 'product_title', 'product', 'sku', 'item_name', 'variant'])), None)
         unique_emails = raw_df[email_col].dropna().astype(str).str.lower().str.strip()
         unique_emails = unique_emails[unique_emails.str.contains('@', na=False)].unique().tolist()
@@ -1814,9 +1886,18 @@ def admin_page():
             st.markdown(f'<p class="ctrl-label">Upload orders for {sel_client[0]}</p>', unsafe_allow_html=True)
             adm_upload = st.file_uploader("Upload CSV", type=['csv'], key="admin_upload")
             if adm_upload:
-                adm_btn = st.button("Upload & Enrich", type="primary", key="admin_enrich_btn")
+                try:
+                    _a_prev = pd.read_csv(adm_upload, nrows=5, encoding='latin1', on_bad_lines='skip')
+                    adm_upload.seek(0)
+                    _a_errs, _a_warns, _a_summ = validate_order_csv(_a_prev)
+                    for k, v in _a_summ.items(): st.caption(f"**{k}:** {v}")
+                    for w in _a_warns: st.warning(w)
+                    for e in _a_errs:  st.error(e)
+                except Exception:
+                    _a_errs = []
+                adm_btn = st.button("Upload & Enrich", type="primary", key="admin_enrich_btn", disabled=bool(_a_errs))
                 adm_slot = st.empty()
-                if adm_btn:
+                if adm_btn and not _a_errs:
                     adm_slot.info("⏳ Uploading & enriching... This can take up to 3 minutes.")
                     ok, msg = run_enrichment(adm_upload, sel_pixel, sel_tenant)
                     if ok:
@@ -1939,9 +2020,17 @@ def admin_page():
                     vis_preview = pd.read_csv(vis_upload)
                     st.dataframe(vis_preview.head(3), use_container_width=True)
                     st.caption(f"{len(vis_preview):,} rows · {len(vis_preview.columns)} columns detected")
-                    vis_btn  = st.button("💾 Save to pixel_events_raw", type="primary", key="admin_save_vis")
+                    try:
+                        _v_errs, _v_warns, _v_summ = validate_visitor_csv(vis_preview)
+                        for k, v in _v_summ.items():
+                            st.caption(f"**{k}:** {v}")
+                        for w in _v_warns: st.warning(w)
+                        for e in _v_errs:  st.error(e)
+                    except Exception:
+                        _v_errs = []
+                    vis_btn  = st.button("💾 Save to pixel_events_raw", type="primary", key="admin_save_vis", disabled=bool(_v_errs))
                     vis_slot = st.empty()
-                    if vis_btn:
+                    if vis_btn and not _v_errs:
                         vis_slot.info("⏳ Uploading raw event data...")
                         ok, msg = save_visitor_data_to_bq(vis_preview, sel_pixel)
                         if ok:
@@ -2134,9 +2223,27 @@ def dashboard_page():
                 key="sidebar_upload"
             )
             if uploaded_file is not None:
-                upload_btn    = st.button("Upload & Enrich", type="primary", use_container_width=True, key="upload_btn")
+                _chosen_rev_col = None
+                try:
+                    _preview = pd.read_csv(uploaded_file, nrows=5, encoding='latin1', on_bad_lines='skip')
+                    uploaded_file.seek(0)
+                    _errs, _warns, _summ = validate_order_csv(_preview)
+                    _rev_opts = _summ.pop('_rev_matches', None)
+                    for k, v in _summ.items():
+                        st.markdown(f'<p style="font-size:0.6rem;color:#94A3B8;margin:1px 0;"><b style="color:#C4B5FD;">{k}:</b> {v}</p>', unsafe_allow_html=True)
+                    if _rev_opts:
+                        _chosen_rev_col = st.selectbox("Multiple revenue columns found — pick one:", _rev_opts, key="rev_col_pick")
+                    for w in _warns:
+                        st.markdown(f'<p style="font-size:0.6rem;color:#F59E0B;">⚠ {w}</p>', unsafe_allow_html=True)
+                    for e in _errs:
+                        st.markdown(f'<p style="font-size:0.6rem;color:#EF4444;">✗ {e}</p>', unsafe_allow_html=True)
+                except Exception:
+                    _errs = []
+                upload_btn    = st.button("Upload & Enrich", type="primary", use_container_width=True, key="upload_btn", disabled=bool(_errs))
                 upload_status = st.empty()
-                if upload_btn:
+                if _chosen_rev_col:
+                    st.session_state['_override_rev_col'] = _chosen_rev_col
+                if upload_btn and not _errs:
                     upload_status.markdown(
                         '<div style="background: rgba(124,58,237,0.15); border: 1px solid rgba(196,181,253,0.3); '
                         'border-radius: 8px; padding: 10px 8px; color: #C4B5FD; font-size: 0.75rem; text-align: center;">'
