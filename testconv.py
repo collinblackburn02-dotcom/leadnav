@@ -1386,8 +1386,7 @@ def build_report_html(active_tab, configs, df_demo_cube, df_state_map,
             grp['% of Purchasers'] = grp['% of Purchasers'].map('{:.2f}%'.format)
             grp['Purchases']       = grp['Purchases'].map('{:,.0f}'.format)
             tbl = fmt_table(grp[['Rank',lbl,'Revenue','Purchases','% of Purchasers','AOV']])
-            ts  = ts_section(df_cust_orders, col, lbl, cust_metric_col, cust_fmt)
-            sections += f'<div class="section"><h2 class="var-title">{lbl}</h2>{tbl}<h3 class="ts-title">Performance Over Time</h3>{ts}</div>'
+            sections += f'<div class="section"><h2 class="var-title">{lbl}</h2>{tbl}</div>'
 
     else:  # Conversion Insights
         metric_col_map = {'Revenue Per Visitor':'Rev/Visitor','Conversion Rate':'Conv %',
@@ -1430,8 +1429,7 @@ def build_report_html(active_tab, configs, df_demo_cube, df_state_map,
             merged['Visitors']    = merged['Visitors'].map('{:,.0f}'.format)
             merged['Purchases']   = merged['Purchases'].map('{:,.0f}'.format)
             tbl = fmt_table(merged[['Rank',lbl,'Revenue','Visitors','Purchases','Conv %','Rev/Visitor']])
-            ts  = conv_ts_section(df_demo_cube, df_state_map, df_p_filtered, col, lbl, key_col, conv_fmt, is_state)
-            sections += f'<div class="section"><h2 class="var-title">{lbl}</h2>{tbl}<h3 class="ts-title">Performance Over Time</h3>{ts}</div>'
+            sections += f'<div class="section"><h2 class="var-title">{lbl}</h2>{tbl}</div>'
 
     css = f"""
     @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Playfair+Display:wght@700&display=swap');
