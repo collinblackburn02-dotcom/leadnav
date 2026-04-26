@@ -2666,7 +2666,21 @@ def dashboard_page():
             active_segs = [s for s in segs if ct_agg[ct_agg[cust_col]==s][cust_ts_col].sum() > 0]
 
             if active_segs:
-                chart_df = ct_agg[ct_agg[cust_col].isin(active_segs)].rename(columns={cust_col:'Segment', cust_ts_col:'Value'})
+                # Segment filter
+                seg_filter_key = f"cust_seg_filter_{cust_col}_{gran_choice}"
+                if seg_filter_key not in st.session_state:
+                    st.session_state[seg_filter_key] = active_segs
+                selected_segs = st.multiselect(
+                    "Show segments",
+                    options=active_segs,
+                    default=[s for s in st.session_state[seg_filter_key] if s in active_segs] or active_segs,
+                    key=seg_filter_key,
+                    label_visibility="collapsed"
+                )
+                if not selected_segs:
+                    selected_segs = active_segs
+
+                chart_df = ct_agg[ct_agg[cust_col].isin(selected_segs)].rename(columns={cust_col:'Segment', cust_ts_col:'Value'})
                 chart_df['ts_date'] = pd.to_datetime(chart_df['ts_date'])
                 label_expr_c = {
                     '% of Purchasers': "format(datum.value,'.1f')+'%'",
@@ -2674,9 +2688,9 @@ def dashboard_page():
                     'Revenue':         "'$'+format(datum.value,',.0f')",
                     'Purchases':       "format(datum.value,',.0f')",
                 }.get(cust_metric, "format(datum.value,',.2f')")
-                tt_fmt_c = {'% of Purchasers':'.1f','AOV':'$,.2f','Revenue':'$,.0f','Purchases':',.0f'}.get(cust_metric,',.2f')
+                tt_fmt_c   = {'% of Purchasers':'.1f','AOV':'$,.2f','Revenue':'$,.0f','Purchases':',.0f'}.get(cust_metric,',.2f')
                 tt_title_c = cust_metric + (' (%)' if cust_metric == '% of Purchasers' else '')
-                color_scale_c = alt.Scale(domain=active_segs, range=CHART_COLORS[:len(active_segs)])
+                color_scale_c = alt.Scale(domain=selected_segs, range=CHART_COLORS[:len(selected_segs)])
                 x_enc_c = alt.X('ts_date:T', axis=alt.Axis(format='%b %d', labelColor='#0F172A', tickColor='#EBE4F4', domainColor='#EBE4F4', gridOpacity=0, labelFontSize=11, labelFont='Outfit', title=None))
                 y_enc_c = alt.Y('Value:Q', title='', axis=alt.Axis(labelExpr=label_expr_c, labelColor='#0F172A', gridColor='#F1F5F9', domainOpacity=0, tickOpacity=0, labelFontSize=11, labelFont='Outfit'))
                 color_enc_c = alt.Color('Segment:N', scale=color_scale_c, legend=alt.Legend(orient='top', title=None, labelFontSize=12, labelFont='Outfit', labelColor='#0F172A', symbolStrokeWidth=3, symbolSize=120, padding=6))
@@ -2684,7 +2698,37 @@ def dashboard_page():
                 points_c = alt.Chart(chart_df).mark_circle(size=55).encode(x=x_enc_c, y=y_enc_c,
                     color=alt.Color('Segment:N', scale=color_scale_c, legend=None),
                     tooltip=[alt.Tooltip('ts_date:T', title='Date', format='%b %d, %Y'), alt.Tooltip('Segment:N', title=active_cust_var), alt.Tooltip('Value:Q', title=tt_title_c, format=tt_fmt_c)])
-                st.altair_chart((line_c + points_c).properties(height=320, background='transparent'), use_container_width=True)
+                final_chart = line_c + points_c
+
+                # % of Visitors dashed overlay — only when 1 segment selected and metric is % of Purchasers
+                if len(selected_segs) == 1 and cust_metric == '% of Purchasers':
+                    _dc = st.session_state.get('df_demo_cube', pd.DataFrame())
+                    if not _dc.empty and cust_col in _dc.columns:
+                        _vc = _dc.copy().rename(columns={'visit_date':'ts_date','total_visitors':'Visitors'})
+                        _vc[cust_col] = _vc[cust_col].replace(_CUST_NORM)
+                        _vc = _vc[~_vc[cust_col].isin(EXCLUDE_LIST)]
+                        _vc['ts_date'] = pd.to_datetime(_vc['ts_date'])
+                        if _vc['ts_date'].dt.tz is not None:
+                            _vc['ts_date'] = _vc['ts_date'].dt.tz_convert(None)
+                        v_agg_c = _vc.groupby([pd.Grouper(key='ts_date', freq=freq), cust_col])['Visitors'].sum().reset_index()
+                        pt = v_agg_c.groupby('ts_date')['Visitors'].transform('sum')
+                        v_agg_c['VisPct'] = (v_agg_c['Visitors'] / pt.replace(0,1) * 100).round(2)
+                        seg_vis = v_agg_c[v_agg_c[cust_col] == selected_segs[0]][['ts_date','VisPct']].rename(columns={'VisPct':'Value'})
+                        if not seg_vis.empty:
+                            seg_vis['Label'] = f'{selected_segs[0]} — % of Visitors'
+                            seg_color = CHART_COLORS[0]
+                            dashed_line = alt.Chart(seg_vis).mark_line(
+                                strokeWidth=2, strokeDash=[6,3], interpolate='monotone', color=seg_color, opacity=0.6
+                            ).encode(
+                                x=x_enc_c,
+                                y=alt.Y('Value:Q', title=''),
+                                tooltip=[alt.Tooltip('ts_date:T', title='Date', format='%b %d, %Y'),
+                                         alt.Tooltip('Value:Q', title='% of Visitors', format='.1f')]
+                            )
+                            final_chart = final_chart + dashed_line
+                            st.caption("Solid line = % of Purchasers · Dashed line = % of Visitors")
+
+                st.altair_chart(final_chart.properties(height=320, background='transparent'), use_container_width=True)
 
         return  # Don't render Conversion Insights content when on Customer Insights tab
 
