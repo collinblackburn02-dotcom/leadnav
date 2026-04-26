@@ -433,6 +433,25 @@ def apply_custom_theme(primary_color):
             text-transform: none !important;
             letter-spacing: normal !important;
         }}
+        /* Export download button — match pill style */
+        [data-testid="stSidebar"] [data-testid="stDownloadButton"] button {{
+            border-radius: 999px !important;
+            font-size: 0.88rem !important;
+            font-weight: 600 !important;
+            padding: 3px 14px !important;
+            background: rgba(255,255,255,0.05) !important;
+            border: 1.5px solid rgba(196,181,253,0.45) !important;
+            color: {SIDEBAR_TEXT} !important;
+            text-transform: none !important;
+            letter-spacing: normal !important;
+            width: 100% !important;
+            margin-bottom: 1px !important;
+        }}
+        [data-testid="stSidebar"] [data-testid="stDownloadButton"] button:hover {{
+            background: rgba(124,58,237,0.2) !important;
+            border-color: {SIDEBAR_ACCENT} !important;
+            color: #FFFFFF !important;
+        }}
 
         /* ── Filter option pills — unselected: faded white ── */
         [data-testid="stBaseButton-pills"] {{
@@ -1256,6 +1275,198 @@ def save_visitor_data_to_bq(df, pixel_id):
     except Exception as e:
         return False, str(e)
 
+def build_report_html(active_tab, configs, df_demo_cube, df_state_map,
+                       df_p_filtered, df_cust_orders, start_date, end_date,
+                       client_name, min_purchasers, is_ascending,
+                       metric_choice, cust_metric, tenant_type):
+    """Generate a full branded HTML report for the active tab."""
+
+    _NORM = {
+        'Homeowner': 'Yes', 'Renter': 'No', 'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female',
+        '$50k-100k': '$50k-$100k', '$100k-200k': '$100k-$200k',
+        '$100k-500k': '$100k-$500k', '$500k-1M': '$500k-$1M',
+        '65 and older': '65+', '65 And Older': '65+',
+    }
+    EX = ['Unknown','UNKNOWN','U','','None','NONE','nan','NaN','null','NULL','<NA>','ALL']
+    BRAND = '#4D148C'
+
+    def fmt_table(df):
+        return df.to_html(index=False, border=0, escape=False)\
+                 .replace('<table','<table class="rt"')
+
+    def ts_section(orders_df, col, label, key_col, fmt_fn):
+        out = ""
+        for gran_label, freq in [('Daily','D'),('Weekly','W'),('Monthly','MS')]:
+            p = orders_df.copy()
+            if pd.to_datetime(p['order_date']).dt.tz is not None:
+                p['ts_date'] = pd.to_datetime(p['order_date']).dt.tz_convert(None).dt.normalize()
+            else:
+                p['ts_date'] = pd.to_datetime(p['order_date']).dt.normalize()
+            p[col] = p[col].replace(_NORM)
+            p = p[~p[col].isin(EX)]
+            if p.empty: continue
+            agg = p.groupby([pd.Grouper(key='ts_date', freq=freq), col]).agg(
+                Purchases=('Order_ID','nunique'), Revenue=('Total','sum')
+            ).reset_index()
+            if agg.empty: continue
+            agg['AOV']             = (agg['Revenue']/agg['Purchases'].replace(0,1)).round(2)
+            pt                     = agg.groupby('ts_date')['Purchases'].transform('sum')
+            agg['% of Purchasers'] = (agg['Purchases']/pt.replace(0,1)*100).round(2)
+            pivot = agg.pivot_table(index='ts_date', columns=col, values=key_col, aggfunc='first')
+            pivot.index = pivot.index.strftime('%Y-%m-%d')
+            pivot.columns.name = None
+            pivot = pivot.applymap(fmt_fn)
+            out += f'<h4 class="gran">{gran_label}</h4>{fmt_table(pivot.reset_index().rename(columns={"ts_date":"Date"}))}'
+        return out
+
+    def conv_ts_section(df_demo, df_state, df_orders, col, label, key_col, fmt_fn, is_state):
+        out = ""
+        for gran_label, freq in [('Daily','D'),('Weekly','W'),('Monthly','MS')]:
+            if is_state:
+                v = df_state.copy()
+                v = v.rename(columns={'visit_date':'ts_date','total_visitors':'Visitors','state':col})
+            else:
+                v = df_demo.copy()
+                v = v.rename(columns={'visit_date':'ts_date','total_visitors':'Visitors'})
+            v[col] = v[col].replace(_NORM)
+            v = v[~v[col].isin(EX)]
+            v['ts_date'] = pd.to_datetime(v['ts_date'])
+            if v['ts_date'].dt.tz is not None:
+                v['ts_date'] = v['ts_date'].dt.tz_convert(None)
+            v_agg = v.groupby([pd.Grouper(key='ts_date',freq=freq),col])['Visitors'].sum().reset_index()
+
+            p = df_orders.copy()
+            if pd.to_datetime(p['order_date']).dt.tz is not None:
+                p['ts_date'] = pd.to_datetime(p['order_date']).dt.tz_convert(None).dt.normalize()
+            else:
+                p['ts_date'] = pd.to_datetime(p['order_date']).dt.normalize()
+            p[col] = p[col].replace(_NORM)
+            p = p[~p[col].isin(EX)]
+            p_agg = p.groupby([pd.Grouper(key='ts_date',freq=freq),col]).agg(
+                Purchases=('Order_ID','nunique'), Revenue=('Total','sum')
+            ).reset_index() if not p.empty else pd.DataFrame(columns=['ts_date',col,'Purchases','Revenue'])
+
+            merged = pd.merge(v_agg, p_agg, on=['ts_date',col], how='outer').fillna(0)
+            merged['Visitors']    += merged['Purchases']
+            merged['Conv %']       = (merged['Purchases']/merged['Visitors'].replace(0,1)*100).round(2)
+            merged['Rev/Visitor']  = (merged['Revenue']/merged['Visitors'].replace(0,1)).round(2)
+            if merged.empty: continue
+            pivot = merged.pivot_table(index='ts_date', columns=col, values=key_col, aggfunc='first')
+            pivot.index = pivot.index.strftime('%Y-%m-%d')
+            pivot.columns.name = None
+            pivot = pivot.applymap(fmt_fn)
+            out += f'<h4 class="gran">{gran_label}</h4>{fmt_table(pivot.reset_index().rename(columns={"ts_date":"Date"}))}'
+        return out
+
+    sections = ""
+
+    if active_tab == 'Customer Insights':
+        cust_configs = [c for c in configs if c[1] != 'state']
+        cust_metric_col = {'% of Purchasers':'% of Purchasers','AOV':'AOV','Revenue':'Revenue','Purchases':'Purchases'}.get(cust_metric,'AOV')
+        cust_fmt = {'% of Purchasers': lambda x: f'{x:.2f}%', 'AOV': lambda x: f'${x:,.2f}',
+                    'Revenue': lambda x: f'${x:,.2f}', 'Purchases': lambda x: f'{x:,.0f}'}.get(cust_metric, lambda x: str(x))
+
+        for lbl, col in cust_configs:
+            orders = df_cust_orders.copy()
+            if col not in orders.columns: continue
+            orders[col] = orders[col].replace(_NORM)
+            grp = orders[~orders[col].isin(EX)].groupby(col).agg(
+                Purchases=('Order_ID','nunique'), Revenue=('Total','sum')
+            ).reset_index()
+            if grp.empty: continue
+            tot = grp['Purchases'].sum()
+            grp['AOV']             = (grp['Revenue']/grp['Purchases'].replace(0,1)).round(2)
+            grp['% of Purchasers'] = (grp['Purchases']/tot*100).round(2)
+            grp = grp[grp['Purchases']>=min_purchasers].sort_values(cust_metric_col, ascending=is_ascending)
+            if grp.empty: continue
+            grp.insert(0,'Rank',range(1,len(grp)+1))
+            grp = grp.rename(columns={col:lbl})
+            grp['Revenue']         = grp['Revenue'].map('${:,.2f}'.format)
+            grp['AOV']             = grp['AOV'].map('${:,.2f}'.format)
+            grp['% of Purchasers'] = grp['% of Purchasers'].map('{:.2f}%'.format)
+            grp['Purchases']       = grp['Purchases'].map('{:,.0f}'.format)
+            tbl = fmt_table(grp[['Rank',lbl,'Revenue','Purchases','% of Purchasers','AOV']])
+            ts  = ts_section(df_cust_orders, col, lbl, cust_metric_col, cust_fmt)
+            sections += f'<div class="section"><h2 class="var-title">{lbl}</h2>{tbl}<h3 class="ts-title">Performance Over Time</h3>{ts}</div>'
+
+    else:  # Conversion Insights
+        metric_col_map = {'Revenue Per Visitor':'Rev/Visitor','Conversion Rate':'Conv %',
+                          'Revenue':'Revenue','Purchases':'Purchases','Visitors':'Visitors'}
+        key_col  = metric_col_map.get(metric_choice,'Rev/Visitor')
+        conv_fmt = {'Rev/Visitor': lambda x: f'${x:,.2f}', 'Conv %': lambda x: f'{x:.2f}%',
+                    'Revenue': lambda x: f'${x:,.2f}', 'Purchases': lambda x: f'{x:,.0f}',
+                    'Visitors': lambda x: f'{x:,.0f}'}.get(key_col, lambda x: str(x))
+
+        for lbl, col in configs:
+            is_state = (col == 'state' and tenant_type == 'B2C')
+            if is_state:
+                v_grp = df_state_map[~df_state_map['state'].isin(EX)].copy()
+                v_grp['state'] = v_grp['state'].replace(_NORM)
+                v_grp = v_grp.groupby('state',as_index=False)['total_visitors'].sum().rename(columns={'total_visitors':'Visitors','state':col})
+            else:
+                dc = df_demo_cube.copy()
+                if col not in dc.columns: continue
+                dc[col] = dc[col].replace(_NORM)
+                v_grp = dc[~dc[col].isin(EX)].groupby(col,as_index=False)['total_visitors'].sum().rename(columns={'total_visitors':'Visitors'})
+
+            p = df_p_filtered.copy()
+            if col in p.columns:
+                p[col] = p[col].replace(_NORM)
+                p_grp = p[~p[col].isin(EX)].groupby(col).agg(Purchases=('Order_ID','nunique'),Revenue=('Total','sum')).reset_index()
+            else:
+                p_grp = pd.DataFrame(columns=[col,'Purchases','Revenue'])
+
+            merged = pd.merge(v_grp, p_grp, on=col, how='outer').fillna(0)
+            merged['Visitors']   += merged['Purchases']
+            merged['Conv %']      = (merged['Purchases']/merged['Visitors'].replace(0,1)*100).round(2)
+            merged['Rev/Visitor'] = (merged['Revenue']/merged['Visitors'].replace(0,1)).round(2)
+            merged = merged[merged['Purchases']>=min_purchasers].sort_values(key_col, ascending=is_ascending)
+            if merged.empty: continue
+            merged.insert(0,'Rank',range(1,len(merged)+1))
+            merged = merged.rename(columns={col:lbl})
+            merged['Revenue']     = merged['Revenue'].map('${:,.2f}'.format)
+            merged['Rev/Visitor'] = merged['Rev/Visitor'].map('${:,.2f}'.format)
+            merged['Conv %']      = merged['Conv %'].map('{:.2f}%'.format)
+            merged['Visitors']    = merged['Visitors'].map('{:,.0f}'.format)
+            merged['Purchases']   = merged['Purchases'].map('{:,.0f}'.format)
+            tbl = fmt_table(merged[['Rank',lbl,'Revenue','Visitors','Purchases','Conv %','Rev/Visitor']])
+            ts  = conv_ts_section(df_demo_cube, df_state_map, df_p_filtered, col, lbl, key_col, conv_fmt, is_state)
+            sections += f'<div class="section"><h2 class="var-title">{lbl}</h2>{tbl}<h3 class="ts-title">Performance Over Time</h3>{ts}</div>'
+
+    css = f"""
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Playfair+Display:wght@700&display=swap');
+    *{{box-sizing:border-box;margin:0;padding:0}}
+    body{{font-family:'Outfit',sans-serif;background:#FAFAFC;color:#0F172A;padding:40px 48px}}
+    .report-header{{border-bottom:2px solid {BRAND};padding-bottom:20px;margin-bottom:32px}}
+    .logo{{font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:700;color:#0F172A}}
+    .logo .accent{{color:{BRAND}}}
+    .report-title{{font-size:1.1rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:{BRAND};margin-top:8px}}
+    .meta{{font-size:0.78rem;color:#64748B;margin-top:4px}}
+    .section{{margin-bottom:48px;page-break-inside:avoid}}
+    h2.var-title{{font-size:1rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#0F172A;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid #EBE4F4}}
+    h3.ts-title{{font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#94A3B8;margin:20px 0 8px}}
+    h4.gran{{font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#C4B5FD;background:{BRAND};display:inline-block;padding:2px 10px;border-radius:999px;margin:10px 0 6px}}
+    table.rt{{width:100%;border-collapse:collapse;border-radius:10px;overflow:hidden;border:1px solid #EBE4F4;font-size:0.8rem;margin-bottom:4px}}
+    table.rt th{{background:#F8F6FA;color:{BRAND};font-weight:700;text-transform:uppercase;letter-spacing:0.08em;font-size:0.65rem;padding:10px 12px;text-align:center;border-bottom:2px solid {BRAND}}}
+    table.rt td{{padding:9px 12px;text-align:center;border-bottom:1px solid #F1F5F9;color:#0F172A}}
+    table.rt tr:last-child td{{border-bottom:none}}
+    table.rt tr:nth-child(even) td{{background:#FAFAFC}}
+    @media print{{body{{padding:20px}}.section{{page-break-inside:avoid}}}}
+    """
+
+    return f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<title>LeadNavigator — {client_name} {active_tab}</title>
+<style>{css}</style></head>
+<body>
+<div class="report-header">
+  <div class="logo">Lead<span class="accent">Navigator</span></div>
+  <div class="report-title">{client_name}'s {active_tab}</div>
+  <div class="meta">Date range: {start_date} → {end_date} &nbsp;|&nbsp; Exported {datetime.now().strftime('%B %d, %Y')}</div>
+</div>
+{sections}
+</body></html>"""
+
 def run_visitor_rollup():
     """Run the B2C + B2B visitor rollup for all unprocessed dates across all pixels."""
     B2C_SQL = """
@@ -1451,8 +1662,19 @@ def get_aggregate_analytics(start_date=None, end_date=None):
 
 # ================ 8. ADMIN PAGE =================
 def admin_page():
-    # Hide sidebar for admin
-    st.markdown('<style>[data-testid="stSidebar"]{display:none!important;}[data-testid="collapsedControl"]{display:none!important;}</style>', unsafe_allow_html=True)
+    st.markdown(
+        '<style>'
+        '[data-testid="stSidebar"]{display:none!important;}'
+        '[data-testid="collapsedControl"]{display:none!important;}'
+        'html,body{overflow:auto!important;height:auto!important;}'
+        '.stApp{height:auto!important;overflow:auto!important;}'
+        '[data-testid="stMain"]{padding:1rem 2rem!important;}'
+        '[data-testid="stMainBlockContainer"]{max-width:100%!important;padding:0!important;}'
+        '[data-testid="stHorizontalBlock"]{gap:revert!important;height:auto!important;align-items:revert!important;}'
+        '[data-testid="stVerticalBlock"]{gap:revert!important;}'
+        '</style>',
+        unsafe_allow_html=True
+    )
 
     # Header
     hdr_l, hdr_r = st.columns([8, 1])
@@ -1984,36 +2206,33 @@ def dashboard_page():
         st.markdown("---")
 
         # ── EXPORT ──
-        export_df    = st.session_state.get('export_df', pd.DataFrame())
-        export_label = st.session_state.get('export_label', 'report')
-        if not export_df.empty:
-            # Build styled HTML
-            html_table = export_df.to_html(index=False, border=0)
-            html_content = f"""<!DOCTYPE html>
-<html><head><meta charset="UTF-8">
-<title>LeadNavigator — {export_label}</title>
-<style>
-  body {{ font-family: 'Helvetica Neue', Arial, sans-serif; background: #FAFAFC; padding: 40px; color: #0F172A; }}
-  h2 {{ font-size: 1.1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #0F172A; margin-bottom: 6px; }}
-  p.sub {{ font-size: 0.8rem; color: #94A3B8; margin-bottom: 24px; }}
-  table {{ width: 100%; border-collapse: collapse; border-radius: 12px; overflow: hidden; border: 1px solid #EBE4F4; background: #fff; }}
-  th {{ background: #F8F6FA; color: #4D148C; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; padding: 12px 14px; text-align: center; border-bottom: 2px solid #4D148C; }}
-  td {{ padding: 11px 14px; text-align: center; border-bottom: 1px solid #F1F5F9; font-size: 0.85rem; }}
-  tr:last-child td {{ border-bottom: none; }}
-  tr:nth-child(even) td {{ background: #FAFAFC; }}
-</style></head><body>
-<h2>LeadNavigator — {export_label}</h2>
-<p class="sub">Exported {datetime.now().strftime('%B %d, %Y at %I:%M %p')}</p>
-{html_table}
-</body></html>"""
-            st.download_button(
-                label="Export",
-                data=html_content,
-                file_name=f"leadnav_{export_label.lower().replace(' ','_')}_{datetime.now().strftime('%Y%m%d')}.html",
-                mime="text/html",
-                key="export_btn",
-                use_container_width=True,
+        _cur_tab = st.session_state.get('main_tab_selector', 'Customer Insights')
+        with st.spinner(""):
+            report_html = build_report_html(
+                active_tab    = _cur_tab,
+                configs       = st.session_state.get('_export_configs', []),
+                df_demo_cube  = st.session_state.get('df_demo_cube', pd.DataFrame()),
+                df_state_map  = st.session_state.get('df_state_map', pd.DataFrame()),
+                df_p_filtered = st.session_state.get('_export_p_filtered', pd.DataFrame()),
+                df_cust_orders= st.session_state.get('_export_cust_orders', pd.DataFrame()),
+                start_date    = st.session_state.get('_export_start', ''),
+                end_date      = st.session_state.get('_export_end', ''),
+                client_name   = st.session_state.get('client_name', ''),
+                min_purchasers= st.session_state.get('_export_min_purchases', 1),
+                is_ascending  = st.session_state.get('_export_is_ascending', False),
+                metric_choice = st.session_state.get('_export_metric_choice', 'Revenue Per Visitor'),
+                cust_metric   = st.session_state.get('cust_metric', '% of Purchasers'),
+                tenant_type   = st.session_state.get('_export_tenant', 'B2C'),
             )
+        fname = f"leadnav_{client_name.lower().replace(' ','_')}_{_cur_tab.lower().replace(' ','_')}_{datetime.now().strftime('%Y%m%d')}.html"
+        st.download_button(
+            label="Export",
+            data=report_html,
+            file_name=fname,
+            mime="text/html",
+            key="export_btn",
+            use_container_width=True,
+        )
 
         # ── LOGOUT / REFRESH (bottom) ──
         sb_c1, sb_c2 = st.columns(2)
@@ -2088,6 +2307,17 @@ def dashboard_page():
     df_cust_orders = orders_in_range.copy()
     if not df_cust_orders.empty and 'Total' in df_cust_orders.columns:
         df_cust_orders = df_cust_orders[pd.to_numeric(df_cust_orders['Total'], errors='coerce').fillna(0) > 0]
+
+    # Store in session state so sidebar export can access them
+    st.session_state['_export_p_filtered']    = df_p_filtered
+    st.session_state['_export_cust_orders']   = df_cust_orders
+    st.session_state['_export_start']         = start_date
+    st.session_state['_export_end']           = end_date
+    st.session_state['_export_min_purchases'] = min_purchasers
+    st.session_state['_export_is_ascending']  = is_ascending
+    st.session_state['_export_metric_choice'] = metric_choice
+    st.session_state['_export_configs']       = configs
+    st.session_state['_export_tenant']        = tenant_type
 
 
     # =====================================================
