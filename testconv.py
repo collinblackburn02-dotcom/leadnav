@@ -611,10 +611,20 @@ def apply_custom_theme(primary_color):
             color: #FFFFFF !important;
         }}
 
-        /* Multiselect tags (main area) */
-        .stMultiSelect [data-baseweb="tag"] {{
-            background-color: {primary_color} !important;
-            border-radius: 6px !important;
+        /* Multiselect tags (main area) — light pill style */
+        [data-testid="stMain"] .stMultiSelect [data-baseweb="tag"] {{
+            background-color: #EDE9FE !important;
+            border-radius: 999px !important;
+            border: 1px solid #D8C8F5 !important;
+        }}
+        [data-testid="stMain"] .stMultiSelect [data-baseweb="tag"] span {{
+            color: {primary_color} !important;
+            font-size: 0.7rem !important;
+            font-weight: 600 !important;
+        }}
+        [data-testid="stMain"] .stMultiSelect [data-baseweb="tag"] [role="presentation"] {{
+            color: {primary_color} !important;
+            font-size: 0.7rem !important;
         }}
     </style>
 """, unsafe_allow_html=True)
@@ -2725,7 +2735,15 @@ def dashboard_page():
                                 tooltip=[alt.Tooltip('ts_date:T', title='Date', format='%b %d, %Y'),
                                          alt.Tooltip('Value:Q', title='% of Visitors', format='.1f')]
                             )
-                            final_chart = final_chart + dashed_line
+                            dashed_dots = alt.Chart(seg_vis).mark_circle(
+                                size=55, color=seg_color, opacity=0.6
+                            ).encode(
+                                x=x_enc_c,
+                                y=alt.Y('Value:Q', title=''),
+                                tooltip=[alt.Tooltip('ts_date:T', title='Date', format='%b %d, %Y'),
+                                         alt.Tooltip('Value:Q', title='% of Visitors', format='.1f')]
+                            )
+                            final_chart = final_chart + dashed_line + dashed_dots
                             st.caption("Solid line = % of Purchasers · Dashed line = % of Visitors")
 
                 st.altair_chart(final_chart.properties(height=320, background='transparent'), use_container_width=True)
