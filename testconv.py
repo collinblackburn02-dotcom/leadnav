@@ -709,11 +709,28 @@ def bucket_income(val):
     else: return '$200k+'
 
 def bucket_net_worth(val):
+    """Match the BQ rollup CASE statement exactly so order-side and visitor-side
+    buckets always agree. Identity-graph net worth comes in formats like
+    "$499,999 or more", "Less than $1", "-$2,499 to $2,499", "$1,000,000 or more"
+    that need pattern handling beyond pure numeric extraction."""
+    if pd.isna(val):
+        return 'Unknown'
+    val_str = str(val).lower()
+    # Negative ranges and "less than X" → always Under $100k (matches SQL %-$% and %less than%)
+    if 'less than' in val_str or '-$' in val_str:
+        return 'Under $100k'
+    # "or more" → $500k+ (catches "$499,999 or more" and "$1,000,000 or more")
+    if 'or more' in val_str:
+        return '$500k+'
     num = get_real_number(val)
-    if num is None: return 'Unknown'
-    if num < 100000: return 'Under $100k'
-    elif num < 500000: return '$100k-$500k'
-    else: return '$500k+'
+    if num is None:
+        return 'Unknown'
+    if num < 100000:
+        return 'Under $100k'
+    elif num < 500000:
+        return '$100k-$500k'
+    else:
+        return '$500k+'
 
 def clean_gender(val):
     if pd.isna(val): return 'Unknown'
