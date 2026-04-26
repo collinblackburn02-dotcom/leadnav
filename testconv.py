@@ -2224,7 +2224,8 @@ def dashboard_page():
                 cust_metric   = st.session_state.get('cust_metric', '% of Purchasers'),
                 tenant_type   = st.session_state.get('_export_tenant', 'B2C'),
             )
-        fname = f"leadnav_{client_name.lower().replace(' ','_')}_{_cur_tab.lower().replace(' ','_')}_{datetime.now().strftime('%Y%m%d')}.html"
+        _cn = (st.session_state.get('client_name') or '').lower().replace(' ','_')
+        fname = f"leadnav_{_cn}_{_cur_tab.lower().replace(' ','_')}_{datetime.now().strftime('%Y%m%d')}.html"
         st.download_button(
             label="Export",
             data=report_html,
