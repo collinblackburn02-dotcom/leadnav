@@ -2592,7 +2592,8 @@ def dashboard_page():
         _CUST_NORM = {
             'Homeowner': 'Yes', 'Renter': 'No', 'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female',
             '$50k-100k': '$50k-$100k', '$100k-200k': '$100k-$200k',
-            '$100k-500k': '$100k-$500k', '$500k-1M': '$500k-$1M',
+            '$100k-500k': '$100k-$500k',
+            '$500k-1M': '$500k+', '$500k-$1M': '$500k+', '$1M+': '$500k+',
             '65 and older': '65+', '65 And Older': '65+',
         }
         cust_configs = [c for c in configs if c[1] != 'state']
