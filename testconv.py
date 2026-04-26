@@ -770,6 +770,10 @@ if 'has_unsaved_enrichment' not in st.session_state:
     st.session_state.has_unsaved_enrichment = False
 if 'pending_save_orders' not in st.session_state:
     st.session_state.pending_save_orders = pd.DataFrame()
+if 'export_df' not in st.session_state:
+    st.session_state.export_df = pd.DataFrame()
+if 'export_label' not in st.session_state:
+    st.session_state.export_label = 'export'
 if 'is_admin' not in st.session_state:
     st.session_state.is_admin = False
 if 'main_tab_selector' not in st.session_state:
@@ -1979,6 +1983,38 @@ def dashboard_page():
         st.markdown("<br><br><br><br><br>", unsafe_allow_html=True)
         st.markdown("---")
 
+        # ── EXPORT ──
+        export_df    = st.session_state.get('export_df', pd.DataFrame())
+        export_label = st.session_state.get('export_label', 'report')
+        if not export_df.empty:
+            # Build styled HTML
+            html_table = export_df.to_html(index=False, border=0)
+            html_content = f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<title>LeadNavigator — {export_label}</title>
+<style>
+  body {{ font-family: 'Helvetica Neue', Arial, sans-serif; background: #FAFAFC; padding: 40px; color: #0F172A; }}
+  h2 {{ font-size: 1.1rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #0F172A; margin-bottom: 6px; }}
+  p.sub {{ font-size: 0.8rem; color: #94A3B8; margin-bottom: 24px; }}
+  table {{ width: 100%; border-collapse: collapse; border-radius: 12px; overflow: hidden; border: 1px solid #EBE4F4; background: #fff; }}
+  th {{ background: #F8F6FA; color: #4D148C; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; padding: 12px 14px; text-align: center; border-bottom: 2px solid #4D148C; }}
+  td {{ padding: 11px 14px; text-align: center; border-bottom: 1px solid #F1F5F9; font-size: 0.85rem; }}
+  tr:last-child td {{ border-bottom: none; }}
+  tr:nth-child(even) td {{ background: #FAFAFC; }}
+</style></head><body>
+<h2>LeadNavigator — {export_label}</h2>
+<p class="sub">Exported {datetime.now().strftime('%B %d, %Y at %I:%M %p')}</p>
+{html_table}
+</body></html>"""
+            st.download_button(
+                label="Export",
+                data=html_content,
+                file_name=f"leadnav_{export_label.lower().replace(' ','_')}_{datetime.now().strftime('%Y%m%d')}.html",
+                mime="text/html",
+                key="export_btn",
+                use_container_width=True,
+            )
+
         # ── LOGOUT / REFRESH (bottom) ──
         sb_c1, sb_c2 = st.columns(2)
         with sb_c1:
@@ -2174,6 +2210,8 @@ def dashboard_page():
                     .format({'Revenue': '${:,.2f}', 'Purchases': '{:,.0f}',
                              '% of Purchasers': '{:.2f}%', 'AOV': '${:,.2f}'})
                 render_premium_table(styler)
+                st.session_state.export_df    = display_df[display_cols].copy()
+                st.session_state.export_label = f"{active_cust_var} — Customer Insights"
         else:
             st.info("Upload and enrich orders to see customer analysis.")
 
@@ -2323,6 +2361,8 @@ def dashboard_page():
                          'Conv %': '{:.2f}%', 'Rev/Visitor': '${:,.2f}'})\
                 .background_gradient(subset=['Rev/Visitor', 'Conv %'], cmap=brand_gradient)
             render_premium_table(styler)
+            st.session_state.export_df    = display_df[display_cols].copy()
+            st.session_state.export_label = f"{st.session_state.active_single_var} — Conversion Insights"
 
     # =====================================================
     # TIME SERIES CHART
