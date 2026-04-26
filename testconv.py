@@ -1886,15 +1886,21 @@ def admin_page():
             st.markdown(f'<p class="ctrl-label">Upload orders for {sel_client[0]}</p>', unsafe_allow_html=True)
             adm_upload = st.file_uploader("Upload CSV", type=['csv'], key="admin_upload")
             if adm_upload:
+                _adm_chosen_rev = None
                 try:
                     _a_prev = pd.read_csv(adm_upload, nrows=5, encoding='latin1', on_bad_lines='skip')
                     adm_upload.seek(0)
                     _a_errs, _a_warns, _a_summ = validate_order_csv(_a_prev)
-                    for k, v in _a_summ.items(): st.caption(f"**{k}:** {v}")
+                    _a_rev_opts = _a_summ.pop('_rev_matches', None)
+                    for k, v in _a_summ.items(): st.write(f"**{k}:** {v}")
+                    if _a_rev_opts:
+                        _adm_chosen_rev = st.selectbox("Which column is the order total?", _a_rev_opts, key="adm_rev_col_pick")
                     for w in _a_warns: st.warning(w)
                     for e in _a_errs:  st.error(e)
                 except Exception:
                     _a_errs = []
+                if _adm_chosen_rev:
+                    st.session_state['_override_rev_col'] = _adm_chosen_rev
                 adm_btn = st.button("Upload & Enrich", type="primary", key="admin_enrich_btn", disabled=bool(_a_errs))
                 adm_slot = st.empty()
                 if adm_btn and not _a_errs:
@@ -2230,9 +2236,9 @@ def dashboard_page():
                     _errs, _warns, _summ = validate_order_csv(_preview)
                     _rev_opts = _summ.pop('_rev_matches', None)
                     for k, v in _summ.items():
-                        st.markdown(f'<p style="font-size:0.6rem;color:#94A3B8;margin:1px 0;"><b style="color:#C4B5FD;">{k}:</b> {v}</p>', unsafe_allow_html=True)
+                        st.markdown(f'<p style="font-size:0.78rem;color:#94A3B8;margin:2px 0;"><b style="color:#C4B5FD;">{k}:</b> {v}</p>', unsafe_allow_html=True)
                     if _rev_opts:
-                        _chosen_rev_col = st.selectbox("Multiple revenue columns found — pick one:", _rev_opts, key="rev_col_pick")
+                        _chosen_rev_col = st.selectbox("Which column is the order total?", _rev_opts, key="rev_col_pick")
                     for w in _warns:
                         st.markdown(f'<p style="font-size:0.6rem;color:#F59E0B;">⚠ {w}</p>', unsafe_allow_html=True)
                     for e in _errs:
@@ -2597,7 +2603,7 @@ def dashboard_page():
         st.markdown('<p class="section-title">Customer Performance Over Time</p>', unsafe_allow_html=True)
 
         if 'cust_time_gran' not in st.session_state:
-            st.session_state.cust_time_gran = 'Daily'
+            st.session_state.cust_time_gran = 'Monthly'
         cust_gran = st.radio("Granularity", ['Daily', 'Weekly', 'Monthly'],
                              index=['Daily','Weekly','Monthly'].index(st.session_state.cust_time_gran),
                              horizontal=True, key='cust_time_gran_radio', label_visibility='collapsed')
