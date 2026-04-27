@@ -946,7 +946,27 @@ def login_page():
             username = st.text_input("Username", key="login_username")
             password = st.text_input("Password", type="password", key="login_password")
             st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("Sign In", use_container_width=True, type="primary"):
+            # Button + swap-to-spinner pattern
+            _signin_slot = st.empty()
+            _signin_clicked = _signin_slot.button(
+                "Sign In", use_container_width=True, type="primary",
+                key="login_signin_btn"
+            )
+            if _signin_clicked:
+                # Immediately replace the button with a centered spinner so the
+                # user sees instant feedback and doesn't double-click.
+                _signin_slot.markdown(
+                    '<div style="display:flex;align-items:center;justify-content:center;'
+                    'background:#7C3AED;border-radius:8px;padding:9px 0;color:#fff;'
+                    'font-weight:600;font-size:0.95rem;gap:10px;">'
+                    '<div style="width:16px;height:16px;border:2.5px solid rgba(255,255,255,0.35);'
+                    'border-top-color:#fff;border-radius:50%;'
+                    'animation:lnv-signin-spin 0.7s linear infinite;"></div>'
+                    'Signing in…'
+                    '</div>'
+                    '<style>@keyframes lnv-signin-spin{to{transform:rotate(360deg);}}</style>',
+                    unsafe_allow_html=True
+                )
                 user_info, auth_error = authenticate_user(username, password)
                 if user_info:
                     st.session_state.username    = username
