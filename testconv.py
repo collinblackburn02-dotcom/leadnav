@@ -650,28 +650,36 @@ def get_bq_client():
 
 # ================ 3. DATA LOADING =================
 @st.cache_data(ttl=3600, show_spinner=False)
-def load_visitor_base(pixel_id, tenant_type):
+def load_visitor_base(pixel_id, tenant_type, min_date=None):
+    """Load visitor summary data for one client.
+
+    min_date: optional datetime.date — only fetch visit_date >= min_date.
+              Used by the dashboard to limit the working set to recent data
+              (default 90 days). Pass None to load all history.
+    """
     try:
         client = get_bq_client()
         # Support comma-separated pixel IDs for multi-pixel users
         pixel_ids = [p.strip() for p in str(pixel_id).split(',') if p.strip()]
+        _date_clause = " AND visit_date >= @min_date" if min_date is not None else ""
         if tenant_type == "B2C":
             query = f"""
             SELECT pixel_id, visit_date, total_visitors, state, gender, age_range, income_bucket,
                    net_worth_bucket, homeowner, marital_status, children
             FROM `{BQ_B2C_VISITOR_TABLE}`
-            WHERE pixel_id IN UNNEST(@pixel_ids)
+            WHERE pixel_id IN UNNEST(@pixel_ids){_date_clause}
             """
         else:
             query = f"""
             SELECT pixel_id, visit_date, total_visitors, industry, employee_count_range, job_title,
                    seniority, company_revenue
             FROM `{BQ_B2B_VISITOR_TABLE}`
-            WHERE pixel_id IN UNNEST(@pixel_ids)
+            WHERE pixel_id IN UNNEST(@pixel_ids){_date_clause}
             """
-        job_config = bigquery.QueryJobConfig(
-            query_parameters=[bigquery.ArrayQueryParameter("pixel_ids", "STRING", pixel_ids)]
-        )
+        _params = [bigquery.ArrayQueryParameter("pixel_ids", "STRING", pixel_ids)]
+        if min_date is not None:
+            _params.append(bigquery.ScalarQueryParameter("min_date", "DATE", min_date))
+        job_config = bigquery.QueryJobConfig(query_parameters=_params)
         df = client.query(query, job_config=job_config).to_dataframe()
         if df.empty:
             return pd.DataFrame(), pd.DataFrame(), "No data found"
@@ -765,21 +773,29 @@ def clean_state(val):
     return str(val).strip().upper()
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def load_order_base(pixel_id, tenant_type):
+def load_order_base(pixel_id, tenant_type, min_date=None):
+    """Load order data for one client.
+
+    min_date: optional datetime.date — only fetch order_date >= min_date.
+              Used by the dashboard to limit the working set to recent data
+              (default 90 days). Pass None to load all history.
+    """
     try:
         client = get_bq_client()
         # Support comma-separated pixel IDs for multi-pixel users
         pixel_ids = [p.strip() for p in str(pixel_id).split(',') if p.strip()]
+        _date_clause = " AND DATE(order_date) >= @min_date" if min_date is not None else ""
         query = f"""
         SELECT pixel_id, order_id, order_date, customer_email, revenue, lineitem_name, state,
                gender, age_range, income_bucket, net_worth_bucket, homeowner, marital_status, children,
                company_name, company_industry, employee_count_range, job_title, seniority, company_revenue
         FROM `{BQ_ORDERS_TABLE}`
-        WHERE pixel_id IN UNNEST(@pixel_ids)
+        WHERE pixel_id IN UNNEST(@pixel_ids){_date_clause}
         """
-        job_config = bigquery.QueryJobConfig(
-            query_parameters=[bigquery.ArrayQueryParameter("pixel_ids", "STRING", pixel_ids)]
-        )
+        _params = [bigquery.ArrayQueryParameter("pixel_ids", "STRING", pixel_ids)]
+        if min_date is not None:
+            _params.append(bigquery.ScalarQueryParameter("min_date", "DATE", min_date))
+        job_config = bigquery.QueryJobConfig(query_parameters=_params)
         df = client.query(query, job_config=job_config).to_dataframe()
         if df.empty:
             return pd.DataFrame(), None
@@ -925,12 +941,16 @@ def login_page():
                         st.rerun()
                     else:
                         with st.spinner("Syncing your data..."):
+                            _default_load_min = (datetime.now() - timedelta(days=90)).date()
                             df_demo, df_state, error = load_visitor_base(
-                                st.session_state.pixel_id, st.session_state.tenant_type
+                                st.session_state.pixel_id, st.session_state.tenant_type,
+                                min_date=_default_load_min
                             )
                             df_orders, order_error = load_order_base(
-                                st.session_state.pixel_id, st.session_state.tenant_type
+                                st.session_state.pixel_id, st.session_state.tenant_type,
+                                min_date=_default_load_min
                             )
+                            st.session_state.loaded_min_date = _default_load_min
                         if error:
                             st.error(f"Error loading visitor data: {error}")
                         elif order_error:
@@ -956,8 +976,14 @@ def onboarding_page():
     st.markdown("Click the button below to load your data from BigQuery and proceed to the dashboard.")
     if st.button("Load Data & Enter Dashboard"):
         with st.spinner("Loading data from BigQuery..."):
-            df_demo, df_state, error = load_visitor_base(st.session_state.pixel_id, st.session_state.tenant_type)
-            df_orders, order_error = load_order_base(st.session_state.pixel_id, st.session_state.tenant_type)
+            _default_load_min = (datetime.now() - timedelta(days=90)).date()
+            df_demo, df_state, error = load_visitor_base(
+                st.session_state.pixel_id, st.session_state.tenant_type, min_date=_default_load_min
+            )
+            df_orders, order_error = load_order_base(
+                st.session_state.pixel_id, st.session_state.tenant_type, min_date=_default_load_min
+            )
+            st.session_state.loaded_min_date = _default_load_min
             if error:
                 st.error(f"Error loading visitor data: {error}")
             elif order_error:
@@ -1910,8 +1936,13 @@ def admin_page():
             with dcol1:
                 if st.button("👁 View as this client", type="primary"):
                     with st.spinner("Loading client data..."):
-                        df_demo, df_state, err = load_visitor_base(sel_pixel, sel_tenant)
-                        df_orders, oerr = load_order_base(sel_pixel, sel_tenant)
+                        _default_load_min = (datetime.now() - timedelta(days=90)).date()
+                        df_demo, df_state, err = load_visitor_base(
+                            sel_pixel, sel_tenant, min_date=_default_load_min
+                        )
+                        df_orders, oerr = load_order_base(
+                            sel_pixel, sel_tenant, min_date=_default_load_min
+                        )
                     if not err and not oerr:
                         st.session_state.pixel_id    = sel_pixel
                         st.session_state.tenant_type = sel_tenant
@@ -1919,6 +1950,7 @@ def admin_page():
                         st.session_state.df_demo     = df_demo
                         st.session_state.df_state    = df_state
                         st.session_state.df_orders   = df_orders
+                        st.session_state.loaded_min_date = _default_load_min
                         st.session_state.app_state   = 'dashboard'
                         st.rerun()
                     else:
@@ -2461,6 +2493,34 @@ def dashboard_page():
     metric_choice = st.session_state.metric_choice
     is_ascending  = st.session_state.sort_asc
     sort_label    = "Low → High" if is_ascending else "High → Low"
+
+    # ── Auto-refetch if user expanded the date picker beyond what's loaded ──
+    # We default-load 90 days. If the user picks an earlier start date in
+    # either tab's picker, fetch a wider window from BQ on the fly.
+    _default_load_min = (datetime.now() - timedelta(days=90)).date()
+    _picker_starts = [
+        st.session_state.cust_date_range[0],
+        st.session_state.conv_date_range[0],
+    ]
+    _needed_min = min([_default_load_min] + _picker_starts)
+    _loaded_min = st.session_state.get('loaded_min_date', _default_load_min)
+    if _needed_min < _loaded_min:
+        with st.spinner("Loading earlier data…"):
+            df_demo, df_state, _err = load_visitor_base(
+                pixel_id, tenant_type, min_date=_needed_min
+            )
+            df_orders, _oerr = load_order_base(
+                pixel_id, tenant_type, min_date=_needed_min
+            )
+            if _err:
+                st.error(f"Visitor reload error: {_err}")
+            elif _oerr:
+                st.error(f"Order reload error: {_oerr}")
+            else:
+                st.session_state.df_demo   = df_demo
+                st.session_state.df_state  = df_state
+                st.session_state.df_orders = df_orders
+                st.session_state.loaded_min_date = _needed_min
 
     # =====================================================
     # MAIN AREA — data filtering
@@ -3271,4 +3331,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-        
