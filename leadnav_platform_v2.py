@@ -182,14 +182,32 @@ def apply_custom_theme(primary_color):
             font-size: 0.73rem !important;
         }}
 
-        /* Sidebar multiselect */
+        /* Sidebar multiselect — matches main-area light-pill style */
         [data-testid="stSidebar"] .stMultiSelect [data-baseweb="select"] {{
             background: rgba(255,255,255,0.07) !important;
             border: 1px solid rgba(196,181,253,0.2) !important;
             border-radius: 8px !important;
         }}
+        /* Kill any white inner backdrops Streamlit/BaseWeb injects */
+        [data-testid="stSidebar"] .stMultiSelect [data-baseweb="select"] > div,
+        [data-testid="stSidebar"] .stMultiSelect [data-baseweb="select"] > div > div {{
+            background: transparent !important;
+            background-color: transparent !important;
+        }}
+        /* Pill — light lavender bg, dark purple text (like main area filters) */
         [data-testid="stSidebar"] .stMultiSelect [data-baseweb="tag"] {{
-            background-color: {SIDEBAR_ACCENT} !important;
+            background-color: #EDE9FE !important;
+            border-radius: 999px !important;
+            border: 1px solid #D8C8F5 !important;
+        }}
+        [data-testid="stSidebar"] .stMultiSelect [data-baseweb="tag"] span {{
+            color: {SIDEBAR_ACCENT} !important;
+            font-size: 0.7rem !important;
+            font-weight: 600 !important;
+        }}
+        [data-testid="stSidebar"] .stMultiSelect [data-baseweb="tag"] [role="presentation"] {{
+            color: {SIDEBAR_ACCENT} !important;
+            font-size: 0.7rem !important;
         }}
         [data-testid="stSidebar"] .stMultiSelect input {{
             color: #E2D9F3 !important;
