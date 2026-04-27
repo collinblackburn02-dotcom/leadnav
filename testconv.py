@@ -1564,15 +1564,24 @@ def build_report_html(active_tab, configs, df_demo_cube, df_state_map,
 {sections}
 </body></html>"""
 
-def run_visitor_rollup():
-    """Run the B2C + B2B visitor rollup for all unprocessed dates across all pixels."""
+def run_visitor_rollup(pixel_id):
+    """Run the B2C + B2B visitor rollup for one client's unprocessed dates only.
+
+    Scoped to the passed pixel_id (or comma-separated list of pixel_ids for multi-pixel
+    clients). The anti-duplication shield against the summary tables prevents reprocessing
+    pixel+date combos that are already there, so this is safe to run repeatedly.
+    """
+    pixel_ids = [p.strip() for p in str(pixel_id).split(',') if p.strip()]
+    if not pixel_ids:
+        return False, "Rollup error: no pixel_id provided."
+
     B2C_SQL = """
     INSERT INTO `leadnav-hhs.leadnav_platform.b2c_visitor_summary`
       (pixel_id, visit_date, total_visitors, state, gender, age_range,
        income_bucket, net_worth_bucket, homeowner, marital_status, children)
     SELECT
       r.PIXEL_ID, DATE(r.EVENT_TIMESTAMP,'America/Chicago'),
-      COUNT(*),
+      COUNT(DISTINCT r.HEM_SHA256),
       UPPER(TRIM(r.PERSONAL_STATE)),
       CASE WHEN UPPER(TRIM(r.GENDER)) IN ('M','MALE') THEN 'Male' WHEN UPPER(TRIM(r.GENDER)) IN ('F','FEMALE') THEN 'Female' ELSE 'Unknown' END,
       CASE WHEN r.AGE_RANGE IS NULL OR TRIM(r.AGE_RANGE)='' THEN 'Unknown' ELSE TRIM(r.AGE_RANGE) END,
@@ -1590,11 +1599,13 @@ def run_visitor_rollup():
       CASE WHEN UPPER(TRIM(r.CHILDREN))='Y' THEN 'Yes' WHEN UPPER(TRIM(r.CHILDREN))='N' THEN 'No' ELSE 'Unknown' END
     FROM (
       SELECT * FROM `leadnav-hhs.leadnav_platform.pixel_events_raw`
-      WHERE PIXEL_ID IS NOT NULL
+      WHERE PIXEL_ID IN UNNEST(@pixel_ids)
       QUALIFY ROW_NUMBER() OVER (PARTITION BY HEM_SHA256, EVENT_TIMESTAMP ORDER BY HEM_SHA256) = 1
     ) r
     WHERE CONCAT(r.PIXEL_ID, CAST(DATE(r.EVENT_TIMESTAMP,'America/Chicago') AS STRING)) NOT IN (
-        SELECT DISTINCT CONCAT(pixel_id, CAST(visit_date AS STRING)) FROM `leadnav-hhs.leadnav_platform.b2c_visitor_summary`
+        SELECT DISTINCT CONCAT(pixel_id, CAST(visit_date AS STRING))
+        FROM `leadnav-hhs.leadnav_platform.b2c_visitor_summary`
+        WHERE pixel_id IN UNNEST(@pixel_ids)
       )
     GROUP BY 1,2,4,5,6,7,8,9,10,11
     """
@@ -1604,7 +1615,7 @@ def run_visitor_rollup():
       (pixel_id, visit_date, total_visitors, industry, employee_count_range, job_title, seniority, company_revenue)
     SELECT
       r.PIXEL_ID, DATE(r.EVENT_TIMESTAMP,'America/Chicago'),
-      COUNT(*),
+      COUNT(DISTINCT r.HEM_SHA256),
       COALESCE(NULLIF(TRIM(r.COMPANY_INDUSTRY),''),'Unknown'),
       COALESCE(NULLIF(TRIM(r.COMPANY_EMPLOYEE_COUNT),''),'Unknown'),
       COALESCE(NULLIF(TRIM(r.JOB_TITLE),''),'Unknown'),
@@ -1619,22 +1630,27 @@ def run_visitor_rollup():
       COALESCE(NULLIF(TRIM(r.COMPANY_REVENUE),''),'Unknown')
     FROM (
       SELECT * FROM `leadnav-hhs.leadnav_platform.pixel_events_raw`
-      WHERE PIXEL_ID IS NOT NULL
+      WHERE PIXEL_ID IN UNNEST(@pixel_ids)
       QUALIFY ROW_NUMBER() OVER (PARTITION BY HEM_SHA256, EVENT_TIMESTAMP ORDER BY HEM_SHA256) = 1
     ) r
     WHERE CONCAT(r.PIXEL_ID, CAST(DATE(r.EVENT_TIMESTAMP,'America/Chicago') AS STRING)) NOT IN (
-        SELECT DISTINCT CONCAT(pixel_id, CAST(visit_date AS STRING)) FROM `leadnav-hhs.leadnav_platform.b2b_visitor_summary`
+        SELECT DISTINCT CONCAT(pixel_id, CAST(visit_date AS STRING))
+        FROM `leadnav-hhs.leadnav_platform.b2b_visitor_summary`
+        WHERE pixel_id IN UNNEST(@pixel_ids)
       )
     GROUP BY 1,2,4,5,6,7,8
     """
     try:
         client = get_bq_client()
-        b2c_job = client.query(B2C_SQL)
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[bigquery.ArrayQueryParameter("pixel_ids", "STRING", pixel_ids)]
+        )
+        b2c_job = client.query(B2C_SQL, job_config=job_config)
         b2c_job.result()
-        b2b_job = client.query(B2B_SQL)
+        b2b_job = client.query(B2B_SQL, job_config=job_config)
         b2b_job.result()
         load_visitor_base.clear()
-        return True, "✅ Visitor rollup complete — B2C and B2B summary tables updated for all unprocessed dates."
+        return True, f"✅ Visitor rollup complete for {len(pixel_ids)} pixel(s) — B2C and B2B summary tables updated for unprocessed dates."
     except Exception as e:
         return False, f"Rollup error: {e}"
 
@@ -2073,13 +2089,13 @@ def admin_page():
                     st.error(str(e))
 
             st.markdown("---")
-            st.markdown('<p class="ctrl-label">Run Visitor Rollup</p>', unsafe_allow_html=True)
-            st.caption("Processes all unprocessed dates in pixel_events_raw and updates both B2C and B2B summary tables. Equivalent to triggering the scheduled query manually.")
+            st.markdown(f'<p class="ctrl-label">Run Visitor Rollup for {sel_client[0]}</p>', unsafe_allow_html=True)
+            st.caption(f"Processes all unprocessed dates in pixel_events_raw for {sel_client[0]} only and updates B2C and B2B summary tables. Skips pixel+date combos already in summary, so safe to re-run.")
             rollup_btn  = st.button("▶ Run Rollup Now", type="primary", key="admin_run_rollup")
             rollup_slot = st.empty()
             if rollup_btn:
-                rollup_slot.info("⏳ Running visitor rollup — this may take a minute...")
-                ok, msg = run_visitor_rollup()
+                rollup_slot.info(f"⏳ Running visitor rollup for {sel_client[0]} — this may take a minute...")
+                ok, msg = run_visitor_rollup(sel_pixel)
                 if ok:
                     rollup_slot.success(msg)
                 else:
