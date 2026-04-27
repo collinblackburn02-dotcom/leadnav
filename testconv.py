@@ -2609,9 +2609,9 @@ def dashboard_page():
     k1, k2, k3, k4 = st.columns(4)
     if active_tab == 'Customer Insights':
         with k1:
-            st.markdown(f'<div class="kpi-card"><div class="kpi-label">Total Revenue</div><div class="kpi-value">${total_revenue:,.0f}</div><div class="kpi-sub">{total_purchases:,} orders</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="kpi-card"><div class="kpi-label">Enriched Total Revenue</div><div class="kpi-value">${total_revenue:,.0f}</div><div class="kpi-sub">{total_purchases:,} enriched orders</div></div>', unsafe_allow_html=True)
         with k2:
-            st.markdown(f'<div class="kpi-card"><div class="kpi-label">Total Purchases</div><div class="kpi-value">{total_purchases:,}</div><div class="kpi-sub">{start_date} – {end_date}</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="kpi-card"><div class="kpi-label">Enriched Total Purchases</div><div class="kpi-value">{total_purchases:,}</div><div class="kpi-sub">{start_date} – {end_date}</div></div>', unsafe_allow_html=True)
         with k3:
             st.markdown(f'<div class="kpi-card"><div class="kpi-label">Avg Order Value</div><div class="kpi-value">${overall_aov:,.2f}</div><div class="kpi-sub">across all segments</div></div>', unsafe_allow_html=True)
         with k4:
@@ -2620,7 +2620,7 @@ def dashboard_page():
         with k1:
             st.markdown(f'<div class="kpi-card"><div class="kpi-label">Total Visitors</div><div class="kpi-value">{total_visitors:,.0f}</div><div class="kpi-sub">{start_date} – {end_date}</div></div>', unsafe_allow_html=True)
         with k2:
-            st.markdown(f'<div class="kpi-card"><div class="kpi-label">Total Revenue</div><div class="kpi-value">${total_revenue:,.0f}</div><div class="kpi-sub">{total_purchases:,} orders</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="kpi-card"><div class="kpi-label">Enriched Total Revenue</div><div class="kpi-value">${total_revenue:,.0f}</div><div class="kpi-sub">{total_purchases:,} enriched orders</div></div>', unsafe_allow_html=True)
         with k3:
             st.markdown(f'<div class="kpi-card"><div class="kpi-label">Conversion Rate</div><div class="kpi-value">{conv_rate:.2f}%</div><div class="kpi-sub">of visitors purchased</div></div>', unsafe_allow_html=True)
         with k4:
@@ -3271,3 +3271,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+        
