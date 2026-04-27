@@ -2577,6 +2577,28 @@ def dashboard_page():
     # =====================================================
     # KPI base values — customer insights uses unfiltered orders, conversion uses ghost-day filtered
     _kpi_orders     = df_cust_orders if active_tab == 'Customer Insights' else df_p_filtered
+
+    # Filter KPI orders to ENRICHED orders only (orders with at least one
+    # demographic column populated). The deep dive tables already exclude
+    # Unknown values per segment, so without this filter the KPI revenue/
+    # conversion/RPV would include unenriched orders (~60% of total) that
+    # never appear in the breakdown — making the top-line numbers look
+    # disproportionately high vs the per-segment math.
+    if not _kpi_orders.empty:
+        if tenant_type == "B2C":
+            _enrich_cols = ['gender', 'age_range', 'income_bucket', 'net_worth_bucket',
+                            'homeowner', 'marital_status', 'children', 'state']
+        else:
+            _enrich_cols = ['industry', 'employee_count_range', 'job_title',
+                            'seniority', 'company_revenue']
+        _enrich_cols = [c for c in _enrich_cols if c in _kpi_orders.columns]
+        if _enrich_cols:
+            _enriched_mask = pd.Series(False, index=_kpi_orders.index)
+            for _c in _enrich_cols:
+                _col_str = _kpi_orders[_c].fillna('Unknown').astype(str)
+                _enriched_mask = _enriched_mask | ~_col_str.isin(EXCLUDE_LIST)
+            _kpi_orders = _kpi_orders[_enriched_mask]
+
     total_revenue   = float(_kpi_orders['Total'].sum()) if not _kpi_orders.empty and 'Total' in _kpi_orders.columns else 0.0
     total_purchases = int(_kpi_orders['Order_ID'].nunique()) if not _kpi_orders.empty and 'Order_ID' in _kpi_orders.columns else 0
     total_visitors  = int(df_demo_filtered['total_visitors'].sum()) if not df_demo_filtered.empty else 0
