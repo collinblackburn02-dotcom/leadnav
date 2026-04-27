@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import numpy as np
 from google.cloud import bigquery
@@ -1818,6 +1819,45 @@ def get_aggregate_analytics(start_date=None, end_date=None):
 
 # ================ 8. ADMIN PAGE =================
 def admin_page():
+    # ── Loading shroud: covers leftover login DOM during transition ──
+    # Uses components.html (which executes scripts) to inject a fixed-position
+    # overlay into the PARENT document. Polls for the admin tabs to render,
+    # then fades the shroud out. Hard-removes after ~12s as a safety net.
+    components.html(
+        """
+        <script>
+        (function(){
+          var doc = window.parent.document;
+          if (doc.getElementById('lnv-admin-shroud')) return;
+          var s = doc.createElement('div');
+          s.id = 'lnv-admin-shroud';
+          s.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;'
+            + 'background:#FAFAFB;z-index:999999;display:flex;'
+            + 'align-items:center;justify-content:center;'
+            + 'font-family:Outfit,sans-serif;color:#7C3AED;'
+            + 'font-weight:600;font-size:1rem;';
+          s.textContent = 'Loading admin console…';
+          doc.body.appendChild(s);
+          var attempts = 0;
+          function fade(){
+            s.style.transition = 'opacity .35s';
+            s.style.opacity = '0';
+            setTimeout(function(){ if(s && s.parentNode) s.remove(); }, 400);
+          }
+          function poll(){
+            attempts++;
+            var tabs = doc.querySelector('[data-baseweb="tab-list"]');
+            if (tabs) { fade(); return; }
+            if (attempts > 60) { fade(); return; }
+            setTimeout(poll, 200);
+          }
+          setTimeout(poll, 250);
+        })();
+        </script>
+        """,
+        height=0,
+    )
+
     # Reset all login-page scroll locks; hide sidebar
     st.markdown(
         '<style>'
