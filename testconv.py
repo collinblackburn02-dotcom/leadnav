@@ -1591,8 +1591,8 @@ def run_visitor_rollup(pixel_id):
            WHEN SAFE_CAST(REGEXP_EXTRACT(REPLACE(r.INCOME_RANGE,',',''),r'\\$(\\d+)') AS INT64)>=200000 THEN '$200k+'
            ELSE 'Unknown' END,
       CASE WHEN LOWER(r.NET_WORTH) LIKE '%less than%' OR LOWER(r.NET_WORTH) LIKE '%-$%' OR SAFE_CAST(REGEXP_EXTRACT(REPLACE(r.NET_WORTH,',',''),r'\\$(\\d+)') AS INT64)<100000 THEN 'Under $100k'
-           WHEN SAFE_CAST(REGEXP_EXTRACT(REPLACE(r.NET_WORTH,',',''),r'\\$(\\d+)') AS INT64)<500000 THEN '$100k-$500k'
            WHEN SAFE_CAST(REGEXP_EXTRACT(REPLACE(r.NET_WORTH,',',''),r'\\$(\\d+)') AS INT64)>=500000 OR LOWER(r.NET_WORTH) LIKE '%or more%' THEN '$500k+'
+           WHEN SAFE_CAST(REGEXP_EXTRACT(REPLACE(r.NET_WORTH,',',''),r'\\$(\\d+)') AS INT64)<500000 THEN '$100k-$500k'
            ELSE 'Unknown' END,
       CASE WHEN LOWER(r.HOMEOWNER) LIKE '%homeowner%' THEN 'Homeowner' WHEN LOWER(r.HOMEOWNER) LIKE '%renter%' THEN 'Renter' ELSE 'Unknown' END,
       CASE WHEN LOWER(TRIM(r.MARRIED)) IN ('married','y','yes') THEN 'Married' WHEN LOWER(TRIM(r.MARRIED)) IN ('single','n','no') THEN 'Single' WHEN LOWER(TRIM(r.MARRIED)) LIKE '%divorced%' THEN 'Divorced' ELSE 'Unknown' END,
