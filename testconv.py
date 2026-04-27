@@ -2349,6 +2349,10 @@ def dashboard_page():
             st.session_state.date_range = (start_date, end_date)
 
         # ── RANK BY (adapts to active tab) ──
+        # Note: button clicks already trigger a Streamlit rerun. Calling st.rerun()
+        # again inside the click block can drop in-progress widget state (causing
+        # the main tab radio to silently reset to its default). Just update state
+        # and let Streamlit's natural rerun handle the redraw.
         with st.expander("Rank By", expanded=False):
             _cur_tab = st.session_state.get('main_tab_selector', 'Customer Insights')
             if _cur_tab == 'Customer Insights':
@@ -2357,25 +2361,21 @@ def dashboard_page():
                     if st.button(m, key=f"cust_metric_{m}",
                                  type="primary" if st.session_state.cust_metric == m else "secondary"):
                         st.session_state.cust_metric = m
-                        st.rerun()
             else:
                 for m in metrics:
                     is_active = (st.session_state.metric_choice == m)
                     if st.button(m, key=f"metric_{m}",
                                  type="primary" if is_active else "secondary"):
                         st.session_state.metric_choice = m
-                        st.rerun()
 
         # ── SORT BY ──
         with st.expander("Sort By", expanded=False):
             if st.button("High → Low", key="sort_htl",
                          type="primary" if not st.session_state.sort_asc else "secondary"):
                 st.session_state.sort_asc = False
-                st.rerun()
             if st.button("Low → High", key="sort_lth",
                          type="primary" if st.session_state.sort_asc else "secondary"):
                 st.session_state.sort_asc = True
-                st.rerun()
 
         # ── MIN PURCHASES ──
         with st.expander("Min Purchases", expanded=False):
@@ -2541,9 +2541,15 @@ def dashboard_page():
 
     _, tab_r = st.columns([5, 3])
     with tab_r:
+        # Defensive index= so the radio always renders the right tab even if
+        # session state for the widget gets dropped during a rerun.
+        _tab_options = ["Customer Insights", "Conversion Insights"]
+        _stored_tab  = st.session_state.get('main_tab_selector', 'Customer Insights')
+        _tab_idx     = _tab_options.index(_stored_tab) if _stored_tab in _tab_options else 0
         active_tab = st.radio(
             "View",
-            ["Customer Insights", "Conversion Insights"],
+            _tab_options,
+            index=_tab_idx,
             horizontal=True,
             label_visibility="collapsed",
             key="main_tab_selector"
