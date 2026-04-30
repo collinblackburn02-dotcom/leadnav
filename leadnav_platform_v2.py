@@ -2043,6 +2043,14 @@ def admin_page():
                     _a_prev = pd.read_csv(adm_upload, nrows=5, encoding='latin1', on_bad_lines='skip')
                     adm_upload.seek(0)
                     _a_errs, _a_warns, _a_summ = validate_order_csv(_a_prev)
+                    # Count actual rows in the full CSV so the displayed
+                    # "Rows" reflects the file size, not the 5-row preview.
+                    try:
+                        _a_total_rows = sum(1 for _ in adm_upload) - 1  # minus header
+                        adm_upload.seek(0)
+                        _a_summ['Rows'] = f"{max(_a_total_rows, 0):,}"
+                    except Exception:
+                        adm_upload.seek(0)
                     _a_rev_opts = _a_summ.pop('_rev_matches', None)
                     for k, v in _a_summ.items(): st.write(f"**{k}:** {v}")
                     if _a_rev_opts:
@@ -2434,6 +2442,14 @@ def dashboard_page():
                     _preview = pd.read_csv(uploaded_file, nrows=5, encoding='latin1', on_bad_lines='skip')
                     uploaded_file.seek(0)
                     _errs, _warns, _summ = validate_order_csv(_preview)
+                    # Count actual rows in the full CSV so the displayed
+                    # "Rows" reflects the file size, not the 5-row preview.
+                    try:
+                        _total_rows = sum(1 for _ in uploaded_file) - 1  # minus header
+                        uploaded_file.seek(0)
+                        _summ['Rows'] = f"{max(_total_rows, 0):,}"
+                    except Exception:
+                        uploaded_file.seek(0)
                     _rev_opts = _summ.pop('_rev_matches', None)
                     for k, v in _summ.items():
                         st.markdown(f'<p style="font-size:0.78rem;color:#94A3B8;margin:2px 0;"><b style="color:#C4B5FD;">{k}:</b> {v}</p>', unsafe_allow_html=True)
@@ -3044,6 +3060,16 @@ def dashboard_page():
     # =====================================================
     # CONVERSION INSIGHTS — SINGLE VARIABLE DEEP DIVE
     # =====================================================
+    # Inform the user when the ghost-day shield is actively filtering orders
+    # so they understand why the conversion-tab numbers may differ from the
+    # customer-tab totals. This appears whenever the shield has removed any
+    # orders (partial or full filter).
+    if not orders_in_range.empty and len(df_p_filtered) < len(orders_in_range):
+        st.caption(
+            "🛡 Only showing conversion data for days with visitor data to "
+            "preserve accurate conversion insights."
+        )
+
     st.markdown('<p class="section-title">Single Variable Deep Dive</p>', unsafe_allow_html=True)
 
     if "active_single_var" not in st.session_state:
