@@ -2645,7 +2645,18 @@ def dashboard_page():
             else:
                 st.session_state.df_demo   = df_demo
                 st.session_state.df_state  = df_state
-                st.session_state.df_orders = df_orders
+                # Preserve any unsaved enriched orders that were just uploaded
+                # — without this, the auto-refetch wipes them from df_orders
+                # (the user can still see "X orders ready to save" in the
+                # sidebar because pending_save_orders is separate, but the
+                # dashboard renders empty until they click Save to Database).
+                _pending = st.session_state.get('pending_save_orders', pd.DataFrame())
+                if not _pending.empty:
+                    st.session_state.df_orders = pd.concat(
+                        [df_orders, _pending], ignore_index=True
+                    )
+                else:
+                    st.session_state.df_orders = df_orders
                 st.session_state.loaded_min_date = _needed_min
 
     # =====================================================
