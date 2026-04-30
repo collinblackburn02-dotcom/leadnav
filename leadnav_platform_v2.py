@@ -1156,6 +1156,25 @@ def run_enrichment(uploaded_file, pixel_id, tenant_type):
             if src_col in enriched_df.columns:
                 enriched_df[dst_col] = enriched_df[src_col]
 
+        # B2B field mapping — n8n's identity API returns fields with various
+        # naming conventions. Map them all to the canonical names the dashboard
+        # expects (company_industry, employee_count_range, seniority, etc.).
+        N8N_B2B_COLUMN_MAPPER = {
+            "industry":                "company_industry",
+            "company_industry":        "company_industry",
+            "company_employee_count":  "employee_count_range",
+            "employee_count_range":    "employee_count_range",
+            "company_size":            "employee_count_range",
+            "seniority_level":         "seniority",
+            "seniority":               "seniority",
+            "job_title":               "job_title",
+            "company_revenue":         "company_revenue",
+            "company_name":            "company_name",
+        }
+        for src_col, dst_col in N8N_B2B_COLUMN_MAPPER.items():
+            if src_col in enriched_df.columns and dst_col not in enriched_df.columns:
+                enriched_df[dst_col] = enriched_df[src_col]
+
         if 'income_bucket'    in enriched_df.columns: enriched_df['income_bucket']    = enriched_df['income_bucket'].apply(bucket_income)
         if 'net_worth_bucket' in enriched_df.columns: enriched_df['net_worth_bucket'] = enriched_df['net_worth_bucket'].apply(bucket_net_worth)
         if 'gender'           in enriched_df.columns: enriched_df['gender']           = enriched_df['gender'].apply(clean_gender)
