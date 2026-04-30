@@ -804,10 +804,13 @@ def load_order_base(pixel_id, tenant_type, min_date=None):
         # Support comma-separated pixel IDs for multi-pixel users
         pixel_ids = [p.strip() for p in str(pixel_id).split(',') if p.strip()]
         _date_clause = " AND DATE(order_date) >= @min_date" if min_date is not None else ""
+        # Alias company_industry → industry to match the dashboard configs
+        # and visitor summary table column name. App-side everything uses
+        # 'industry'; only the BQ orders table uses 'company_industry'.
         query = f"""
         SELECT pixel_id, order_id, order_date, customer_email, revenue, lineitem_name, state,
                gender, age_range, income_bucket, net_worth_bucket, homeowner, marital_status, children,
-               company_name, company_industry, employee_count_range, job_title, seniority, company_revenue
+               company_name, company_industry AS industry, employee_count_range, job_title, seniority, company_revenue
         FROM `{BQ_ORDERS_TABLE}`
         WHERE pixel_id IN UNNEST(@pixel_ids){_date_clause}
         """
@@ -1157,11 +1160,14 @@ def run_enrichment(uploaded_file, pixel_id, tenant_type):
                 enriched_df[dst_col] = enriched_df[src_col]
 
         # B2B field mapping — n8n's identity API returns fields with various
-        # naming conventions. Map them all to the canonical names the dashboard
-        # expects (company_industry, employee_count_range, seniority, etc.).
+        # naming conventions. Map them all to the canonical dashboard column
+        # names (industry, employee_count_range, seniority, etc.). Note:
+        # the BQ orders table uses 'company_industry' but the visitor summary
+        # and dashboard configs use 'industry' — we keep the canonical app-side
+        # name as 'industry' and translate at the BQ read/write boundary.
         N8N_B2B_COLUMN_MAPPER = {
-            "industry":                "company_industry",
-            "company_industry":        "company_industry",
+            "company_industry":        "industry",
+            "industry":                "industry",
             "company_employee_count":  "employee_count_range",
             "employee_count_range":    "employee_count_range",
             "company_size":            "employee_count_range",
@@ -1237,7 +1243,10 @@ def run_enrichment(uploaded_file, pixel_id, tenant_type):
         temp_orders['pixel_id']        = pixel_id
 
         if tenant_type == 'B2B':
-            for b2b_col in ['company_name', 'company_industry', 'employee_count_range', 'job_title', 'seniority', 'company_revenue']:
+            # Use dashboard column names (industry, not company_industry).
+            # The translation back to the BQ column name happens in
+            # save_enriched_orders_to_bq().
+            for b2b_col in ['company_name', 'industry', 'employee_count_range', 'job_title', 'seniority', 'company_revenue']:
                 temp_orders[b2b_col] = joined_df[b2b_col] if b2b_col in joined_df.columns else 'Unknown'
 
         existing = st.session_state.get('df_orders', pd.DataFrame())
@@ -1287,8 +1296,14 @@ def save_enriched_orders_to_bq(pixel_id):
         if df_new.empty:
             return True, "All orders already exist in the database — nothing new to save."
 
-        # Rename columns to match BQ schema
-        df_bq = df_new.rename(columns={'Order_ID': 'order_id', 'Total': 'revenue'})
+        # Rename columns to match BQ schema. App memory uses 'industry'
+        # (matching dashboard configs and visitor summary table); BQ orders
+        # table uses 'company_industry' — translate at this boundary.
+        df_bq = df_new.rename(columns={
+            'Order_ID': 'order_id',
+            'Total': 'revenue',
+            'industry': 'company_industry',
+        })
 
         # Ensure all BQ columns are present
         bq_cols = ['pixel_id', 'order_id', 'order_date', 'customer_email', 'revenue',
