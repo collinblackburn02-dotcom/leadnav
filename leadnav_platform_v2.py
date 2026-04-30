@@ -2230,9 +2230,57 @@ def admin_page():
                 with dc2:
                     st.warning(f"**{int(vis_cnt):,}** visitor rows in database")
                     if st.button("🗑 Delete ALL visitor data", key="admin_del_visitors"):
-                        client_bq.query(f"DELETE FROM `{BQ_PIXEL_RAW_TABLE}` WHERE PIXEL_ID=@pid", job_config=cfg).result()
+                        # Wipe both the raw events AND the rolled-up summary tables.
+                        # The dashboard reads from the summary tables, so deleting
+                        # only the raw data leaves the dashboard showing stale rows.
+                        # Note: pixel_events_raw uses PIXEL_ID (uppercase),
+                        # b2c_visitor_summary / b2b_visitor_summary use pixel_id (lowercase).
+                        # The pixel_events_raw delete EXCLUDES rows still in the
+                        # BQ streaming buffer (inserted_at < 90 minutes ago) — BQ
+                        # rejects the whole DELETE atomically if any matched row is
+                        # in the buffer. Rows still in the buffer get cleaned up
+                        # next time the user clicks delete (after buffer flushes).
+                        deletes = [
+                            (BQ_PIXEL_RAW_TABLE,
+                             "PIXEL_ID=@pid AND inserted_at < TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 90 MINUTE)"),
+                            (BQ_B2C_VISITOR_TABLE,  "pixel_id=@pid"),
+                            (BQ_B2B_VISITOR_TABLE,  "pixel_id=@pid"),
+                        ]
+                        _del_errors = []
+                        for _tbl, _where in deletes:
+                            try:
+                                _job_cfg = bigquery.QueryJobConfig(
+                                    query_parameters=[bigquery.ScalarQueryParameter("pid", "STRING", sel_pixel)]
+                                )
+                                client_bq.query(
+                                    f"DELETE FROM `{_tbl}` WHERE {_where}",
+                                    job_config=_job_cfg
+                                ).result()
+                            except Exception as _e:
+                                _del_errors.append(f"{_tbl.split('.')[-1]}: {_e}")
                         load_visitor_base.clear()
-                        st.success("All raw visitor data deleted.")
+
+                        # Re-count raw events to tell the user how many are left
+                        # in the streaming buffer (they'll wash out within ~90 min)
+                        try:
+                            _cfg2 = bigquery.QueryJobConfig(
+                                query_parameters=[bigquery.ScalarQueryParameter("pid", "STRING", sel_pixel)]
+                            )
+                            _remaining = client_bq.query(
+                                f"SELECT COUNT(*) AS n FROM `{BQ_PIXEL_RAW_TABLE}` WHERE PIXEL_ID=@pid",
+                                job_config=_cfg2
+                            ).to_dataframe().iloc[0]['n']
+                        except Exception:
+                            _remaining = None
+
+                        if _del_errors:
+                            st.error("Some deletes failed: " + " · ".join(_del_errors))
+                        else:
+                            _msg = "Visitor data deleted (raw events outside streaming buffer + B2C summary + B2B summary)."
+                            if _remaining and int(_remaining) > 0:
+                                _msg += (f" {int(_remaining):,} raw events still in BQ's streaming "
+                                         f"buffer — click delete again in ~90 minutes to wipe those.")
+                            st.success(_msg)
                         st.rerun()
             except Exception as e:
                 st.error(str(e))
@@ -3018,6 +3066,27 @@ def dashboard_page():
     _p_filt = df_p_filtered.copy()
     if not _p_filt.empty and selected_col in _p_filt.columns:
         _p_filt[selected_col] = _p_filt[selected_col].replace(_VALUE_NORM)
+
+    # ── Empty-data guard ──
+    # If there's no visitor data for the selected dimension, show a friendly
+    # empty state rather than crashing. This keeps the dashboard usable for
+    # newly-onboarded clients whose pixel hasn't started logging yet.
+    _state_map = st.session_state.get('df_state_map', pd.DataFrame())
+    _no_state_data = (
+        selected_col == 'state' and tenant_type == 'B2C'
+        and (_state_map.empty or 'state' not in _state_map.columns)
+    )
+    _no_demo_data = (
+        not (selected_col == 'state' and tenant_type == 'B2C')
+        and (_demo_cube.empty or selected_col not in _demo_cube.columns)
+    )
+    if _no_state_data or _no_demo_data:
+        st.info(
+            f"**No visitor data available for {active_var} yet.** Conversion "
+            f"Insights will populate once your tracking pixel starts logging "
+            f"visitors. (Customer Insights still works with uploaded order data.)"
+        )
+        return
 
     if selected_col == 'state' and tenant_type == 'B2C':
         df_v_grp = st.session_state.df_state_map[
