@@ -2403,7 +2403,7 @@ def dashboard_page():
     else:
         configs = [
             ("Industry", "industry"), ("Company Size", "employee_count_range"),
-            ("Job Title", "job_title"), ("Seniority", "seniority"), ("Revenue", "company_revenue"),
+            ("Job Title", "job_title"), ("Seniority", "seniority"), ("Company Revenue", "company_revenue"),
         ]
 
     # Display name → dataframe column name
