@@ -1140,7 +1140,9 @@ def run_enrichment(uploaded_file, pixel_id, tenant_type):
         unique_emails = raw_df[email_col].dropna().astype(str).str.lower().str.strip()
         unique_emails = unique_emails[unique_emails.str.contains('@', na=False)].unique().tolist()
 
-        response = requests.post(N8N_WEBHOOK_URL, json={"emails": unique_emails}, timeout=180)
+        # 10 min timeout — n8n on Hostinger can take a while to spin up if
+        # idle, and large batches add to processing time.
+        response = requests.post(N8N_WEBHOOK_URL, json={"emails": unique_emails}, timeout=600)
 
         if response.status_code != 200:
             return False, f"Webhook failed with status {response.status_code}: {response.text}"
@@ -2140,7 +2142,7 @@ def admin_page():
                 adm_btn = st.button("Upload & Enrich", type="primary", key="admin_enrich_btn", disabled=bool(_a_errs))
                 adm_slot = st.empty()
                 if adm_btn and not _a_errs:
-                    adm_slot.info("⏳ Uploading & enriching... This can take up to 3 minutes.")
+                    adm_slot.info("⏳ Uploading & enriching... This can take up to 10 minutes.")
                     ok, msg = run_enrichment(adm_upload, sel_pixel, sel_tenant)
                     if ok:
                         adm_slot.success(msg)
@@ -2572,7 +2574,7 @@ def dashboard_page():
                         '<div style="background: rgba(124,58,237,0.15); border: 1px solid rgba(196,181,253,0.3); '
                         'border-radius: 8px; padding: 10px 8px; color: #C4B5FD; font-size: 0.75rem; text-align: center;">'
                         '⏳ <b>Uploading & enriching...</b><br>'
-                        '<span style="font-size: 0.68rem; opacity: 0.8;">This can take up to 3 minutes</span>'
+                        '<span style="font-size: 0.68rem; opacity: 0.8;">This can take up to 10 minutes</span>'
                         '</div>',
                         unsafe_allow_html=True
                     )
