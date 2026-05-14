@@ -1107,7 +1107,17 @@ def run_enrichment(uploaded_file, pixel_id, tenant_type):
     # Use only the primary (first) pixel ID for saving enriched orders
     pixel_id = str(pixel_id).split(',')[0].strip()
     try:
-        raw_df = pd.read_csv(io.BytesIO(uploaded_file.getvalue()), encoding='latin1', on_bad_lines='skip')
+        # engine='python' handles Shopify exports better — multi-line cells
+        # (Notes, Lineitem Properties, Tags) get parsed as single rows instead
+        # of being split into multiple broken rows by embedded newlines.
+        raw_df = pd.read_csv(
+            io.BytesIO(uploaded_file.getvalue()),
+            encoding='latin1',
+            on_bad_lines='skip',
+            engine='python',
+            quotechar='"',
+            doublequote=True,
+        )
         raw_df.columns = [str(c).strip().lower() for c in raw_df.columns]
 
         email_col = next((c for c in raw_df.columns if 'email' in c), None)
@@ -1261,6 +1271,35 @@ def run_enrichment(uploaded_file, pixel_id, tenant_type):
         # Store enriched orders so user can save them to BigQuery
         st.session_state.pending_save_orders     = temp_orders.copy()
         st.session_state.has_unsaved_enrichment  = True
+
+        # Expand cust_date_range so newly enriched orders are visible on the
+        # Customer Insights tab. Without this, cust_date_range stays stuck at
+        # whatever was computed when the dashboard first loaded (often just
+        # "today" if no orders were previously saved to BQ), and the new
+        # orders get filtered out by the date picker.
+        if not temp_orders.empty and 'order_date' in temp_orders.columns:
+            _new_dates = pd.to_datetime(temp_orders['order_date'], errors='coerce')
+            if _new_dates.dt.tz is not None:
+                _new_dates = _new_dates.dt.tz_convert(None)
+            _new_min = _new_dates.min()
+            _new_max = _new_dates.max()
+            if pd.notna(_new_min) and pd.notna(_new_max):
+                _new_min_d = _new_min.date()
+                _new_max_d = _new_max.date()
+                _cur = st.session_state.get('cust_date_range')
+                if _cur:
+                    st.session_state.cust_date_range = (
+                        min(_cur[0], _new_min_d),
+                        max(_cur[1], _new_max_d),
+                    )
+                else:
+                    st.session_state.cust_date_range = (_new_min_d, _new_max_d)
+                # Clear sidebar date_input widget state so the picker re-reads
+                # from cust_date_range on next render (otherwise the widget's
+                # cached value sticks and overrides our expanded range).
+                for _k in ('sb_start_cust', 'sb_end_cust'):
+                    if _k in st.session_state:
+                        del st.session_state[_k]
 
         return True, f"✅ {num_enriched:,} orders enriched, {num_matched:,} matched with identity data."
 
@@ -2473,15 +2512,41 @@ def dashboard_page():
             if uploaded_file is not None:
                 _chosen_rev_col = None
                 try:
-                    _preview = pd.read_csv(uploaded_file, nrows=5, encoding='latin1', on_bad_lines='skip')
+                    _preview = pd.read_csv(
+                        uploaded_file, nrows=5, encoding='latin1',
+                        on_bad_lines='skip', engine='python',
+                        quotechar='"', doublequote=True,
+                    )
                     uploaded_file.seek(0)
                     _errs, _warns, _summ = validate_order_csv(_preview)
-                    # Count actual rows in the full CSV so the displayed
-                    # "Rows" reflects the file size, not the 5-row preview.
+                    # Count actual rows in the full CSV using the SAME parser as
+                    # enrichment uses, so the displayed row count matches what
+                    # gets enriched. Also count unique orders using the same
+                    # dedup logic enrichment uses (order_id column → md5 hash).
+                    # Shopify exports often have multiple rows per order (one
+                    # per line item), so unique-orders is usually < total-rows.
                     try:
-                        _total_rows = sum(1 for _ in uploaded_file) - 1  # minus header
+                        _full_df = pd.read_csv(
+                            uploaded_file, encoding='latin1',
+                            on_bad_lines='skip', engine='python',
+                            quotechar='"', doublequote=True,
+                        )
                         uploaded_file.seek(0)
-                        _summ['Rows'] = f"{max(_total_rows, 0):,}"
+                        _summ['Rows'] = f"{len(_full_df):,}"
+
+                        # Apply the same column normalisation enrichment uses
+                        _norm_cols = [str(c).strip().lower() for c in _full_df.columns]
+                        _order_id_col = next(
+                            (c for c in _norm_cols if c in
+                             ['name', 'order_id', 'order_number', 'id', 'number']),
+                            None
+                        )
+                        if _order_id_col:
+                            _full_df.columns = _norm_cols
+                            _ids = _full_df[_order_id_col].astype(str).str.strip()
+                            _ids = _ids[_ids.notna() & (_ids != '') & (_ids.str.lower() != 'nan')]
+                            _unique_orders = _ids.nunique()
+                            _summ['Unique orders'] = f"{_unique_orders:,}"
                     except Exception:
                         uploaded_file.seek(0)
                     _rev_opts = _summ.pop('_rev_matches', None)
@@ -2557,33 +2622,49 @@ def dashboard_page():
             st.session_state.date_range = (start_date, end_date)
 
         # ── RANK BY (adapts to active tab) ──
-        # Note: button clicks already trigger a Streamlit rerun. Calling st.rerun()
-        # again inside the click block can drop in-progress widget state (causing
-        # the main tab radio to silently reset to its default). Just update state
-        # and let Streamlit's natural rerun handle the redraw.
+        # Use on_click callbacks so state updates BEFORE the next render —
+        # otherwise the button highlight lags by one click (button is already
+        # drawn with old state when the if-block runs). The defensive
+        # index=_tab_idx on the main tab radio (above) keeps the active tab
+        # stable across these reruns.
+        def _set_cust_metric(m):
+            st.session_state.cust_metric = m
+        def _set_metric_choice(m):
+            st.session_state.metric_choice = m
+        def _set_sort_asc(v):
+            st.session_state.sort_asc = v
+
         with st.expander("Rank By", expanded=False):
             _cur_tab = st.session_state.get('main_tab_selector', 'Customer Insights')
             if _cur_tab == 'Customer Insights':
                 cust_rank_opts = ["% of Purchasers", "AOV", "Revenue", "Purchases"]
                 for m in cust_rank_opts:
-                    if st.button(m, key=f"cust_metric_{m}",
-                                 type="primary" if st.session_state.cust_metric == m else "secondary"):
-                        st.session_state.cust_metric = m
+                    st.button(
+                        m, key=f"cust_metric_{m}",
+                        type="primary" if st.session_state.cust_metric == m else "secondary",
+                        on_click=_set_cust_metric, args=(m,),
+                    )
             else:
                 for m in metrics:
                     is_active = (st.session_state.metric_choice == m)
-                    if st.button(m, key=f"metric_{m}",
-                                 type="primary" if is_active else "secondary"):
-                        st.session_state.metric_choice = m
+                    st.button(
+                        m, key=f"metric_{m}",
+                        type="primary" if is_active else "secondary",
+                        on_click=_set_metric_choice, args=(m,),
+                    )
 
         # ── SORT BY ──
         with st.expander("Sort By", expanded=False):
-            if st.button("High → Low", key="sort_htl",
-                         type="primary" if not st.session_state.sort_asc else "secondary"):
-                st.session_state.sort_asc = False
-            if st.button("Low → High", key="sort_lth",
-                         type="primary" if st.session_state.sort_asc else "secondary"):
-                st.session_state.sort_asc = True
+            st.button(
+                "High → Low", key="sort_htl",
+                type="primary" if not st.session_state.sort_asc else "secondary",
+                on_click=_set_sort_asc, args=(False,),
+            )
+            st.button(
+                "Low → High", key="sort_lth",
+                type="primary" if st.session_state.sort_asc else "secondary",
+                on_click=_set_sort_asc, args=(True,),
+            )
 
         # ── MIN PURCHASES ──
         with st.expander("Min Purchases", expanded=False):
