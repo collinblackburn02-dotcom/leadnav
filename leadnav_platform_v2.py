@@ -982,17 +982,20 @@ def login_page():
                         st.session_state.app_state = 'admin'
                         st.rerun()
                     else:
-                        with st.spinner("Syncing your data..."):
-                            _default_load_min = (datetime.now() - timedelta(days=90)).date()
-                            df_demo, df_state, error = load_visitor_base(
-                                st.session_state.pixel_id, st.session_state.tenant_type,
-                                min_date=_default_load_min
-                            )
-                            df_orders, order_error = load_order_base(
-                                st.session_state.pixel_id, st.session_state.tenant_type,
-                                min_date=_default_load_min
-                            )
-                            st.session_state.loaded_min_date = _default_load_min
+                        # No st.spinner here — the custom button-swap spinner
+                        # above is already showing visual feedback. Streamlit's
+                        # default spinner would render an extra "Syncing your
+                        # data..." toast that visually conflicts with our UI.
+                        _default_load_min = (datetime.now() - timedelta(days=90)).date()
+                        df_demo, df_state, error = load_visitor_base(
+                            st.session_state.pixel_id, st.session_state.tenant_type,
+                            min_date=_default_load_min
+                        )
+                        df_orders, order_error = load_order_base(
+                            st.session_state.pixel_id, st.session_state.tenant_type,
+                            min_date=_default_load_min
+                        )
+                        st.session_state.loaded_min_date = _default_load_min
                         if error:
                             st.error(f"Error loading visitor data: {error}")
                         elif order_error:
@@ -2871,7 +2874,7 @@ def dashboard_page():
     with tab_r:
         # Defensive index= so the radio always renders the right tab even if
         # session state for the widget gets dropped during a rerun.
-        _tab_options = ["Customer Insights", "Conversion Insights"]
+        _tab_options = ["Customer Insights", "Visitor Insights", "Conversion Insights"]
         _stored_tab  = st.session_state.get('main_tab_selector', 'Customer Insights')
         _tab_idx     = _tab_options.index(_stored_tab) if _stored_tab in _tab_options else 0
         active_tab = st.radio(
@@ -2883,7 +2886,9 @@ def dashboard_page():
             key="main_tab_selector"
         )
 
-    # Pull the correct date range for the active tab
+    # Pull the correct date range for the active tab.
+    # Visitor Insights uses the same visitor data range as Conversion Insights
+    # since both depend on visitor (pixel) data.
     if active_tab == 'Customer Insights':
         start_date = st.session_state.cust_date_range[0]
         end_date   = st.session_state.cust_date_range[1]
@@ -2892,7 +2897,12 @@ def dashboard_page():
         end_date   = st.session_state.conv_date_range[1]
     st.session_state.date_range = (start_date, end_date)
 
-    tab_title = f"{client_name}'s Customer Insights" if active_tab == 'Customer Insights' else f"{client_name}'s Conversion Insights"
+    if active_tab == 'Customer Insights':
+        tab_title = f"{client_name}'s Customer Insights"
+    elif active_tab == 'Visitor Insights':
+        tab_title = f"{client_name}'s Visitor Insights"
+    else:
+        tab_title = f"{client_name}'s Conversion Insights"
     st.markdown(
         f'<div style="text-align:center; margin-bottom: 0.8rem;">'
         f'<span class="serif-gradient-centerpiece" style="font-size: 2.6rem;">'
@@ -2944,6 +2954,18 @@ def dashboard_page():
             st.markdown(f'<div class="kpi-card"><div class="kpi-label">Avg Order Value</div><div class="kpi-value">${overall_aov:,.2f}</div><div class="kpi-sub">across all segments</div></div>', unsafe_allow_html=True)
         with k4:
             st.markdown(f'<div class="kpi-card"><div class="kpi-label">Date Range</div><div class="kpi-value" style="font-size:1rem;">{start_date}</div><div class="kpi-sub">→ {end_date}</div></div>', unsafe_allow_html=True)
+    elif active_tab == 'Visitor Insights':
+        # Visitor-only KPIs — no order/revenue data shown here
+        _days_with_data = int(df_demo_filtered['visit_date'].dt.date.nunique()) if not df_demo_filtered.empty else 0
+        _avg_per_day    = (total_visitors / _days_with_data) if _days_with_data > 0 else 0
+        with k1:
+            st.markdown(f'<div class="kpi-card"><div class="kpi-label">Total Visitors</div><div class="kpi-value">{total_visitors:,.0f}</div><div class="kpi-sub">{start_date} – {end_date}</div></div>', unsafe_allow_html=True)
+        with k2:
+            st.markdown(f'<div class="kpi-card"><div class="kpi-label">Days With Data</div><div class="kpi-value">{_days_with_data:,}</div><div class="kpi-sub">in selected range</div></div>', unsafe_allow_html=True)
+        with k3:
+            st.markdown(f'<div class="kpi-card"><div class="kpi-label">Avg Visitors / Day</div><div class="kpi-value">{_avg_per_day:,.0f}</div><div class="kpi-sub">across active days</div></div>', unsafe_allow_html=True)
+        with k4:
+            st.markdown(f'<div class="kpi-card"><div class="kpi-label">Date Range</div><div class="kpi-value" style="font-size:1rem;">{start_date}</div><div class="kpi-sub">→ {end_date}</div></div>', unsafe_allow_html=True)
     else:
         with k1:
             st.markdown(f'<div class="kpi-card"><div class="kpi-label">Total Visitors</div><div class="kpi-value">{total_visitors:,.0f}</div><div class="kpi-sub">{start_date} – {end_date}</div></div>', unsafe_allow_html=True)
@@ -2957,12 +2979,19 @@ def dashboard_page():
     # =====================================================
     # ACTIVE FILTER PILLS
     # =====================================================
-    active_rank_label = st.session_state.cust_metric if active_tab == 'Customer Insights' else metric_choice
+    if active_tab == 'Customer Insights':
+        active_rank_label = st.session_state.cust_metric
+    elif active_tab == 'Visitor Insights':
+        active_rank_label = None  # No rank-by selector on Visitor Insights
+    else:
+        active_rank_label = metric_choice
     pills_html = '<div class="filter-pills-row">'
     pills_html += f'<span class="filter-pill">📅 {start_date} → {end_date}</span>'
-    pills_html += f'<span class="filter-pill">🏅 {active_rank_label}</span>'
+    if active_rank_label:
+        pills_html += f'<span class="filter-pill">🏅 {active_rank_label}</span>'
     pills_html += f'<span class="filter-pill">↕ {sort_label}</span>'
-    if min_purchasers > 0:
+    # Min purchases pill is order-related — only show on tabs with order data
+    if min_purchasers > 0 and active_tab != 'Visitor Insights':
         pills_html += f'<span class="filter-pill">≥ {min_purchasers} purchases</span>'
     if selected_skus:
         for _sku in selected_skus[:3]:
@@ -3171,6 +3200,81 @@ def dashboard_page():
                 st.altair_chart(final_chart.properties(height=320, background='transparent'), use_container_width=True)
 
         return  # Don't render Conversion Insights content when on Customer Insights tab
+
+    # =====================================================
+    # VISITOR INSIGHTS TAB — single-variable visitor breakdown
+    # Shows visitors per demographic and % of visitors. No order data.
+    # =====================================================
+    if active_tab == 'Visitor Insights':
+        _VIS_NORM = {
+            'Homeowner': 'Yes', 'Renter': 'No', 'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female',
+            '$50k-100k': '$50k-$100k', '$100k-200k': '$100k-$200k',
+            '$100k-500k': '$100k-$500k',
+            '$500k-1M': '$500k+', '$500k-$1M': '$500k+', '$1M+': '$500k+',
+            '65 and older': '65+', '65 And Older': '65+',
+        }
+
+        st.markdown('<p class="section-title">Visitor Analysis</p>', unsafe_allow_html=True)
+
+        if 'active_vis_var' not in st.session_state:
+            st.session_state.active_vis_var = configs[0][0]
+
+        vis_var_labels = [label for label, _ in configs]
+        vis_idx = vis_var_labels.index(st.session_state.active_vis_var) if st.session_state.active_vis_var in vis_var_labels else 0
+        active_vis_var = st.radio(
+            "Visitor variable", options=vis_var_labels, index=vis_idx,
+            horizontal=True, label_visibility="collapsed", key="vis_var_radio"
+        )
+        st.session_state.active_vis_var = active_vis_var
+        vis_col = dict(configs)[active_vis_var]
+
+        # Pull from state-map for state, otherwise from demo cube
+        if vis_col == 'state' and tenant_type == 'B2C':
+            _vis_src = st.session_state.get('df_state_map', pd.DataFrame())
+        else:
+            _vis_src = st.session_state.get('df_demo_cube', pd.DataFrame())
+
+        if not _vis_src.empty and vis_col in _vis_src.columns:
+            v_df = _vis_src.copy()
+            v_df[vis_col] = v_df[vis_col].replace(_VIS_NORM)
+            v_df = v_df[~v_df[vis_col].isin(EXCLUDE_LIST)]
+
+            v_grp = v_df.groupby(vis_col, as_index=False)['total_visitors'].sum()
+            v_grp = v_grp.rename(columns={'total_visitors': 'Visitors'})
+
+            if not v_grp.empty:
+                _total_known = v_grp['Visitors'].sum()
+                v_grp['% of Visitors'] = (v_grp['Visitors'] / _total_known * 100).round(2) if _total_known > 0 else 0
+
+                # Display-level cleanup for raw Y/N/M/F codes
+                _display_map = {'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female'}
+                v_grp[vis_col] = v_grp[vis_col].replace(_display_map)
+
+                v_grp = v_grp.sort_values('Visitors', ascending=is_ascending)
+                v_grp.insert(0, 'Rank', range(1, len(v_grp) + 1))
+
+                display_df   = v_grp.rename(columns={vis_col: active_vis_var})
+                display_cols = ['Rank', active_vis_var, 'Visitors', '% of Visitors']
+
+                styler = display_df[display_cols].style\
+                    .set_properties(**{'font-weight': '800'}, subset=['Visitors'])\
+                    .format({
+                        'Visitors':       '{:,.0f}',
+                        '% of Visitors':  '{:.2f}%',
+                    })\
+                    .background_gradient(subset=['Visitors'], cmap=brand_gradient)
+                render_premium_table(styler)
+                st.session_state.export_df    = display_df[display_cols].copy()
+                st.session_state.export_label = f"{active_vis_var} — Visitor Insights"
+            else:
+                st.info(f"No visitor data available for {active_vis_var} in this date range.")
+        else:
+            st.info(
+                f"**No visitor data available for {active_vis_var} yet.** "
+                f"Visitor Insights will populate once your tracking pixel starts logging."
+            )
+
+        return  # Stop here — don't render Conversion Insights content
 
     # =====================================================
     # CONVERSION INSIGHTS — SINGLE VARIABLE DEEP DIVE
