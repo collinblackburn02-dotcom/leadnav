@@ -2870,7 +2870,8 @@ def dashboard_page():
     # =====================================================
     client_name = st.session_state.get('client_name') or st.session_state.get('username', '')
 
-    _, tab_r = st.columns([5, 3])
+    # Wider tab column so 3 tabs fit on one line without wrapping
+    _, tab_r = st.columns([3, 5])
     with tab_r:
         # Defensive index= so the radio always renders the right tab even if
         # session state for the widget gets dropped during a rerun.
