@@ -1057,13 +1057,19 @@ def validate_order_csv(df):
         if valid_pct < 50:
             warnings.append(f"Less than 50% of values in '{email_col}' look like real emails.")
 
-    # Revenue column — prefer exact matches over partial
+    # Revenue column — REQUIRED. Without it, every order would default to $0
+    # which silently disappears from analytics ($0 orders are filtered out as
+    # spare parts / replacements). Better to block upload than to lose data.
     _rev_keywords = ['total', 'revenue', 'amount']
     _rev_matches  = [c for c in df.columns if any(x in c.lower() for x in _rev_keywords)]
     _rev_exact    = [c for c in _rev_matches if c.lower().strip() in _rev_keywords]
     rev_col       = (_rev_exact or _rev_matches or [None])[0]
     if not rev_col:
-        warnings.append("No revenue column found. Revenue will be set to $0.")
+        errors.append(
+            "Missing required revenue column. Add a column named "
+            "'Total', 'Revenue', or 'Amount' (any column whose name contains "
+            "one of those keywords works) and re-upload."
+        )
     elif len(_rev_matches) > 1:
         summary['Revenue column']     = f"Multiple found — user must choose"
         summary['_rev_matches']       = _rev_matches   # pass options back to caller
@@ -1136,6 +1142,14 @@ def run_enrichment(uploaded_file, pixel_id, tenant_type):
             _rev_all   = [c for c in raw_df.columns if any(x in c.lower() for x in _rev_kw)]
             _rev_exact = [c for c in _rev_all if c.lower().strip() in _rev_kw]
             revenue_col = (_rev_exact or _rev_all or [None])[0]
+
+        # Defensive backstop: validation should already block this, but
+        # double-check in case validation was bypassed.
+        if not revenue_col:
+            return False, (
+                "Missing required revenue column. Add a column named "
+                "'Total', 'Revenue', or 'Amount' and re-upload."
+            )
         lineitem_col = next((c for c in raw_df.columns if any(x in c for x in ['lineitem_name', 'line_item', 'product_title', 'product', 'sku', 'item_name', 'variant'])), None)
         unique_emails = raw_df[email_col].dropna().astype(str).str.lower().str.strip()
         unique_emails = unique_emails[unique_emails.str.contains('@', na=False)].unique().tolist()
@@ -1261,11 +1275,15 @@ def run_enrichment(uploaded_file, pixel_id, tenant_type):
             ]
         temp_orders['Total'] = joined_df['Total']
 
+        # Default date for orders missing a date column. Use America/Chicago
+        # local time, NOT datetime.now() — the latter returns UTC on Railway,
+        # which becomes "tomorrow" relative to the user any time after ~6pm CT.
+        _default_order_dt = pd.Timestamp.now(tz='America/Chicago').tz_localize(None)
         if date_col and date_col in joined_df.columns:
             parsed = pd.to_datetime(joined_df[date_col], errors='coerce', utc=True)
-            temp_orders['order_date'] = parsed.dt.tz_convert(None).fillna(datetime.now())
+            temp_orders['order_date'] = parsed.dt.tz_convert(None).fillna(_default_order_dt)
         else:
-            temp_orders['order_date'] = datetime.now()
+            temp_orders['order_date'] = _default_order_dt
 
         for col in ['gender', 'age_range', 'income_bucket', 'net_worth_bucket', 'homeowner', 'marital_status', 'children', 'state']:
             temp_orders[col] = joined_df[col] if col in joined_df.columns else 'Unknown'
@@ -3238,11 +3256,11 @@ def dashboard_page():
             '65 and older': '65+', '65 And Older': '65+',
         }
 
-        # ── DATA HEALTH ──
+        # ── ENRICHED VISITORS ──
         # Total visitors over time (no segmentation) — same chart shape as the
-        # admin page's data health graph. Useful for verifying data freshness
-        # and spotting gaps in pixel coverage.
-        st.markdown('<p class="section-title">Data Health</p>', unsafe_allow_html=True)
+        # admin page's data health graph. Useful for seeing volume trends and
+        # spotting gaps in pixel coverage.
+        st.markdown('<p class="section-title">Enriched Visitors</p>', unsafe_allow_html=True)
 
         if 'vis_dh_gran' not in st.session_state:
             st.session_state.vis_dh_gran = 'Daily'
@@ -3269,7 +3287,7 @@ def dashboard_page():
             # Gaps metric — number of zero-visitor periods within the range
             _dh_gaps = int((_dh_agg['Visitors'] == 0).sum())
             dhm1, dhm2 = st.columns(2)
-            dhm1.metric("Total Visitor Rows", f"{int(_dh_agg['Visitors'].sum()):,}")
+            dhm1.metric("Total Enriched Visitors", f"{int(_dh_agg['Visitors'].sum()):,}")
             dhm2.metric("Gaps (zero visitor periods)", f"{_dh_gaps}")
 
             _dh_x_axis = alt.Axis(format='%b %d', labelColor='#0F172A', title=None, gridOpacity=0)
