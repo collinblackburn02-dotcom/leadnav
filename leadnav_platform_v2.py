@@ -1154,16 +1154,37 @@ def run_enrichment(uploaded_file, pixel_id, tenant_type):
 
         enriched_df.columns = [str(c).strip().lower() for c in enriched_df.columns]
 
-        STANDARD_EMAIL_COLS = ['personal_emails', 'business_email', 'email_match', 'deep_verified_emails']
-        enriched_email_col = next((c for c in STANDARD_EMAIL_COLS if c in enriched_df.columns), None)
-        if enriched_email_col is None:
-            return False, f"Could not find email column in enriched response. Got: {list(enriched_df.columns[:15])}"
+        # Build email_match from ALL email columns the enrichment returns —
+        # not just one. The input email could be in personal_emails OR
+        # business_email OR a verified-emails column; if we only check one,
+        # B2B uploads (business emails as input) silently fail to match
+        # against personal email rows in the response. So we union all of
+        # them per row and explode, then match against any of those.
+        ALL_EMAIL_COLS = [
+            'personal_emails', 'business_email',
+            'personal_verified_emails', 'business_verified_emails',
+            'deep_verified_emails', 'email_match',
+        ]
+        present_email_cols = [c for c in ALL_EMAIL_COLS if c in enriched_df.columns]
+        if not present_email_cols:
+            return False, f"Could not find any email column in enriched response. Got: {list(enriched_df.columns[:15])}"
 
-        enriched_df = enriched_df.rename(columns={enriched_email_col: 'email_match'})
-        enriched_df['email_match'] = enriched_df['email_match'].astype(str).str.split(',')
+        def _combine_emails(row):
+            seen = set()
+            for _c in present_email_cols:
+                v = row.get(_c)
+                if pd.notna(v) and str(v).strip():
+                    for e in str(v).split(','):
+                        e = e.strip().lower()
+                        if '@' in e:
+                            seen.add(e)
+            return list(seen)
+
+        enriched_df['email_match'] = enriched_df.apply(_combine_emails, axis=1)
         enriched_df = enriched_df.explode('email_match')
-        enriched_df['email_match'] = enriched_df['email_match'].str.strip().str.lower()
-        enriched_df = enriched_df[enriched_df['email_match'].str.contains('@', na=False)].drop_duplicates('email_match')
+        enriched_df = enriched_df.dropna(subset=['email_match'])
+        enriched_df = enriched_df[enriched_df['email_match'].astype(str).str.contains('@', na=False)]
+        enriched_df = enriched_df.drop_duplicates('email_match')
 
         N8N_COLUMN_MAPPER = {
             "gender": "gender", "married": "marital_status", "age_range": "age_range",
@@ -3217,6 +3238,61 @@ def dashboard_page():
             '65 and older': '65+', '65 And Older': '65+',
         }
 
+        # ── DATA HEALTH ──
+        # Total visitors over time (no segmentation) — same chart shape as the
+        # admin page's data health graph. Useful for verifying data freshness
+        # and spotting gaps in pixel coverage.
+        st.markdown('<p class="section-title">Data Health</p>', unsafe_allow_html=True)
+
+        if 'vis_dh_gran' not in st.session_state:
+            st.session_state.vis_dh_gran = 'Daily'
+        vis_dh_gran = st.radio(
+            "Data health granularity", ["Daily", "Weekly", "Monthly"],
+            index=["Daily","Weekly","Monthly"].index(st.session_state.vis_dh_gran),
+            horizontal=True, key="vis_dh_gran_radio", label_visibility="collapsed"
+        )
+        st.session_state.vis_dh_gran = vis_dh_gran
+
+        if not df_demo_filtered.empty and 'visit_date' in df_demo_filtered.columns:
+            import altair as alt
+            _dh_freq_map = {"Daily": "D", "Weekly": "W", "Monthly": "MS"}
+            _dh_freq = _dh_freq_map[vis_dh_gran]
+
+            _dh_src = df_demo_filtered.copy()
+            _dh_src['visit_date'] = pd.to_datetime(_dh_src['visit_date'])
+            if _dh_src['visit_date'].dt.tz is not None:
+                _dh_src['visit_date'] = _dh_src['visit_date'].dt.tz_convert(None)
+
+            _dh_agg = _dh_src.set_index('visit_date').resample(_dh_freq)['total_visitors'].sum().reset_index()
+            _dh_agg.columns = ['date', 'Visitors']
+
+            # Gaps metric — number of zero-visitor periods within the range
+            _dh_gaps = int((_dh_agg['Visitors'] == 0).sum())
+            dhm1, dhm2 = st.columns(2)
+            dhm1.metric("Total Visitor Rows", f"{int(_dh_agg['Visitors'].sum()):,}")
+            dhm2.metric("Gaps (zero visitor periods)", f"{_dh_gaps}")
+
+            _dh_x_axis = alt.Axis(format='%b %d', labelColor='#0F172A', title=None, gridOpacity=0)
+            _dh_y_axis = alt.Axis(labelColor='#0F172A', title=None, gridColor='#F1F5F9')
+
+            _dh_chart = alt.Chart(_dh_agg).mark_line(
+                point=True, strokeWidth=2.5, color='#4D148C', interpolate='monotone'
+            ).encode(
+                x=alt.X('date:T', axis=_dh_x_axis),
+                y=alt.Y('Visitors:Q', axis=_dh_y_axis),
+                tooltip=[
+                    alt.Tooltip('date:T', format='%b %d, %Y'),
+                    alt.Tooltip('Visitors:Q', format=',.0f'),
+                ]
+            ).properties(
+                height=200, background='transparent',
+                title=alt.TitleParams('Visitors', fontSize=11, color='#94A3B8', fontWeight='bold')
+            )
+            st.altair_chart(_dh_chart, use_container_width=True)
+        else:
+            st.info("No visitor data in the selected date range.")
+
+        st.markdown("<br>", unsafe_allow_html=True)
         st.markdown('<p class="section-title">Visitor Analysis</p>', unsafe_allow_html=True)
 
         if 'active_vis_var' not in st.session_state:
@@ -3276,6 +3352,109 @@ def dashboard_page():
                 f"**No visitor data available for {active_vis_var} yet.** "
                 f"Visitor Insights will populate once your tracking pixel starts logging."
             )
+
+        # ── Visitor Insights Time Series ──
+        # Matches the Customer/Conversion Insights chart styling exactly.
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        st.markdown('<p class="section-title">Visitor Performance Over Time</p>', unsafe_allow_html=True)
+
+        if 'vis_time_gran' not in st.session_state:
+            st.session_state.vis_time_gran = 'Monthly'
+        vis_gran = st.radio(
+            "Granularity", ['Daily', 'Weekly', 'Monthly'],
+            index=['Daily','Weekly','Monthly'].index(st.session_state.vis_time_gran),
+            horizontal=True, key='vis_time_gran_radio', label_visibility='collapsed'
+        )
+        st.session_state.vis_time_gran = vis_gran
+
+        # Metric toggle — Visitors (count) vs % of Visitors
+        if 'vis_chart_metric' not in st.session_state:
+            st.session_state.vis_chart_metric = 'Visitors'
+        vis_chart_metric = st.radio(
+            "Chart metric", ['Visitors', '% of Visitors'],
+            index=['Visitors','% of Visitors'].index(st.session_state.vis_chart_metric),
+            horizontal=True, key='vis_chart_metric_radio', label_visibility='collapsed'
+        )
+        st.session_state.vis_chart_metric = vis_chart_metric
+
+        st.markdown(
+            f'<p style="font-family:Outfit,sans-serif;font-size:1.35rem;font-weight:600;'
+            f'color:{PITCH_BRAND_COLOR};text-align:center;margin:8px 0 4px 0;'
+            f'text-transform:uppercase;letter-spacing:0.08em;font-size:1.35rem!important;">'
+            f'{active_vis_var} &nbsp;·&nbsp; {vis_chart_metric}</p>',
+            unsafe_allow_html=True
+        )
+
+        if not _vis_src.empty and vis_col in _vis_src.columns:
+            import altair as alt
+            freq_map = {'Daily': 'D', 'Weekly': 'W', 'Monthly': 'MS'}
+            freq = freq_map[vis_gran]
+
+            v_ts = _vis_src.copy()
+            v_ts = v_ts.rename(columns={'visit_date': 'ts_date', 'total_visitors': 'Visitors'})
+            v_ts[vis_col] = v_ts[vis_col].replace(_VIS_NORM)
+            v_ts = v_ts[~v_ts[vis_col].isin(EXCLUDE_LIST)]
+            v_ts['ts_date'] = pd.to_datetime(v_ts['ts_date'])
+            if v_ts['ts_date'].dt.tz is not None:
+                v_ts['ts_date'] = v_ts['ts_date'].dt.tz_convert(None)
+
+            v_agg = v_ts.groupby([pd.Grouper(key='ts_date', freq=freq), vis_col])['Visitors'].sum().reset_index()
+            # % of Visitors per period (denominator = total visitors that period)
+            period_totals = v_agg.groupby('ts_date')['Visitors'].transform('sum')
+            v_agg['% of Visitors'] = (v_agg['Visitors'] / period_totals.replace(0, 1) * 100).round(2)
+
+            # Display-level cleanup for raw Y/N/M/F codes
+            _display_map = {'Y': 'Yes', 'N': 'No', 'M': 'Male', 'F': 'Female'}
+            v_agg[vis_col] = v_agg[vis_col].replace(_display_map)
+            v_agg = v_agg.sort_values('ts_date')
+
+            vis_ts_col = vis_chart_metric  # 'Visitors' or '% of Visitors'
+
+            CHART_COLORS = ['#4D148C', '#7C3AED', '#20B2AA', '#F59E0B', '#E11D48', '#059669']
+            segs = sorted(v_agg[vis_col].unique())
+            active_segs = [s for s in segs if v_agg[v_agg[vis_col]==s][vis_ts_col].sum() > 0]
+
+            if active_segs:
+                seg_filter_key = f"vis_seg_filter_{vis_col}_{vis_gran}"
+                if seg_filter_key not in st.session_state:
+                    st.session_state[seg_filter_key] = active_segs
+                selected_segs = st.multiselect(
+                    "Show segments",
+                    options=active_segs,
+                    default=[s for s in st.session_state[seg_filter_key] if s in active_segs] or active_segs,
+                    key=seg_filter_key,
+                    label_visibility="collapsed"
+                )
+                if not selected_segs:
+                    selected_segs = active_segs
+
+                chart_df = v_agg[v_agg[vis_col].isin(selected_segs)].rename(columns={vis_col:'Segment', vis_ts_col:'Value'})
+                chart_df['ts_date'] = pd.to_datetime(chart_df['ts_date'])
+
+                label_expr_v = (
+                    "format(datum.value,'.1f')+'%'"
+                    if vis_chart_metric == '% of Visitors'
+                    else "format(datum.value,',.0f')"
+                )
+                tt_fmt_v   = '.1f' if vis_chart_metric == '% of Visitors' else ',.0f'
+                tt_title_v = vis_chart_metric + (' (%)' if vis_chart_metric == '% of Visitors' else '')
+
+                color_scale_v = alt.Scale(domain=selected_segs, range=CHART_COLORS[:len(selected_segs)])
+                x_enc_v = alt.X('ts_date:T', axis=alt.Axis(format='%b %d', labelColor='#0F172A', tickColor='#EBE4F4', domainColor='#EBE4F4', gridOpacity=0, labelFontSize=11, labelFont='Outfit', title=None))
+                y_enc_v = alt.Y('Value:Q', title='', axis=alt.Axis(labelExpr=label_expr_v, labelColor='#0F172A', gridColor='#F1F5F9', domainOpacity=0, tickOpacity=0, labelFontSize=11, labelFont='Outfit'))
+                color_enc_v = alt.Color('Segment:N', scale=color_scale_v, legend=alt.Legend(orient='top', title=None, labelFontSize=12, labelFont='Outfit', labelColor='#0F172A', symbolStrokeWidth=3, symbolSize=120, padding=6))
+                line_v   = alt.Chart(chart_df).mark_line(strokeWidth=2.5, interpolate='monotone').encode(x=x_enc_v, y=y_enc_v, color=color_enc_v)
+                points_v = alt.Chart(chart_df).mark_circle(size=55).encode(
+                    x=x_enc_v, y=y_enc_v,
+                    color=alt.Color('Segment:N', scale=color_scale_v, legend=None),
+                    tooltip=[
+                        alt.Tooltip('ts_date:T', title='Date', format='%b %d, %Y'),
+                        alt.Tooltip('Segment:N', title=active_vis_var),
+                        alt.Tooltip('Value:Q', title=tt_title_v, format=tt_fmt_v),
+                    ]
+                )
+                final_chart_v = line_v + points_v
+                st.altair_chart(final_chart_v.properties(height=320, background='transparent'), use_container_width=True)
 
         return  # Stop here — don't render Conversion Insights content
 
